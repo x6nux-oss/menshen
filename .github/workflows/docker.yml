@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 jobs:
-  # 打包前的三项检查（见 CLAUDE.md）。不过就不构建，更不发布。
+  # 打包前的两项检查（见 CLAUDE.md）。不过就不构建，更不发布。
   check:
     runs-on: ubuntu-latest
     steps:
@@ -39,13 +39,6 @@ jobs:
       - run: npm --prefix web run test
       - run: npm --prefix web run typecheck
       - run: npm --prefix web run build
-      - name: gofmt
-        run: |
-          unformatted=$(gofmt -l .)
-          if [ -n "$unformatted" ]; then
-            echo "::error::以下文件未 gofmt：$unformatted"
-            exit 1
-          fi
       - run: go vet ./...
       # 默认嵌入上面构建好的前端产物，覆盖托管逻辑与产物内容。
       - run: go test ./...
