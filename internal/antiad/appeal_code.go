@@ -166,6 +166,15 @@ func handleGroupRedeem(b *core.Bot, conf store.BotChat, m *tg.Message) bool {
 		slog.Error("申诉：群内兑换后刷新快照失败", "err", err)
 	}
 
+	// 解封落地后清理旧上下文：此人名下已无生效限制时把单子结案，别让旧码
+	// 一直占着未结入口（之后再 /start 只会重发旧码）。还有没解的群时保持
+	// code 状态，码在那边仍可兑换。
+	if len(effectivePenalties(b.Shared, b.BotID(), ap.UserID)) == 0 {
+		updateAppeal(b.Shared, ap.ID, `status='redeemed'`)
+	}
+	// 成功解除即清掉申诉退避计数：下次再被限制时从头开始等。
+	unbanGateClear(b.Shared, ap.UserID)
+
 	final := fmt.Sprintf("✅ %s 已解除限制，24 小时内不受反广告检查。",
 		userLink(ap.UserID))
 	if progress != 0 {
@@ -541,6 +550,8 @@ func HandleDirectRedeem(b *core.Bot, m *tg.Message, code string) {
 	}
 
 	updateAppeal(b.Shared, ap.ID, `status='redeemed'`)
+	// 成功解除即清掉申诉退避计数：下次再被限制时从头开始等。
+	unbanGateClear(b.Shared, ap.UserID)
 	b.Store.Write.Exec(`INSERT OR REPLACE INTO appeal_redeems
 		(appeal_id,chat_id,by_uid,at) VALUES (?,0,?,?)`, ap.ID, uid, now)
 

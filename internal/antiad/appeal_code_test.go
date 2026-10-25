@@ -64,6 +64,8 @@ func TestGroupRedeemOnlyForPrivileged(t *testing.T) {
 	testutil.EnableAntiad(t, b, -100)
 	const code = "MSU-7K2Q-9XFM"
 	appealID := insertCodedAppeal(t, b, 555, code, time.Now().Add(time.Hour).Unix())
+	// 另一个群还有限制：兑换完本群后单子要留在 code，码在那边仍可兑换。
+	saveJoinMute(b, -200, 555, kindProfile, "简介里有联系方式", 0)
 
 	// 普通成员发码：不截，照常留底。
 	fake.Resp["getChatMember"] = `{"ok":true,"result":{"status":"member"}}`
@@ -86,7 +88,7 @@ func TestGroupRedeemOnlyForPrivileged(t *testing.T) {
 	var st string
 	b.Store.Read.QueryRow(`SELECT status FROM appeals WHERE id=?`, appealID).Scan(&st)
 	if st != "code" {
-		t.Errorf("群内兑换不改申诉单状态，得到 %q", st)
+		t.Errorf("还有别的群没解时申诉单应留在 code，得到 %q", st)
 	}
 	var wlChat int64
 	var wlExpires int64
@@ -122,6 +124,35 @@ func TestGroupRedeemOnlyForPrivileged(t *testing.T) {
 	}
 	if !found {
 		t.Error("第二次兑换应回「已在本群用过」")
+	}
+}
+
+// TestGroupRedeemClosesAppealWhenNothingRemains：兑换后此人名下再无生效
+// 限制时，单子结案为 redeemed，旧码随之作废 —— 别让结了案的事还占着未结
+// 入口，之后 /start 重发旧码、或拿旧码继续兑换绕过复判。
+func TestGroupRedeemClosesAppealWhenNothingRemains(t *testing.T) {
+	b, fake := testutil.NewTestBot(t, 1)
+	testutil.EnableAntiad(t, b, -100)
+	const code = "MSU-AB2D-EFGH"
+	insertCodedAppeal(t, b, 555, code, time.Now().Add(time.Hour).Unix())
+	saveJoinMute(b, -100, 555, kindProfile, "简介里有联系方式", 0)
+
+	fake.Resp["getChatMember"] = `{"ok":true,"result":{"status":"administrator"}}`
+	HandleGroupMessage(b, testutil.GroupMsg(-100, 777, 900, code))
+
+	if st := appealStatus(t, b, 555); st != "redeemed" {
+		t.Errorf("兑换完且无剩余限制时应结案为 redeemed，得到 %q", st)
+	}
+	// 旧码作废：再发同一条码要回「已失效」。
+	HandleGroupMessage(b, testutil.GroupMsg(-100, 777, 901, code))
+	found := false
+	for _, c := range fake.Calls("sendMessage") {
+		if text, _ := c["text"].(string); strings.Contains(text, "已失效") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("结案后旧码再兑换应回「已失效」")
 	}
 }
 

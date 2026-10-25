@@ -359,6 +359,67 @@ func TestAppealWebWindowRenews(t *testing.T) {
 	}
 }
 
+// TestAppealStartRetiresExpiredCode：解禁码过期的单不能占死申诉入口 ——
+// /start 要把单子惰性结案（不再把旧码发一遍），落到全新申诉入口，能重新
+// 走完整个流程。
+func TestAppealStartRetiresExpiredCode(t *testing.T) {
+	b, fake := testutil.NewTestBot(t, 1)
+	const code = "MSU-7K2Q-9XFM"
+	insertCodedAppeal(t, b, 555, code, time.Now().Add(-time.Hour).Unix())
+	saveJoinMute(b, -100, 555, kindProfile, "简介里有联系方式", 88)
+
+	if !HandleNonStaffPrivate(b, appealDM(555), "/start") {
+		t.Fatal("仍有限制时 /start 应进申诉入口")
+	}
+	for _, c := range fake.Calls("sendMessage") {
+		if text, _ := c["text"].(string); strings.Contains(text, code) {
+			t.Errorf("过期码不该再发给用户:\n%s", text)
+		}
+	}
+	if st := appealStatus(t, b, 555); st != "expired" {
+		t.Errorf("过期码单应惰性结案为 expired，得到 %q", st)
+	}
+	// 结案后能重新发起并走完。
+	appealAI(t, b, false, "资料已改正")
+	submitAppeal(b, 555, "这是误判：我只是在聊技术，没有推广意图")
+	waitIdle(t, b)
+	if st := appealStatus(t, b, 555); st != "lifted" {
+		t.Errorf("重新申诉应能走完并结案，得到 %q", st)
+	}
+}
+
+// TestAppealStartRetiresRedeemedCode：群内兑换不改单子状态（别的群还能
+// 兑换），但用户再发 /start 时旧单要结案 —— 之后的限制是新一案，该重新
+// 复判，而不是把旧码再发一遍。
+func TestAppealStartRetiresRedeemedCode(t *testing.T) {
+	b, fake := testutil.NewTestBot(t, 1)
+	const code = "MSU-9XFM-7K2Q"
+	apID := insertCodedAppeal(t, b, 555, code, time.Now().Add(time.Hour).Unix())
+	if _, err := b.Store.Write.Exec(`INSERT INTO appeal_redeems
+		(appeal_id,chat_id,by_uid,at) VALUES (?,?,777,?)`,
+		apID, -100, time.Now().Unix()); err != nil {
+		t.Fatal(err)
+	}
+	saveJoinMute(b, -100, 555, kindProfile, "简介里有联系方式", 88)
+
+	if !HandleNonStaffPrivate(b, appealDM(555), "/start") {
+		t.Fatal("仍有限制时 /start 应进申诉入口")
+	}
+	for _, c := range fake.Calls("sendMessage") {
+		if text, _ := c["text"].(string); strings.Contains(text, code) {
+			t.Errorf("兑换过的旧码不该再发给用户:\n%s", text)
+		}
+	}
+	if st := appealStatus(t, b, 555); st != "redeemed" {
+		t.Errorf("已兑换的码单应结案为 redeemed，得到 %q", st)
+	}
+	// 落到全新入口：有「写申诉理由」按钮，而不是旧码。
+	last := fake.LastCall("sendMessage")
+	if kb := fmt.Sprint(last["reply_markup"]); !strings.Contains(kb, "a:ap:st") {
+		t.Errorf("结案后应展示全新申诉入口，得到 %v", last)
+	}
+}
+
 // TestAppealNoWebBlocksNewAppeal：noweb 也算未结单——允许重复发起的话，
 // 用户每点一次就重跑一遍 AI 复核、重推一张管理员卡片。
 func TestAppealNoWebBlocksNewAppeal(t *testing.T) {

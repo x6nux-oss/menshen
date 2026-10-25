@@ -284,8 +284,11 @@ func showAppealEntry(b *core.Bot, dmChat, uid int64, payload string) bool {
 	}
 
 	if ap, ok := openAppeal(b.Store, b.BotID(), uid); ok {
-		showAppealProgress(b, dmChat, ap)
-		return true
+		if !retireStaleCodeAppeal(b, dmChat, ap) {
+			showAppealProgress(b, dmChat, ap)
+			return true
+		}
+		// 旧码单已结案：落到下面的全新申诉入口。
 	}
 
 	var sb strings.Builder
@@ -299,6 +302,32 @@ func showAppealEntry(b *core.Bot, dmChat, uid int64, payload string) bool {
 	b.Send(dmChat, sb.String(), tg.InlineKB(
 		[][2]string{{"📝 写申诉理由", "a:ap:st"}},
 	))
+	return true
+}
+
+// retireStaleCodeAppeal 把已经走完使命的解禁码单结案，让 /start 重新走申诉，
+// 而不是把旧码再发一遍。返回 true 表示已结案，调用方应继续展示全新入口。
+//
+// 两种情况该结案：码已过期（读取时惰性判定，保留期清理兜底）；码已被兑换
+// 过 —— 兑换只解除兑换当时的限制，之后再被限制就是新的一案，该重新走一遍
+// 复判，拿旧码反复兑换等于绕过复核。
+func retireStaleCodeAppeal(b *core.Bot, dmChat int64, ap appealRec) bool {
+	if ap.Status != "code" {
+		return false
+	}
+	var redeemed int
+	b.Store.Read.QueryRow(`SELECT COUNT(*) FROM appeal_redeems
+		WHERE appeal_id=?`, ap.ID).Scan(&redeemed)
+	switch {
+	case redeemed > 0:
+		updateAppeal(b.Shared, ap.ID, `status='redeemed'`)
+		b.Send(dmChat, "你的解禁码已被兑换过。若你仍受到限制，请重新发起申诉。", nil)
+	case ap.CodeExpires != 0 && ap.CodeExpires < time.Now().Unix():
+		updateAppeal(b.Shared, ap.ID, `status='expired'`)
+		b.Send(dmChat, "你之前的解禁码已过期失效。若你仍受到限制，请重新发起申诉。", nil)
+	default:
+		return false
+	}
 	return true
 }
 
@@ -431,8 +460,11 @@ func HandleAppealCallback(b *core.Bot, q *tg.CallbackQuery) {
 				))
 				return
 			}
-			showAppealProgress(b, dmChat, ap)
-			return
+			if !retireStaleCodeAppeal(b, dmChat, ap) {
+				showAppealProgress(b, dmChat, ap)
+				return
+			}
+			// 旧码单已结案：落到下面建新单。
 		}
 		if ok, wait := unbanGateCheck(b.Shared, uid); !ok {
 			b.Send(dmChat, fmt.Sprintf(
