@@ -28,7 +28,7 @@ func TestLLMDoesNotReceiveSystemonePrior(t *testing.T) {
 	userContent := func() string {
 		var req struct {
 			Messages []struct {
-				Role    string `json:"role"`
+				Role    string          `json:"role"`
 				Content json.RawMessage `json:"content"`
 			} `json:"messages"`
 		}

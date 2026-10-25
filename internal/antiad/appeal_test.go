@@ -612,7 +612,7 @@ func TestJudgeAppealPrewarmPayload(t *testing.T) {
 	got, _ := body.Load().(string)
 	var req struct {
 		Messages []struct {
-			Role    string `json:"role"`
+			Role    string          `json:"role"`
 			Content json.RawMessage `json:"content"`
 		} `json:"messages"`
 	}

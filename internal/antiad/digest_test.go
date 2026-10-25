@@ -109,7 +109,7 @@ func TestRunAdDigestAppliesFixText(t *testing.T) {
 	}
 	var sent struct {
 		Messages []struct {
-			Role    string `json:"role"`
+			Role    string          `json:"role"`
 			Content json.RawMessage `json:"content"`
 		} `json:"messages"`
 	}
