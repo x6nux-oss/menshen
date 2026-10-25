@@ -284,7 +284,7 @@ func showAppealEntry(b *core.Bot, dmChat, uid int64, payload string) bool {
 	}
 
 	if ap, ok := openAppeal(b.Store, b.BotID(), uid); ok {
-		if !retireStaleCodeAppeal(b, dmChat, ap) {
+		if !retireStaleCodeAppeal(b, dmChat, ap, penalties) {
 			showAppealProgress(b, dmChat, ap)
 			return true
 		}
@@ -311,7 +311,13 @@ func showAppealEntry(b *core.Bot, dmChat, uid int64, payload string) bool {
 // 两种情况该结案：码已过期（读取时惰性判定，保留期清理兜底）；码已被兑换
 // 过 —— 兑换只解除兑换当时的限制，之后再被限制就是新的一案，该重新走一遍
 // 复判，拿旧码反复兑换等于绕过复核。
-func retireStaleCodeAppeal(b *core.Bot, dmChat int64, ap appealRec) bool {
+//
+// 过期时若名下现存的限制全是建单之后才出现的新限制，旧码与眼下的处境
+// 无关，静默结案直接进全新入口；只有建单前的旧限制还在生效时才提一句
+// 过期，解释为什么没有重发旧码。
+func retireStaleCodeAppeal(b *core.Bot, dmChat int64, ap appealRec,
+	penalties []appealPenalty) bool {
+
 	if ap.Status != "code" {
 		return false
 	}
@@ -324,11 +330,24 @@ func retireStaleCodeAppeal(b *core.Bot, dmChat int64, ap appealRec) bool {
 		b.Send(dmChat, "你的解禁码已被兑换过。若你仍受到限制，请重新发起申诉。", nil)
 	case ap.CodeExpires != 0 && ap.CodeExpires < time.Now().Unix():
 		updateAppeal(b.Shared, ap.ID, `status='expired'`)
-		b.Send(dmChat, "你之前的解禁码已过期失效。若你仍受到限制，请重新发起申诉。", nil)
+		if hasPenaltyOlderThan(penalties, ap.CreatedAt) {
+			b.Send(dmChat, "你之前的解禁码已过期失效。若你仍受到限制，请重新发起申诉。", nil)
+		}
 	default:
 		return false
 	}
 	return true
+}
+
+// hasPenaltyOlderThan 报告限制里是否有建单前就已存在的旧限制：有说明旧码单
+// 就是为眼下的限制开的，结案时值得提一句；全是新限制则旧码与此无关。
+func hasPenaltyOlderThan(penalties []appealPenalty, createdAt int64) bool {
+	for _, p := range penalties {
+		if p.At <= createdAt {
+			return true
+		}
+	}
+	return false
 }
 
 // penaltyLines 渲染限制清单。带上理由：只写处置类型与群名时用户不知道
@@ -460,7 +479,8 @@ func HandleAppealCallback(b *core.Bot, q *tg.CallbackQuery) {
 				))
 				return
 			}
-			if !retireStaleCodeAppeal(b, dmChat, ap) {
+			if !retireStaleCodeAppeal(b, dmChat, ap,
+				effectivePenalties(b.Shared, b.BotID(), uid)) {
 				showAppealProgress(b, dmChat, ap)
 				return
 			}

@@ -361,20 +361,31 @@ func TestAppealWebWindowRenews(t *testing.T) {
 
 // TestAppealStartRetiresExpiredCode：解禁码过期的单不能占死申诉入口 ——
 // /start 要把单子惰性结案（不再把旧码发一遍），落到全新申诉入口，能重新
-// 走完整个流程。
+// 走完整个流程。当初那条限制还在生效，所以结案时提一句过期。
 func TestAppealStartRetiresExpiredCode(t *testing.T) {
 	b, fake := testutil.NewTestBot(t, 1)
 	const code = "MSU-7K2Q-9XFM"
 	insertCodedAppeal(t, b, 555, code, time.Now().Add(-time.Hour).Unix())
 	saveJoinMute(b, -100, 555, kindProfile, "简介里有联系方式", 88)
+	// 把限制拨到建单之前：这单就是为这条限制开的。
+	b.Store.Write.Exec(`UPDATE join_mutes SET created_at=?
+		WHERE user_id=555`, time.Now().Add(-48*time.Hour).Unix())
 
 	if !HandleNonStaffPrivate(b, appealDM(555), "/start") {
 		t.Fatal("仍有限制时 /start 应进申诉入口")
 	}
+	found := false
 	for _, c := range fake.Calls("sendMessage") {
-		if text, _ := c["text"].(string); strings.Contains(text, code) {
+		text, _ := c["text"].(string)
+		if strings.Contains(text, code) {
 			t.Errorf("过期码不该再发给用户:\n%s", text)
 		}
+		if strings.Contains(text, "已过期失效") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("旧限制还在生效时应提示码已过期")
 	}
 	if st := appealStatus(t, b, 555); st != "expired" {
 		t.Errorf("过期码单应惰性结案为 expired，得到 %q", st)
@@ -385,6 +396,43 @@ func TestAppealStartRetiresExpiredCode(t *testing.T) {
 	waitIdle(t, b)
 	if st := appealStatus(t, b, 555); st != "lifted" {
 		t.Errorf("重新申诉应能走完并结案，得到 %q", st)
+	}
+}
+
+// TestAppealStartExpiredCodeNewRestrictionSilent：码过期后用户受的已经不是
+// 当初那一案，而是建单之后才出现的新限制 —— 旧码与眼下的处境无关，静默
+// 结案直接进全新申诉入口，不提示过期这件事。
+func TestAppealStartExpiredCodeNewRestrictionSilent(t *testing.T) {
+	b, fake := testutil.NewTestBot(t, 1)
+	const code = "MSU-7K2Q-9XFM"
+	created := time.Now().Add(-48 * time.Hour).Unix()
+	if _, err := b.Store.Write.Exec(`INSERT INTO appeals
+		(bot_id,user_id,status,code,code_expires,created_at,updated_at)
+		VALUES (?,?,'code',?,?,?,?)`, b.BotID(), 555, code,
+		time.Now().Add(-time.Hour).Unix(), created, created); err != nil {
+		t.Fatal(err)
+	}
+	// 现存限制是刚刚才落库的新案（晚于建单）。
+	saveJoinMute(b, -100, 555, kindProfile, "新的一案：又发了广告", 88)
+
+	if !HandleNonStaffPrivate(b, appealDM(555), "/start") {
+		t.Fatal("仍有限制时 /start 应进申诉入口")
+	}
+	for _, c := range fake.Calls("sendMessage") {
+		text, _ := c["text"].(string)
+		if strings.Contains(text, code) {
+			t.Errorf("过期码不该再发给用户:\n%s", text)
+		}
+		if strings.Contains(text, "过期") {
+			t.Errorf("限制是新案时不该提示过期:\n%s", text)
+		}
+	}
+	if st := appealStatus(t, b, 555); st != "expired" {
+		t.Errorf("过期码单应惰性结案为 expired，得到 %q", st)
+	}
+	last := fake.LastCall("sendMessage")
+	if kb := fmt.Sprint(last["reply_markup"]); !strings.Contains(kb, "a:ap:st") {
+		t.Errorf("应直接落到全新申诉入口，得到 %v", last)
 	}
 }
 
