@@ -189,6 +189,11 @@ func adHitsCounted(r AdLogRow) bool {
 	return false
 }
 
+// AdHitsCounted 是 adHitsCounted 的导出包装：与 ForgetAdHash 一样，供
+// 面板之外的一次性修复工具在复刻 UndoVerdict 特例路径时判断命中数是否
+// 真的加过。
+func AdHitsCounted(r AdLogRow) bool { return adHitsCounted(r) }
+
 // ReleaseUser 解封/解禁言一个人并清掉本群的限制记录 —— 与误判不同，
 // 判定维持不变：动作标签、样本池、历史命中与内容哈希都不动，只把还在
 // 生效的限制撤掉（管理员确认过这个人现在可以放回来，但当初判得没错）。

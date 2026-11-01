@@ -195,7 +195,33 @@ func lastSegment(id string) string {
 	return id
 }
 
-type chatMsg struct{ Role, Content string }
+type chatMsg struct {
+	Role    string
+	Content string
+	// Parts 非空表示 content 是多模态数组（文本 + 图片块），此时 Content
+	// 为空。识图路径的 user 消息就是这个形状：anthropic / responses 的
+	// 请求体组装必须把图片块翻成各自 API 的形状，绝不能把数组压成字符串
+	// —— 那会把 base64 当正文文本发出去，模型看不到图，只能拒答或编造
+	// （2026-11-01 的识图误封事故正是这么来的）。
+	Parts []any
+}
+
+// text 返回这条消息的纯文本：字符串原样；多模态数组只取文本部分，供
+// system（Anthropic 只收文本）与 assistant（判定链路里恒为文本）使用。
+func (m chatMsg) text() string {
+	if len(m.Parts) == 0 {
+		return m.Content
+	}
+	var texts []string
+	for _, p := range m.Parts {
+		if pm, ok := p.(map[string]any); ok && pm["type"] == "text" {
+			if s, ok := pm["text"].(string); ok {
+				texts = append(texts, s)
+			}
+		}
+	}
+	return strings.Join(texts, "\n")
+}
 
 // messagesOf 从逻辑载荷里取对话消息。判定链路用 []map[string]string，
 // 面板连通性测试与反序列化后的形状可能给 []any，两种都认。
@@ -212,7 +238,16 @@ func messagesOf(payload map[string]any) []chatMsg {
 			if !ok {
 				continue
 			}
-			out = append(out, chatMsg{Role: anyString(m["role"]), Content: anyString(m["content"])})
+			msg := chatMsg{Role: anyString(m["role"])}
+			switch c := m["content"].(type) {
+			case string:
+				msg.Content = c
+			case []any:
+				msg.Parts = c
+			default:
+				msg.Content = anyString(m["content"])
+			}
+			out = append(out, msg)
 		}
 	}
 	return out
@@ -257,19 +292,19 @@ const anthropicDefaultMaxTokens = 2048
 
 func bodyOpenAIResponses(model string, payload map[string]any) map[string]any {
 	msgs := messagesOf(payload)
-	input := make([]map[string]string, 0, len(msgs))
+	input := make([]map[string]any, 0, len(msgs))
 	var system []string
 	for _, m := range msgs {
 		switch m.Role {
 		case "system", "developer":
 			// Responses API 的 system 提示走顶层 instructions 更稳。
-			system = append(system, m.Content)
+			system = append(system, m.text())
 		default:
 			role := m.Role
 			if role == "" {
 				role = "user"
 			}
-			input = append(input, map[string]string{"role": role, "content": m.Content})
+			input = append(input, map[string]any{"role": role, "content": responsesContent(m)})
 		}
 	}
 	body := map[string]any{"model": model, "input": input, "stream": true}
@@ -287,16 +322,16 @@ func bodyOpenAIResponses(model string, payload map[string]any) map[string]any {
 
 func bodyAnthropic(model string, payload map[string]any) map[string]any {
 	msgs := messagesOf(payload)
-	out := make([]map[string]string, 0, len(msgs))
+	out := make([]map[string]any, 0, len(msgs))
 	var system []string
 	for _, m := range msgs {
 		switch m.Role {
 		case "system", "developer":
-			system = append(system, m.Content)
+			system = append(system, m.text())
 		case "assistant":
-			out = append(out, map[string]string{"role": "assistant", "content": m.Content})
+			out = append(out, map[string]any{"role": "assistant", "content": m.text()})
 		default:
-			out = append(out, map[string]string{"role": "user", "content": m.Content})
+			out = append(out, map[string]any{"role": "user", "content": anthropicContent(m)})
 		}
 	}
 	maxTokens := anthropicDefaultMaxTokens
@@ -319,6 +354,101 @@ func bodyAnthropic(model string, payload map[string]any) map[string]any {
 	return body
 }
 
+// anthropicContent 把一条消息的逻辑 content 翻成 Anthropic Messages API 的
+// 形状：字符串原样；多模态数组逐块翻译——文本照抄，OpenAI 形状的
+// image_url 拆成 image 块（data: URL 拈出 media_type 与 base64，远程 URL
+// 走 url source）。识别不出形状的部分压成文本保留，绝不静默丢内容。
+func anthropicContent(m chatMsg) any {
+	if len(m.Parts) == 0 {
+		return m.Content
+	}
+	blocks := make([]map[string]any, 0, len(m.Parts))
+	for _, p := range m.Parts {
+		pm, ok := p.(map[string]any)
+		if !ok {
+			continue
+		}
+		switch pm["type"] {
+		case "text":
+			if s, ok := pm["text"].(string); ok {
+				blocks = append(blocks, map[string]any{"type": "text", "text": s})
+			}
+		case "image_url":
+			if b := anthropicImage(pm["image_url"]); b != nil {
+				blocks = append(blocks, b)
+			}
+		default:
+			blocks = append(blocks, map[string]any{"type": "text", "text": anyString(p)})
+		}
+	}
+	if len(blocks) == 0 {
+		return m.Content
+	}
+	return blocks
+}
+
+// anthropicImage 把 OpenAI 的 image_url 块翻成 Anthropic 的 image 块。
+// 识别不了的形状返回 nil（调用方跳过，后续的文本块仍会送达）。
+func anthropicImage(v any) map[string]any {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil
+	}
+	u, ok := m["url"].(string)
+	if !ok || u == "" {
+		return nil
+	}
+	// data:<mime>;base64,<payload> —— 判定链路的图片全走这个形状
+	//（见 antiad.imagePart）。远程 URL 原样给 url source。
+	if rest, ok := strings.CutPrefix(u, "data:"); ok {
+		i := strings.IndexByte(rest, ',')
+		if i < 0 {
+			return nil
+		}
+		meta, data := rest[:i], rest[i+1:]
+		if !strings.HasSuffix(meta, ";base64") || data == "" {
+			return nil
+		}
+		return map[string]any{"type": "image", "source": map[string]any{
+			"type": "base64", "media_type": strings.TrimSuffix(meta, ";base64"), "data": data}}
+	}
+	return map[string]any{"type": "image", "source": map[string]any{"type": "url", "url": u}}
+}
+
+// responsesContent 把一条消息的逻辑 content 翻成 Responses API 的输入块：
+// 文本走 input_text，图片走 input_image（data URL 与远程 URL 都直接放在
+// image_url 里）。字符串原样；识别不出形状的部分压成文本保留。
+func responsesContent(m chatMsg) any {
+	if len(m.Parts) == 0 {
+		return m.Content
+	}
+	blocks := make([]map[string]any, 0, len(m.Parts))
+	for _, p := range m.Parts {
+		pm, ok := p.(map[string]any)
+		if !ok {
+			continue
+		}
+		switch pm["type"] {
+		case "text":
+			if s, ok := pm["text"].(string); ok {
+				blocks = append(blocks, map[string]any{"type": "input_text", "text": s})
+			}
+		case "image_url":
+			if im, ok := pm["image_url"].(map[string]any); ok {
+				if u, ok := im["url"].(string); ok && u != "" {
+					blocks = append(blocks, map[string]any{"type": "input_image", "image_url": u})
+				}
+			}
+		default:
+			blocks = append(blocks, map[string]any{"type": "input_text", "text": anyString(p)})
+		}
+	}
+	if len(blocks) == 0 {
+		return m.Content
+	}
+	return blocks
+}
+
 func bodyGemini(model string, payload map[string]any) map[string]any {
 	msgs := messagesOf(payload)
 	contents := make([]map[string]any, 0, len(msgs))
@@ -330,7 +460,7 @@ func bodyGemini(model string, payload map[string]any) map[string]any {
 		case "assistant":
 			contents = append(contents, geminiContent("model", m.Content))
 		default:
-			contents = append(contents, geminiContent("user", m.Content))
+			contents = append(contents, geminiContent("user", m.text()))
 		}
 	}
 	body := map[string]any{"contents": contents}

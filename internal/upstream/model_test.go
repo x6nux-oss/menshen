@@ -235,7 +235,7 @@ func TestBuildBodyPerKind(t *testing.T) {
 	if body["instructions"] != "SYS" {
 		t.Errorf("Responses 的 system 提示应走 instructions: %v", body)
 	}
-	if in, ok := body["input"].([]map[string]string); !ok || len(in) != 1 || in[0]["role"] != "user" {
+	if in, ok := body["input"].([]map[string]any); !ok || len(in) != 1 || in[0]["role"] != "user" {
 		t.Errorf("Responses 的 input 组装不对: %v", body["input"])
 	}
 
@@ -249,7 +249,7 @@ func TestBuildBodyPerKind(t *testing.T) {
 	if body["stream"] != true {
 		t.Errorf("Anthropic 应走流式: %v", body)
 	}
-	if msgs, ok := body["messages"].([]map[string]string); !ok || len(msgs) != 1 || msgs[0]["role"] != "user" {
+	if msgs, ok := body["messages"].([]map[string]any); !ok || len(msgs) != 1 || msgs[0]["role"] != "user" {
 		t.Errorf("Anthropic 的 messages 应剔掉 system: %v", body["messages"])
 	}
 
