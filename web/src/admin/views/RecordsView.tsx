@@ -1,20 +1,10 @@
 // 记录：判定记录与申诉两个分段，服务端分页 + 搜索。
 import { useState } from 'react'
-import {
-  Box,
-  Button,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Tab,
-  Tabs,
-  Typography,
-} from '@mui/material'
+import { Button, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsList, TabsTrigger } from '../../components/ui'
 import { useAppeals, useLogs, useMiniState } from '../../api/hooks'
 import { actionLabel, apAI, displayTz, fmtTS, kindLabel } from '../../lib/format'
 import { appealStatusInfo, verdictInfo } from '../../lib/status'
-import { SearchField } from '../../ui'
+import { SearchField } from '../../components/mobile'
 import { DataTable, PageHeader, StatusBadge, Toolbar } from '../components'
 import { useAdminNav, useDebouncedValue } from '../nav'
 import type { Column } from '../components'
@@ -55,35 +45,37 @@ export function RecordsView() {
             : `申诉，共 ${appeals.data?.total ?? 0} 条（未结 ${state.data?.todo.open_appeals ?? 0}）`
         }
       />
-      <Tabs
-        value={seg}
-        onChange={(_event, next: 'logs' | 'appeals') => setSeg(next)}
-        sx={{ mb: 1.5, minHeight: 36, '& .MuiTab-root': { minHeight: 36, fontSize: 14 } }}
-      >
-        <Tab value="logs" label="判定记录" />
-        <Tab value="appeals" label="申诉" />
+      <Tabs value={seg} onValueChange={(next) => setSeg(next as 'logs' | 'appeals')} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="logs">判定记录</TabsTrigger>
+          <TabsTrigger value="appeals">申诉</TabsTrigger>
+        </TabsList>
       </Tabs>
 
       <Toolbar>
         {seg === 'logs' ? (
           <>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>判定</InputLabel>
+            <div className="flex min-w-[150px] flex-col gap-1">
+              <Label htmlFor="rec-log-filter">判定</Label>
               <Select
-                label="判定"
                 value={logFilter}
-                onChange={(event) => {
-                  setLogFilter(event.target.value)
+                onValueChange={(v) => {
+                  setLogFilter(v)
                   setLogPage(1)
                 }}
               >
-                {LOG_FILTERS.map((f) => (
-                  <MenuItem key={f.value} value={f.value}>
-                    {f.label}
-                  </MenuItem>
-                ))}
+                <SelectTrigger id="rec-log-filter" aria-label="判定">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LOG_FILTERS.map((f) => (
+                    <SelectItem key={f.value} value={f.value}>
+                      {f.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
-            </FormControl>
+            </div>
             <SearchField
               value={q}
               onChange={(v) => {
@@ -91,24 +83,28 @@ export function RecordsView() {
                 setLogPage(1)
               }}
               placeholder="搜索正文 / 用户 id"
-              sx={{ maxWidth: 320 }}
+              className="max-w-[320px]"
             />
           </>
         ) : (
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>状态</InputLabel>
+          <div className="flex min-w-[150px] flex-col gap-1">
+            <Label htmlFor="rec-appeal-filter">状态</Label>
             <Select
-              label="状态"
               value={appealFilter}
-              onChange={(event) => {
-                setAppealFilter(event.target.value)
+              onValueChange={(v) => {
+                setAppealFilter(v)
                 setAppealPage(1)
               }}
             >
-              <MenuItem value="open">未结</MenuItem>
-              <MenuItem value="all">全部</MenuItem>
+              <SelectTrigger id="rec-appeal-filter" aria-label="状态">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="open">未结</SelectItem>
+                <SelectItem value="all">全部</SelectItem>
+              </SelectContent>
             </Select>
-          </FormControl>
+          </div>
         )}
       </Toolbar>
 
@@ -164,9 +160,9 @@ function LogTable({
       key: 'text',
       header: '正文',
       render: (row) => (
-        <Typography sx={{ fontSize: 12.5, color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] text-muted-foreground">
           {row.text || row.reason || '—'}
-        </Typography>
+        </span>
       ),
     },
     { key: 'cost', header: '开销', width: 90, align: 'right', render: (row) => row.cost_text || '—' },
@@ -177,7 +173,7 @@ function LogTable({
       rows={rows}
       rowKey={(row) => row.id}
       onRowClick={(row) => onOpen(row.id)}
-      empty={<Typography sx={{ fontSize: 13, color: 'text.secondary' }}>没有匹配的记录。</Typography>}
+      empty={<span className="text-[13px] text-muted-foreground">没有匹配的记录。</span>}
       columns={columns}
     />
   )
@@ -204,9 +200,9 @@ function AppealTable({
       key: 'reason',
       header: 'AI 理由',
       render: (row) => (
-        <Typography sx={{ fontSize: 12.5, color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] text-muted-foreground">
           {row.ai_reason || '—'}
-        </Typography>
+        </span>
       ),
     },
     { key: 'web', header: '网页尝试', width: 90, align: 'right', render: (row) => row.web_attempts },
@@ -218,7 +214,7 @@ function AppealTable({
       rows={rows}
       rowKey={(row) => row.id}
       onRowClick={(row) => onOpen(row.id)}
-      empty={<Typography sx={{ fontSize: 13, color: 'text.secondary' }}>没有匹配的申诉。</Typography>}
+      empty={<span className="text-[13px] text-muted-foreground">没有匹配的申诉。</span>}
       columns={columns}
     />
   )
@@ -238,21 +234,21 @@ function Pager({
 }) {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1.5 }}>
-      <Button size="small" variant="outlined" disabled={page <= 1 || loading} onClick={() => onChange(page - 1)}>
+    <div className="mt-4 flex items-center gap-4">
+      <Button size="sm" variant="outline" disabled={page <= 1 || loading} onClick={() => onChange(page - 1)}>
         上一页
       </Button>
-      <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+      <span className="text-[13px] text-muted-foreground">
         第 {page} / {pages} 页
-      </Typography>
+      </span>
       <Button
-        size="small"
-        variant="outlined"
+        size="sm"
+        variant="outline"
         disabled={page >= pages || loading}
         onClick={() => onChange(page + 1)}
       >
         下一页
       </Button>
-    </Box>
+    </div>
   )
 }

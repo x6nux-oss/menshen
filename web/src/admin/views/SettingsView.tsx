@@ -1,17 +1,7 @@
 // oxlint-disable react/set-state-in-effect -- 草稿态需要跟随服务端返回的值重置（保存后刷新）。
 // 全局设置（主管理员）：总开关、默认模型、分组参数、时区、页脚、人机验证、摘要。
 import { useEffect, useState } from 'react'
-import {
-  Box,
-  Button,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Switch,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Textarea } from '../../components/ui'
 import { useDigestMutation, useSetMutation } from '../../api/mutations'
 import { useMiniState } from '../../api/hooks'
 import { CAPTCHA_DEMO_PATH, controlKind, specHint, specUnit, specValueText, validateSpecValue } from '../../lib/settings'
@@ -19,6 +9,9 @@ import { openLink } from '../../telegram'
 import { CardBlock, PageHeader } from '../components'
 import { useRunFeedback } from '../feedback'
 import type { Spec } from '../../api/types'
+
+/** NOT_SET 是「未启用」提供方在下拉里的哨兵（Base UI Select 用 null 表示未选中）。 */
+const NOT_SET = '__none__'
 
 const MASTER_TOGGLES: { key: string; label: string; hint: string }[] = [
   { key: 'antiad_enabled', label: '反广告总开关', hint: '关闭后所有群都不判定。' },
@@ -49,7 +42,7 @@ export function SettingsView() {
   if (!state.data.me.main || !state.data.global) {
     return (
       <CardBlock>
-        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>全局设置只对主管理员开放。</Typography>
+        <span className="text-sm text-muted-foreground">全局设置只对主管理员开放。</span>
       </CardBlock>
     )
   }
@@ -97,33 +90,34 @@ function SettingsBody({
       <PageHeader title="全局设置" subtitle="默认模型、护栏参数与人机验证；只对主管理员可见" />
 
       <CardBlock title="总开关">
-        <Box sx={{ display: 'grid', gap: 1 }}>
+        <div className="grid gap-2">
           {MASTER_TOGGLES.filter((t) => global[t.key] !== undefined).map((t) => (
-            <Box key={t.key} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontSize: 13.5 }}>{t.label}</Typography>
-                <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{t.hint}</Typography>
-              </Box>
+            <div key={t.key} className="flex items-center gap-4">
+              <div className="flex-1">
+                <div className="text-[13.5px]">{t.label}</div>
+                <div className="text-[12px] text-muted-foreground">{t.hint}</div>
+              </div>
               <Switch
                 checked={global[t.key] === '1'}
                 disabled={setMut.isPending}
-                onChange={(e) => set(t.key, e.target.checked ? '1' : '0', '已更新')}
+                aria-label={t.label}
+                onCheckedChange={(checked) => set(t.key, checked ? '1' : '0', '已更新')}
               />
-            </Box>
+            </div>
           ))}
-        </Box>
+        </div>
       </CardBlock>
 
       <CardBlock title="默认模型">
-        <Box sx={{ display: 'grid', gap: 2 }}>
+        <div className="grid gap-4">
           {MODEL_KEYS.map((m) => (
             <SettingText key={m.key} label={m.label} hint={m.hint} value={global[m.key] ?? ''} onSave={(v) => set(m.key, v)} />
           ))}
-        </Box>
+        </div>
       </CardBlock>
 
       <CardBlock title="展示与落地">
-        <Box sx={{ display: 'grid', gap: 2 }}>
+        <div className="grid gap-4">
           <SettingText label="展示时区（IANA）" hint="留空回退 Asia/Shanghai。" value={tz} onSave={(v) => set('tz_name', v.trim() || 'Asia/Shanghai')} />
           {specByKey.has('antiad_group_footer') && (
             <SettingText
@@ -133,35 +127,39 @@ function SettingsBody({
               onSave={(v) => set('antiad_group_footer', v)}
             />
           )}
-        </Box>
+        </div>
       </CardBlock>
 
       <CardBlock
         title="人机验证"
         actions={
           global.captcha_demo === '1' ? (
-            <Button size="small" variant="text" onClick={() => openLink(CAPTCHA_DEMO_PATH)}>
+            <Button size="sm" variant="ghost" onClick={() => openLink(CAPTCHA_DEMO_PATH)}>
               打开测试台
             </Button>
           ) : undefined
         }
       >
-        <Box sx={{ display: 'grid', gap: 2, maxWidth: 560 }}>
-          <FormControl size="small" fullWidth>
-            <InputLabel>提供方</InputLabel>
+        <div className="grid max-w-[560px] gap-4">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="captcha-provider">提供方</Label>
             <Select
-              label="提供方"
-              value={global.captcha_provider ?? ''}
+              value={global.captcha_provider === undefined || global.captcha_provider === '' ? NOT_SET : global.captcha_provider}
               disabled={setMut.isPending}
-              onChange={(e) => set('captcha_provider', e.target.value, '已更新')}
+              onValueChange={(v) => set('captcha_provider', v === NOT_SET ? '' : v, '已更新')}
             >
-              {CAPTCHA_PROVIDERS.map((p) => (
-                <MenuItem key={p.value} value={p.value}>
-                  {p.label}
-                </MenuItem>
-              ))}
+              <SelectTrigger id="captcha-provider" aria-label="提供方">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CAPTCHA_PROVIDERS.map((p) => (
+                  <SelectItem key={p.value} value={p.value === '' ? NOT_SET : p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
-          </FormControl>
+          </div>
           <SettingText label="Site key" hint="前端公钥。" value={global.captcha_site_key ?? ''} onSave={(v) => set('captcha_site_key', v)} />
           <SettingText
             label="Secret"
@@ -171,7 +169,7 @@ function SettingsBody({
             onSave={(v) => (v === '' ? undefined : set('captcha_secret', v))}
           />
           <SettingText label="测试台密钥组" hint="演示页可一次展示多家：provider=key 逗号分隔。" value={global.captcha_demo_keys ?? ''} onSave={(v) => set('captcha_demo_keys', v)} />
-        </Box>
+        </div>
       </CardBlock>
 
       {sections.map((section) => (
@@ -179,16 +177,16 @@ function SettingsBody({
           key={section.name}
           title={`${section.name}（已设置 ${section.specs.filter((s) => settingsSet.includes(s.key)).length} 项）`}
         >
-          <Box sx={{ display: 'grid', gap: 1.5 }}>
+          <div className="grid gap-3">
             {section.specs.map((spec) => (
               <SpecControl key={spec.key} spec={spec} value={global[spec.key] ?? ''} disabled={setMut.isPending} onSave={(v) => set(spec.key, v)} />
             ))}
-          </Box>
+          </div>
         </CardBlock>
       ))}
 
       <CardBlock title="摘要与修复文案">
-        <Box sx={{ display: 'grid', gap: 2 }}>
+        <div className="grid gap-4">
           <MultilineSetting
             label="形态摘要"
             value={digest}
@@ -199,12 +197,12 @@ function SettingsBody({
             value={digestFix}
             onSave={(v) => run(digestMut.mutateAsync({ action: 'save_fix', value: v }), '已保存')}
           />
-          <Box>
-            <Button variant="outlined" disabled={digestMut.isPending} onClick={() => run(digestMut.mutateAsync({ action: 'run' }), '已开始重跑')}>
+          <div>
+            <Button variant="outline" disabled={digestMut.isPending} onClick={() => run(digestMut.mutateAsync({ action: 'run' }), '已开始重跑')}>
               立即重跑摘要
             </Button>
-          </Box>
-        </Box>
+          </div>
+        </div>
       </CardBlock>
     </>
   )
@@ -226,19 +224,21 @@ function SettingText({
   const [draft, setDraft] = useState(value)
   useEffect(() => setDraft(value), [value])
   return (
-    <Box>
-      <TextField
-        label={label}
-        value={draft}
-        placeholder={placeholder}
-        onChange={(e) => setDraft(e.target.value)}
-        helperText={hint}
-        fullWidth
-      />
-      <Button size="small" variant="text" sx={{ mt: 0.5 }} disabled={draft === value} onClick={() => onSave(draft)}>
+    <div>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor={`setting-${label}`}>{label}</Label>
+        <Input
+          id={`setting-${label}`}
+          value={draft}
+          placeholder={placeholder}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <span className="text-[12px] text-muted-foreground">{hint}</span>
+      </div>
+      <Button size="sm" variant="ghost" className="mt-1" disabled={draft === value} onClick={() => onSave(draft)}>
         保存
       </Button>
-    </Box>
+    </div>
   )
 }
 
@@ -254,12 +254,15 @@ function MultilineSetting({
   const [draft, setDraft] = useState(value)
   useEffect(() => setDraft(value), [value])
   return (
-    <Box>
-      <TextField label={label} value={draft} onChange={(e) => setDraft(e.target.value)} multiline minRows={4} fullWidth />
-      <Button size="small" variant="text" sx={{ mt: 0.5 }} disabled={draft === value} onClick={() => onSave(draft)}>
+    <div>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor={`multi-${label}`}>{label}</Label>
+        <Textarea id={`multi-${label}`} value={draft} onChange={(e) => setDraft(e.target.value)} rows={4} />
+      </div>
+      <Button size="sm" variant="ghost" className="mt-1" disabled={draft === value} onClick={() => onSave(draft)}>
         保存
       </Button>
-    </Box>
+    </div>
   )
 }
 
@@ -281,17 +284,18 @@ function SpecControl({
 
   if (kind === 'toggle') {
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Box sx={{ flex: 1 }}>
-          <Typography sx={{ fontSize: 13.5 }}>{spec.label}</Typography>
-          <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{specHint(spec)}</Typography>
-        </Box>
+      <div className="flex items-center gap-4">
+        <div className="flex-1">
+          <div className="text-[13.5px]">{spec.label}</div>
+          <div className="text-[12px] text-muted-foreground">{specHint(spec)}</div>
+        </div>
         <Switch
           checked={draft === '1'}
           disabled={disabled}
-          onChange={(e) => onSave(e.target.checked ? '1' : '0')}
+          aria-label={spec.label}
+          onCheckedChange={(checked) => onSave(checked ? '1' : '0')}
         />
-      </Box>
+      </div>
     )
   }
 
@@ -310,25 +314,35 @@ function SpecControl({
     onSave(draft.trim())
   }
 
+  const unit = specUnit(spec)
+
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-      <Box sx={{ flex: 1 }}>
-        <Typography sx={{ fontSize: 13.5 }}>{spec.label}</Typography>
-        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{specHint(spec)}</Typography>
-      </Box>
-      <TextField
-        value={draft}
-        disabled={disabled}
-        error={error !== null}
-        helperText={error ?? (draft === '' ? '' : specValueText(draft, spec))}
-        sx={{ width: 220 }}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit()
-        }}
-        slotProps={{ input: { endAdornment: specUnit(spec) ? <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{specUnit(spec)}</Typography> : undefined } }}
-      />
-    </Box>
+    <div className="flex items-center gap-4">
+      <div className="flex-1">
+        <div className="text-[13.5px]">{spec.label}</div>
+        <div className="text-[12px] text-muted-foreground">{specHint(spec)}</div>
+      </div>
+      <div className="flex w-[220px] flex-col gap-1">
+        <div className="flex items-center gap-1.5">
+          <Input
+            value={draft}
+            disabled={disabled}
+            aria-invalid={error !== null || undefined}
+            aria-label={spec.label}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit()
+            }}
+          />
+          {unit && <span className="shrink-0 text-[12px] text-muted-foreground">{unit}</span>}
+        </div>
+        {error !== null ? (
+          <span className="text-[12px] text-[#C62828] dark:text-[#FF8A80]">{error}</span>
+        ) : draft !== '' ? (
+          <span className="text-[12px] text-muted-foreground">{specValueText(draft, spec)}</span>
+        ) : null}
+      </div>
+    </div>
   )
 }
