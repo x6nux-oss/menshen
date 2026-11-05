@@ -7,16 +7,16 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "dev": "vite",
-    "dev:admin": "vite --config vite.admin.config.ts",
+    "dev": "rsbuild dev -c rsbuild.config.ts",
+    "dev:admin": "rsbuild dev -c rsbuild.admin.config.ts",
     "build:miniapp": "rsbuild build -c rsbuild.config.ts",
     "build:admin": "rsbuild build -c rsbuild.admin.config.ts",
-    "build": "tsc -b && vite build && vite build --config vite.admin.config.ts",
+    "build": "tsc -b && npm run build:miniapp && npm run build:admin",
     "lint": "oxlint",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview"
+    "preview": "rsbuild preview -c rsbuild.config.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -37,13 +37,11 @@
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
-    "@vitejs/plugin-react": "^6.1.1",
     "jsdom": "^29.1.1",
     "msw": "^2.15.0",
     "oxlint": "^1.81.0",
     "tailwindcss": "^4.3.4",
     "typescript": "~6.0.2",
-    "vite": "^8.3.0",
     "vitest": "^5.0.3"
   }
 }

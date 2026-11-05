@@ -7,9 +7,11 @@ export async function startMocks(): Promise<void> {
   ])
   const worker = setupWorker(...handlers)
   await worker.start({
-    // publicDir 已关闭（产物根目录不落额外文件）：开发服务器由 vite.config.ts
-    // 的 menshen-msw-worker 插件从 msw 依赖里送出这个脚本。
-    serviceWorker: { url: `${import.meta.env.BASE_URL}mockServiceWorker.js` },
+    // worker 文件在 public/ 下，随 rsbuild 默认的 public 复制进产物根
+    // （web/public/mockServiceWorker.js，与 node_modules/msw/lib/ 下的原件逐字节相同）。
+    // 不读 import.meta.env.BASE_URL：rsbuild 不提供它，而 Mini App 的 assetPrefix
+    // 固定是 /miniapp/（见 rsbuild.config.ts），写常量即可。
+    serviceWorker: { url: '/miniapp/mockServiceWorker.js' },
     onUnhandledRequest: 'bypass',
     quiet: true,
   })
