@@ -3,32 +3,26 @@
 // 与 Mini App 的 App.tsx 是两套独立应用：这里不加载 Telegram SDK，鉴权走
 // 会话 cookie（main.tsx 在挂载前注入 X-Web 与目标 bot）。
 //
-// 主题：新设计系统（Tailwind + oklch token）走 `<html class="dark">`；
-// 旧 MUI 组件（视图尚未迁移完）仍需要 ThemeProvider，两者并存到 Phase 2 结束。
-import { CssBaseline } from '@mui/material'
-import { ThemeProvider } from '@mui/material/styles'
+// 主题：全部走新设计系统 —— `<html class="dark">` + oklch token，
+// 不再需要 MUI 的 ThemeProvider / CssBaseline（视图已全部迁移完）。
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError } from '../api/client'
-import { ErrorBoundary, ToastProvider } from '../ui'
-import { applyThemeMode } from '../lib/theme-mode'
+import { ErrorBoundary, ToastProvider } from '../components/feedback'
+import { applyThemeMode, resolveThemeMode, subscribeSystemTheme } from '../lib/theme-mode'
 import { AdminNavProvider } from './nav'
 import { AdminShell } from './shell'
-import { buildAdminTheme, prefersDark, subscribeSystemTheme } from './theme'
 
 export function AdminApp() {
-  const [dark, setDark] = useState(prefersDark)
+  // 初值读用户显式选择 > 系统偏好（theme-mode 统一了这条规则）。
+  const [dark, setDark] = useState(() => resolveThemeMode() === 'dark')
 
-  // 同步两套主题：MUI 的 ThemeProvider（旧组件）+ <html class="dark">（新组件）。
-  // 两者由同一个 dark 状态驱动，不会分叉。
   useEffect(() => {
     applyThemeMode(dark ? 'dark' : 'light')
   }, [dark])
 
   // 订阅系统偏好只建一次；重复订阅会在每次主题变化时重建监听。
-  useEffect(() => subscribeSystemTheme(setDark), [])
-
-  const theme = useMemo(() => buildAdminTheme(dark), [dark])
+  useEffect(() => subscribeSystemTheme((mode) => setDark(mode === 'dark')), [])
 
   const [queryClient] = useState(
     () =>
@@ -49,20 +43,14 @@ export function AdminApp() {
   )
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <QueryClientProvider client={queryClient}>
-        {/* ToastProvider 暂时仍用旧版（src/ui）：视图与 admin/feedback.ts 还在用
-            旧的 useToast，换成本层实现会让它们拿到新 Context 而抛错。
-            Phase 2 的视图迁移完成后与本文件一起切换。 */}
-        <ToastProvider>
-          <ErrorBoundary>
-            <AdminNavProvider>
-              <AdminShell />
-            </AdminNavProvider>
-          </ErrorBoundary>
-        </ToastProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <ErrorBoundary>
+          <AdminNavProvider>
+            <AdminShell />
+          </AdminNavProvider>
+        </ErrorBoundary>
+      </ToastProvider>
+    </QueryClientProvider>
   )
 }
