@@ -3,10 +3,10 @@
 // 这些是 shadcn 风格的薄封装：样式用 Tailwind 工具类（引用 styles/token.css 的
 // 语义 token），交互原语用 Base UI。代码入仓库而非依赖第三方组件库的样式包，
 // 所以改样式不必等上游发版，也不会被上游的破坏性变更波及。
-export { Button, buttonVariants } from './button'
+export { Button } from './button'
 export type { ButtonProps } from './button'
 
-export { Badge, badgeVariants } from './badge'
+export { Badge } from './badge'
 export type { BadgeProps, BadgeTone } from './badge'
 
 export { Input } from './input'
