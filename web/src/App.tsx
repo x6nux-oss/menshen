@@ -17,9 +17,8 @@ import { Bot, LayoutDashboard, ReceiptText, User, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ApiError, setApiBridge } from './api/client'
 import { useMiniState } from './api/hooks'
-import { ErrorBoundary } from './components/feedback'
-import { ErrorState, Skeletons } from './components/feedback'
-import { TabBar, TopBar } from './components/mobile'
+import { ErrorBoundary, ErrorState, Skeletons, ToastProvider } from './components/feedback'
+import { ActionSheetProvider, TabBar, TopBar } from './components/mobile'
 import type { TabBarItem } from './components/mobile'
 import { Skeleton } from './components/ui'
 import { meLabel } from './lib/format'
@@ -30,9 +29,10 @@ import { routeSlug } from './route'
 import { detailTitle, renderStackPage, renderTabPage, TAB_NAMES } from './shellPages'
 import { initTelegram } from './telegram'
 import type { TelegramBridge, TelegramTheme } from './telegram'
-// ponytail: 19 个页面还 import 旧 src/ui 的 useToast/useConfirm，Provider 暂时用旧版；
-// Task 9 删 src/ui 时一并换成 components/feedback + components/mobile 的同名件。
-import { ActionSheetProvider, ToastProvider } from './ui'
+import {
+  ActionSheetProvider as LegacyActionSheetProvider,
+  ToastProvider as LegacyToastProvider,
+} from './ui'
 
 type Boot =
   | { phase: 'booting' }
@@ -106,13 +106,20 @@ function ReadyApp({ bridge }: { bridge: TelegramBridge }) {
   return (
     <QueryClientProvider client={queryClient}>
       <NavProvider backButton={bridge.backButton}>
-        <ActionSheetProvider>
-          <ToastProvider>
-            <ErrorBoundary>
-              <Shell />
-            </ErrorBoundary>
-          </ToastProvider>
-        </ActionSheetProvider>
+        {/* ponytail: 迁移期间两套 Provider 并存 —— 已迁的页面（批次 3-4）用新层，
+            未迁的 7 个页面（批次 5-7）仍用旧 src/ui。两套 Context 互不干扰。
+            Task 9 删 src/ui 时把旧的一层摘掉。 */}
+        <LegacyActionSheetProvider>
+          <LegacyToastProvider>
+            <ActionSheetProvider>
+              <ToastProvider>
+                <ErrorBoundary>
+                  <Shell />
+                </ErrorBoundary>
+              </ToastProvider>
+            </ActionSheetProvider>
+          </LegacyToastProvider>
+        </LegacyActionSheetProvider>
       </NavProvider>
     </QueryClientProvider>
   )

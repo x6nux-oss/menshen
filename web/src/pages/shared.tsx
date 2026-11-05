@@ -26,23 +26,9 @@ export function ChatStatusBadge({ chat }: { chat: Pick<Chat, 'enabled' | 'dryrun
 }
 
 /**
- * 底部操作条的紧凑按钮参数：全局 Button 把触控高度提到 44，这里压回 32，
+ * 底部操作条的紧凑按钮类名：全局 Button 的默认高度是 36，这里压回 32，
  * 按钮贴底一屏尽量放下，不遮挡正文。记录与申诉详情共用。
- *
- * ponytail: 仍是 MUI `sx` 的对象形态 —— 它的两个调用点（AppealDetailPage /
- * LogDetailPage）在 Task 4 才迁移，本任务只换展示层不动调用点。Task 4 一并
- * 换成 `COMPACT_BTN` 类名并删掉本常量。
  */
-export const COMPACT_BTN_SX = {
-  minHeight: 32,
-  px: 1.25,
-  fontSize: 13,
-  flex: '1 1 auto',
-  minWidth: 0,
-  whiteSpace: 'nowrap',
-} as const
-
-/** Task 4 起的紧凑按钮类名（Tailwind 版，与 COMPACT_BTN_SX 等效）。 */
 export const COMPACT_BTN =
   'h-8 min-w-0 flex-1 basis-auto px-1.25 text-[13px] whitespace-nowrap'
 

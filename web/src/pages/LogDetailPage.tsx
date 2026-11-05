@@ -2,16 +2,17 @@
 // 数据必须单独请求 log{id}（列表正文里后端会回查全量留底，列表数据不完整）。
 // 操作走 logact；成功后由 mutation 统一失效 ['log']/['logs']/['user']/['state']，
 // 详情与列表都会刷新；服务端 note 优先 toast。
-import { Box, Button, Typography } from '@mui/material'
 import type { ReactNode } from 'react'
 import { errorStatus } from '../api/client'
 import { useLog, useMiniState } from '../api/hooks'
 import { useLogactMutation, useRulesMutation } from '../api/mutations'
+import { ErrorState, Skeletons, useToast } from '../components/feedback'
+import { ChatRef, SectionCard, useConfirm } from '../components/mobile'
+import { Button } from '../components/ui'
 import { actionLabel, deciderLabel, displayTz, fmtTS, kindLabel, verdictLabel } from '../lib/format'
 import { useNav } from '../nav'
 import { openLink } from '../telegram'
-import { ChatRef, ErrorState, SectionCard, Skeletons, useConfirm, useToast } from '../ui'
-import { COMPACT_BTN_SX, InfoRow, UserLink } from './shared'
+import { COMPACT_BTN, InfoRow, UserLink } from './shared'
 import { useBarReserve } from './useBarReserve'
 
 // 主操作；危险项带确认文案。
@@ -143,10 +144,10 @@ export function LogDetailPage({ id }: { id: number }) {
   ]
 
   return (
-    <Box
+    <div
       data-testid="log-detail-page"
       data-reserved={reserved}
-      sx={{ pb: `calc(${reserved}px + env(safe-area-inset-bottom))` }}
+      style={{ paddingBottom: `calc(${reserved}px + env(safe-area-inset-bottom))` }}
     >
       <SectionCard>
         {details.map((row) => (
@@ -157,75 +158,53 @@ export function LogDetailPage({ id }: { id: number }) {
       </SectionCard>
 
       <SectionCard title="原文">
-        <Box sx={{ px: 2, py: 1.5 }}>
+        <div className="px-4 py-3">
           {l.text !== '' ? (
-            <Typography
-              component="pre"
-              sx={{
-                m: 0,
-                fontFamily: 'ui-monospace, Menlo, monospace',
-                fontSize: 13,
-                lineHeight: 1.7,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-              }}
-            >
+            <pre className="m-0 font-mono text-[13px] leading-[1.7] break-words whitespace-pre-wrap">
               {l.text}
-            </Typography>
+            </pre>
           ) : (
-            <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>（正文为空）</Typography>
+            <p className="text-sm text-muted-foreground">（正文为空）</p>
           )}
           {l.view_url !== '' && (
             <Button
-              fullWidth
-              variant="outlined"
-              sx={{ mt: 1.5 }}
+              variant="outline"
+              className="mt-3 w-full"
               onClick={() => openLink(l.view_url)}
             >
               打开原文查看页
             </Button>
           )}
-        </Box>
+        </div>
       </SectionCard>
 
-      <Box
+      {/* 纯色底 + 上边框，不用玻璃：这是压在长内容上的固定操作条，
+          玻璃会让下面的正文透上来，按钮与文字互相干扰。 */}
+      <div
         ref={barRef}
         data-testid="log-action-bar"
-        sx={{
-          position: 'fixed',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          px: 1.25,
-          pt: 0.75,
-          pb: 'calc(6px + env(safe-area-inset-bottom))',
-          bgcolor: 'background.paper',
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          zIndex: (theme) => theme.zIndex.appBar,
-        }}
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-1.25 pt-0.75 pb-[calc(6px+env(safe-area-inset-bottom))]"
       >
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+        <div className="flex flex-wrap gap-0.75">
           {PRIMARY_ACTIONS.map((spec) => (
             <Button
               key={spec.action}
-              size="small"
-              variant="outlined"
-              color={spec.danger ? 'error' : 'primary'}
+              variant="outline"
+              size="sm"
               disabled={act.isPending}
               onClick={() => void run(spec)()}
-              sx={COMPACT_BTN_SX}
+              className={spec.danger ? `${COMPACT_BTN} text-destructive` : COMPACT_BTN}
             >
               {spec.label}
             </Button>
           ))}
           {isMain && (
             <Button
-              size="small"
-              variant="outlined"
+              variant="outline"
+              size="sm"
               disabled={act.isPending || ruleMut.isPending}
               onClick={startRuleAgent}
-              sx={COMPACT_BTN_SX}
+              className={COMPACT_BTN}
             >
               AI 写规则
             </Button>
@@ -234,27 +213,26 @@ export function LogDetailPage({ id }: { id: number }) {
             GBAN_ACTIONS.map((spec) => (
               <Button
                 key={spec.action}
-                size="small"
-                variant="outlined"
-                color="error"
+                variant="outline"
+                size="sm"
                 disabled={act.isPending}
                 onClick={() => void run(spec)()}
-                sx={COMPACT_BTN_SX}
+                className={`${COMPACT_BTN} text-destructive`}
               >
                 {spec.label}
               </Button>
             ))}
-        </Box>
-        <Typography sx={{ mt: 0.5, fontSize: 11, color: 'text.secondary', lineHeight: 1.5 }}>
+        </div>
+        <p className="mt-0.5 text-[11px] leading-[1.5] text-muted-foreground">
           复查结果发到群里（受群内静默开关约束）；人工标记与群内 /ban 命令同效；
           AI 写规则围绕本条原文生成候选。
-        </Typography>
-      </Box>
-    </Box>
+        </p>
+      </div>
+    </div>
   )
 }
 
 /** Mono 给标识类值（时间/群号/开销）一个等宽字体。 */
 function Mono({ children }: { children: ReactNode }) {
-  return <Box component="span" sx={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{children}</Box>
+  return <span className="font-mono">{children}</span>
 }

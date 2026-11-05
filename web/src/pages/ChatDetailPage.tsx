@@ -2,25 +2,25 @@
 // - 三个开关（启用/演练/群内展示）乐观更新失败回滚；
 // - 处罚方式 Select + `实际执行` 行 + 防错提示（称呼语时长用 muteOptLabel）；
 // - 补全历史入群时间（成功 toast 用服务端 note）；危险区移除该群。
-import FolderOpenOutlined from '@mui/icons-material/FolderOpenOutlined'
-import { Box, Button, MenuItem, TextField, Typography } from '@mui/material'
+import { FolderOpen } from 'lucide-react'
 import { errorStatus } from '../api/client'
 import { useMiniState } from '../api/hooks'
 import { useChatMutation, useOptimisticMiniMutation } from '../api/mutations'
 import type { Chat, State } from '../api/types'
+import { EmptyState, ErrorState, Skeletons } from '../components/feedback'
+import { ChatRef, ListRow, SectionCard, SwitchRow } from '../components/mobile'
+import { Button, Label, Spinner } from '../components/ui'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select'
 import { muteOptLabel, punishLabel, chatURL } from '../lib/format'
 import { useNav } from '../nav'
-import {
-  ChatRef,
-  EmptyState,
-  ErrorState,
-  ListRow,
-  SectionCard,
-  Skeletons,
-  SwitchRow,
-  useConfirm,
-  useToast,
-} from '../ui'
+import { useToast } from '../components/feedback'
+import { useConfirm } from '../components/mobile'
 import { ChatStatusBadge } from './shared'
 
 export function ChatDetailPage({ botId, chatId }: { botId: number; chatId: number }) {
@@ -116,7 +116,7 @@ export function ChatDetailPage({ botId, chatId }: { botId: number; chatId: numbe
   }
 
   return (
-    <Box data-testid="chat-detail-page">
+    <div data-testid="chat-detail-page">
       <SectionCard>
         <ListRow
           primary={
@@ -153,50 +153,53 @@ export function ChatDetailPage({ botId, chatId }: { botId: number; chatId: numbe
       </SectionCard>
 
       <SectionCard title="处罚">
-        <Box sx={{ px: 2, pt: 1.5 }}>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="处罚方式"
+        <div className="px-4 pt-3">
+          <Label htmlFor="chat-punish" className="mb-1 block">
+            处罚方式
+          </Label>
+          <Select
             value={String(chat.punish)}
+            onValueChange={(value) => changePunish(Number(value))}
             disabled={punishMut.isPending}
-            onChange={(event) => changePunish(Number(event.target.value))}
           >
-            <MenuItem value="-1">跟随 bot 设置</MenuItem>
-            <MenuItem value="0">
-              {muteOptLabel(state.data.bot_settings, state.data.global_defaults, botId)}
-            </MenuItem>
-            <MenuItem value="1">封禁出群（永久）</MenuItem>
-          </TextField>
-        </Box>
+            <SelectTrigger id="chat-punish" aria-label="处罚方式">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="-1">跟随 bot 设置</SelectItem>
+              <SelectItem value="0">
+                {muteOptLabel(state.data.bot_settings, state.data.global_defaults, botId)}
+              </SelectItem>
+              <SelectItem value="1">封禁出群（永久）</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <ListRow
           primary="实际执行"
           value={<span data-testid="effective-punish">{effectivePunish}</span>}
         />
         {effectivePunish.startsWith('禁言') && (
-          <Typography sx={{ px: 2, pb: 1.5, fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
+          <p className="px-4 pb-3 text-[13px] leading-[1.6] text-muted-foreground">
             要改成永久禁言：把本 bot 的「禁言时长（分钟）」设为 0；要踢出群就选「封禁出群」。
-          </Typography>
+          </p>
         )}
       </SectionCard>
 
       <SectionCard title="工具">
-        <Box sx={{ px: 2, py: 1.5 }}>
+        <div className="px-4 py-3">
           <Button
-            fullWidth
-            variant="outlined"
-            startIcon={<FolderOpenOutlined />}
-            loading={backfillMut.isPending}
+            variant="outline"
+            className="w-full"
             disabled={backfillMut.isPending}
             onClick={backfill}
           >
+            {backfillMut.isPending ? <Spinner /> : <FolderOpen aria-hidden />}
             补全历史入群时间
           </Button>
-          <Typography sx={{ mt: 1, fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
+          <p className="mt-2 text-[13px] leading-[1.6] text-muted-foreground">
             Bot API 没有入群时间字段，这里用该 bot 的 token 走 MTProto 把「入群时就在群里」的那批成员补上（只填未知的，不覆盖实时记录）。新入群一直是自动记的。
-          </Typography>
-        </Box>
+          </p>
+        </div>
       </SectionCard>
 
       <SectionCard title="危险区">
@@ -205,9 +208,9 @@ export function ChatDetailPage({ botId, chatId }: { botId: number; chatId: numbe
           secondary="判定与处置立即停止，配置一并删除"
           disabled={removeMut.isPending}
           onClick={() => void removeChat()}
-          sx={{ color: 'error.main' }}
+          className="text-destructive"
         />
       </SectionCard>
-    </Box>
+    </div>
   )
 }

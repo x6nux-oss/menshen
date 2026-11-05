@@ -1,6 +1,7 @@
 // 群组详情：实际执行 + 永久禁言/封禁出群、处罚切换、
 // 补全入群时间（服务端 note）、移除确认（含对象名与后果）。
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { useEffect, useRef } from 'react'
 import { describe, expect, it } from 'vitest'
@@ -63,11 +64,11 @@ describe('ChatDetailPage', () => {
 
     expect(await screen.findByText('实际执行')).toBeInTheDocument()
     expect(screen.getByTestId('effective-punish')).toHaveTextContent('永久禁言')
-    // 处罚方式选择器含 `跟随 bot 设置`
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: '处罚方式' }))
+    // 处罚方式选择器含 `跟随 bot 设置`（Base UI Select 走 pointer 事件，用 userEvent）
+    await userEvent.click(screen.getByRole('combobox', { name: '处罚方式' }))
     expect(await screen.findByRole('option', { name: '跟随 bot 设置' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('option', { name: '封禁出群（永久）' }))
+    await userEvent.click(screen.getByRole('option', { name: '封禁出群（永久）' }))
     await waitFor(() => expect(bodies).toHaveLength(1))
     expect(bodies[0]).toMatchObject({
       action: 'update',
