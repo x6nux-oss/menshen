@@ -155,7 +155,38 @@ Layer 3  边缘折射增强 —— @supports (backdrop-filter: url(#x)) 通过�
 **列表与表格区域一律只用 Layer 1+2。** 这条边界写死在 `glass-refract.css` 的
 类名设计里（`.glass--refract` 是显式 opt-in，不是默认值）。
 
-### 4.6 性能护栏
+### 4.6 景深画布（玻璃能看出效果的前提）
+
+**玻璃的 `backdrop-filter` 模糊的是「它背后的内容」。背后是纯色时，模糊结果与
+不模糊完全相同 —— 玻璃退化成一块半透明白板。** 这是「看着像 AI 生成」最典型的
+来源：组件都写对了，但整页是均匀底色 + 白色卡片，没有景深、没有视觉焦点。
+
+所以页面底色不能是单一颜色。`styles/index.css` 的 `body::before` 铺三团低饱和
+品牌色光晕（`--canvas-glow-1/2/3`），`position: fixed` + `z-index: -1`：
+
+```css
+body::before {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(48rem 32rem at 8% -6%,  var(--canvas-glow-1), transparent 62%),
+    radial-gradient(42rem 30rem at 96% 4%,  var(--canvas-glow-2), transparent 64%),
+    radial-gradient(36rem 26rem at 50% 104%, var(--canvas-glow-3), transparent 66%);
+}
+```
+
+三条硬约束：
+
+1. **页面容器不得再铺不透明的 `bg-background`**。它会把光晕整个盖住，玻璃立刻失效。
+   页面根容器只负责布局与内边距，背景交给 `body`。（这条踩过：预览页曾因此完全看不出玻璃。）
+2. **光晕浓度不能太低**。实测 14% 在整页尺度下几乎不可见；当前取 22%/18%/14%，
+   暗色提高到 26%/20%/24%（暗底上低透明度会被吃掉）。
+3. **`prefers-reduced-transparency: reduce` 时关掉光晕** —— 对低对比敏感用户，
+   纯色底比带色偏的渐变更容易读。
+
+配套的玻璃底色要**薄**：`--glass-bg` 亮色 42%、暗色 38%。可读性不靠加厚不透明度，
+而靠深色正文 + 1px 描边 + 内高光勾勒边界。
+
+### 4.7 性能护栏
 
 - `will-change: backdrop-filter` **只在弹层打开期间**加，关闭即摘（常驻会常驻合成层）。
 - 移动端 `--glass-blur` 降到 12px（桌面 20px），由 `@media (max-width: 640px)` 切换。
