@@ -62,7 +62,7 @@ describe('initTelegram', () => {
     // 不可用桥的方法也不抛错
     expect(() => bridge.backButton.show()).not.toThrow()
     expect(bridge.onThemeChanged(() => {})).toBeTypeOf('function')
-    expect(bridge.getTheme()).toEqual({ colorScheme: '', themeParams: {} })
+    expect(bridge.getTheme()).toEqual({ colorScheme: '' })
   })
 
   it('SDK 存在但不在 Telegram（platform=unknown、initData 为空）：返回不可用且不调 ready/expand', async () => {
@@ -103,7 +103,8 @@ describe('initTelegram', () => {
     expect(bridge.available).toBe(true)
     expect(calls).toEqual(expect.arrayContaining(['ready', 'expand']))
     expect(bridge.initData).toBe('query_id=AAA&user=%7B%22id%22%3A1%7D')
-    expect(bridge.getTheme()).toEqual({ colorScheme: 'dark', themeParams: { bg_color: '#17212B' } })
+    // 只读 colorScheme：themeParams 的主题色不进 TelegramTheme（设计文档 §6）
+    expect(bridge.getTheme()).toEqual({ colorScheme: 'dark' })
 
     // BackButton 显隐与点击（点击回调由导航栈注册）
     bridge.backButton.show()
@@ -119,27 +120,25 @@ describe('initTelegram', () => {
     expect(calls).toContain('open:https://t.me/x/1')
   })
 
-  it('themeChanged 触发后 getTheme 与回调都拿到新主题', async () => {
+  it('themeChanged 触发后 getTheme 与回调都拿到新的 colorScheme', async () => {
     const { wa, handlers } = mockWebApp()
     const bridge = await initTelegram({ getWebApp: () => wa })
-    expect(bridge.getTheme().themeParams.bg_color).toBe('#17212B')
+    expect(bridge.getTheme()).toEqual({ colorScheme: 'dark' })
 
     const seen: string[] = []
     const off = bridge.onThemeChanged((theme) => {
-      seen.push(`${theme.colorScheme}:${theme.themeParams.bg_color ?? ''}`)
+      seen.push(theme.colorScheme)
     })
     expect(handlers.get('themeChanged')).toHaveLength(1)
 
-    // SDK 先更新属性，再派发事件（真实行为）
+    // SDK 先更新属性，再派发事件（真实行为）。主题色仍会被 SDK 写入，
+    // 但 bridge 不读它 —— 换亮/暗才是我们关心的变化。
     wa.colorScheme = 'light'
     wa.themeParams = { bg_color: '#FFFFFF', text_color: '#111111' }
     handlers.get('themeChanged')?.[0]()
 
-    expect(bridge.getTheme()).toEqual({
-      colorScheme: 'light',
-      themeParams: { bg_color: '#FFFFFF', text_color: '#111111' },
-    })
-    expect(seen).toEqual(['light:#FFFFFF'])
+    expect(bridge.getTheme()).toEqual({ colorScheme: 'light' })
+    expect(seen).toEqual(['light'])
     off()
     expect(handlers.get('themeChanged')).toHaveLength(0)
   })
