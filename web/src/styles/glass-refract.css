@@ -1,5 +1,23 @@
 /*
- * 玻璃层折射增强（设计文档 §4.4）。**本文件是 Phase 1 Task 2 的最小占位**：
- * Task 1 的 index.css 需要 import 它才能编译通过，Task 2 会覆写为本体
- * （@supports 包裹的 feDisplacementMap 折射，只在支持的浏览器启用）。
+ * Layer 3：边缘折射增强。**只在浏览器真的支持 `backdrop-filter: url(#…)` 时生效**
+ * —— 实测 iOS Safari 拿不到（WebKit 长期未实现该形式，见设计文档附录 B.1），
+ * 所以它只能是增强层，不能是基线。
+ *
+ * 用法：在 .glass 元素上加 .glass--refract（显式 opt-in，§4.5：列表与表格不用）。
  */
+@supports (backdrop-filter: url(#menshen-glass-refract)) {
+  .glass--refract {
+    backdrop-filter: url(#menshen-glass-refract) blur(var(--glass-blur))
+      saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: url(#menshen-glass-refract) blur(var(--glass-blur))
+      saturate(var(--glass-saturate));
+  }
+}
+
+/* 与回退 2 一致：降低透明度时连折射也去掉 */
+@media (prefers-reduced-transparency: reduce) {
+  .glass--refract {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
