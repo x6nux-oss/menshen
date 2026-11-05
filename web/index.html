@@ -7,14 +7,25 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
     />
     <title>门神配置</title>
+    <!-- 官方 SDK 自托管：部分网络无法直连官方 CDN，不能依赖外链加载。
+         由 rsbuild 从 public/ 复制到产物根，经 assetPrefix /miniapp/ 引用。
+
+         路径写绝对前缀 /miniapp/：Go 侧托管与测试按这个前缀校验
+         （internal/panel/miniapp_test.go 断言 src="/miniapp/telegram-web-app.js"），
+         且 rsbuild 不会像 Vite 那样按 base 重写模板里的字面量路径。
+
+         **本标签必须留在 head 里、且排在 rsbuild 注入的入口脚本之前。**
+         rsbuild 把入口 <script defer> 注入到 head 的末尾（html.inject 默认
+         'head'），而这里的 SDK 是同步脚本、没有 defer，浏览器会先执行它。
+         若把本标签挪进 body（排在 head 之后），入口脚本就会抢在 SDK 之前
+         执行，App 静默落到「请通过 Telegram 打开」引导页，控制台没有明显报错。
+
+         注意：本注释里**不要**写出 head 的闭合标签字面量 —— rsbuild 的 HTML
+         插件按字面量查找并替换，会命中注释里那一处，把入口脚本注进注释内部
+         从而使它们失效（已实测踩过）。 -->
+    <script src="/miniapp/telegram-web-app.js"></script>
   </head>
   <body>
     <div id="root"></div>
-    <!-- 官方 SDK 自托管：部分网络无法直连官方 CDN，不能依赖外链加载。
-         根绝对路径由 Vite 按 base 重写（开发与构建都得到 /miniapp/telegram-web-app.js）；
-         经典脚本同步执行，模块脚本默认 defer，因此 main.tsx 启动时 SDK 已就绪；
-         telegram.ts 仍保留轮询兜底。 -->
-    <script src="/telegram-web-app.js"></script>
-    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

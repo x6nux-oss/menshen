@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* Phase 1 会在这里加 @theme inline 与 token import（设计文档 §3、§4）。
+   本阶段只求 Tailwind 管线跑通。 */
