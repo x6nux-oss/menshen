@@ -18,3 +18,6 @@ export { TabBar } from './TabBar'
 export type { TabBarItem, TabBarProps } from './TabBar'
 export { TopBar } from './TopBar'
 export type { TopBarProps } from './TopBar'
+
+export { ChatRef } from './ChatRef'
+export type { ChatRefProps } from './ChatRef'

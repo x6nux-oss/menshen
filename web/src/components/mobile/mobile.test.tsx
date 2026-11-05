@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ActionSheetProvider,
+  ChatRef,
   ListRow,
   SearchField,
   SectionCard,
@@ -335,5 +336,31 @@ describe('ActionSheet / useConfirm', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() => render(<Probe />)).toThrow(/ActionSheetProvider/)
     spy.mockRestore()
+  })
+})
+
+describe('ChatRef', () => {
+  it('有 url 时渲染外链（_blank + noopener）', () => {
+    render(<ChatRef name="门神群" url="https://t.me/x" />)
+    const a = screen.getByRole('link', { name: '门神群' })
+    expect(a).toHaveAttribute('href', 'https://t.me/x')
+    expect(a).toHaveAttribute('target', '_blank')
+    expect(a).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('无 url 时只渲染纯文本', () => {
+    render(<ChatRef name="私有群" />)
+    expect(screen.getByText('私有群')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('name 为空时回退到 fallback', () => {
+    render(<ChatRef name="" fallback={-100123} />)
+    expect(screen.getByText('-100123')).toBeInTheDocument()
+  })
+
+  it('三者都空时渲染 null', () => {
+    const { container } = render(<ChatRef />)
+    expect(container).toBeEmptyDOMElement()
   })
 })
