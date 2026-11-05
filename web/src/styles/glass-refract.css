@@ -1,0 +1,5 @@
+/*
+ * 玻璃层折射增强（设计文档 §4.4）。**本文件是 Phase 1 Task 2 的最小占位**：
+ * Task 1 的 index.css 需要 import 它才能编译通过，Task 2 会覆写为本体
+ * （@supports 包裹的 feDisplacementMap 折射，只在支持的浏览器启用）。
+ */

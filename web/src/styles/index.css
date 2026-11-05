@@ -1,0 +1,55 @@
+/* Tailwind 入口：把语义 token 映射成工具类（bg-background / text-foreground / rounded-lg …）。
+   用 @theme inline 而非 @theme：变量值保持 var() 引用，暗色切换时工具类跟着变。 */
+@import "tailwindcss";
+@import "./token.css";
+@import "./glass.css";
+@import "./glass-refract.css";
+
+/* 暗色变体：Tailwind 4 需要显式声明基于 .dark 类（而非媒体查询），
+   因为 Mini App 的暗色由 Telegram colorScheme 决定，与系统偏好无关。 */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  /* 玻璃描边：GlassToolbar 等组件用 border-glass-border */
+  --color-glass-border: var(--glass-border);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+}
+
+/* 全局基线：正文可读、字体跟随系统、暗色下的原生控件配色 */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}

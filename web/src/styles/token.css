@@ -1,0 +1,97 @@
+/*
+ * 门神设计 token。两层结构：原始值在 :root 与 .dark，语义名供组件使用。
+ * 颜色一律 oklch（感知均匀，明暗两套的手工调色更可预测）。
+ * 亮暗由 .dark 类切换（设计文档 §6：Mini App 由 Telegram colorScheme 决定）。
+ */
+
+:root {
+  /* ---- 圆角（设计文档 §4.3 的 --radius-lg 由玻璃层引用）---- */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+
+  /* ---- 基础色 ---- */
+  --background: oklch(0.985 0.003 250);
+  --foreground: oklch(0.205 0.015 255);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.205 0.015 255);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.205 0.015 255);
+  --muted: oklch(0.965 0.005 250);
+  --muted-foreground: oklch(0.5 0.015 255);
+  --accent: oklch(0.955 0.012 250);
+  --accent-foreground: oklch(0.205 0.015 255);
+
+  /* ---- 品牌与语义色 ---- */
+  --primary: oklch(0.55 0.185 258);
+  --primary-foreground: oklch(0.99 0.005 250);
+  --destructive: oklch(0.58 0.21 27);
+  --destructive-foreground: oklch(0.99 0.005 250);
+  --success: oklch(0.6 0.15 155);
+  --success-foreground: oklch(0.99 0.005 250);
+  --warning: oklch(0.7 0.16 75);
+  --warning-foreground: oklch(0.22 0.02 75);
+
+  /* ---- 线 ---- */
+  --border: oklch(0.9 0.008 255);
+  --input: oklch(0.9 0.008 255);
+  --ring: oklch(0.55 0.185 258);
+
+  /* ---- 玻璃层（§4.3 契约）---- */
+  --glass-bg: oklch(1 0 0 / 62%);
+  --glass-border: oklch(1 0 0 / 55%);
+  --glass-highlight: oklch(1 0 0 / 70%);
+  --glass-shade: oklch(0.5 0.01 255 / 8%);
+  --glass-shadow: oklch(0.3 0.02 255 / 12%);
+  --glass-blur: 20px;
+  --glass-saturate: 180%;
+  --glass-noise-opacity: 0.03;
+  --glass-sheen: oklch(1 0 0 / 35%);
+  /* Layer 2 噪点纹理：feTurbulence fractalNoise 平铺（SVG data-URI） */
+  --glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: oklch(0.185 0.012 255);
+  --foreground: oklch(0.955 0.005 250);
+  --card: oklch(0.235 0.014 255);
+  --card-foreground: oklch(0.955 0.005 250);
+  --popover: oklch(0.26 0.014 255);
+  --popover-foreground: oklch(0.955 0.005 250);
+  --muted: oklch(0.28 0.012 255);
+  --muted-foreground: oklch(0.72 0.012 250);
+  --accent: oklch(0.3 0.018 255);
+  --accent-foreground: oklch(0.955 0.005 250);
+
+  --primary: oklch(0.68 0.16 258);
+  --primary-foreground: oklch(0.16 0.015 255);
+  --destructive: oklch(0.68 0.19 25);
+  --destructive-foreground: oklch(0.16 0.015 255);
+  --success: oklch(0.7 0.15 155);
+  --success-foreground: oklch(0.16 0.015 255);
+  --warning: oklch(0.78 0.15 78);
+  --warning-foreground: oklch(0.18 0.02 78);
+
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.68 0.16 258);
+
+  /* 暗色玻璃：底色更透、高光更弱（浅色底打白光会过曝） */
+  --glass-bg: oklch(0.3 0.015 255 / 55%);
+  --glass-border: oklch(1 0 0 / 14%);
+  --glass-highlight: oklch(1 0 0 / 20%);
+  --glass-shade: oklch(0 0 0 / 20%);
+  --glass-shadow: oklch(0 0 0 / 40%);
+  --glass-sheen: oklch(1 0 0 / 12%);
+}
+
+/* 移动端降模糊半径（§4.6：每帧重算模糊是移动端掉帧主因） */
+@media (max-width: 640px) {
+  :root,
+  .dark {
+    --glass-blur: 12px;
+  }
+}
