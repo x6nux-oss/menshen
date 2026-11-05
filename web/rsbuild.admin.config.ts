@@ -63,6 +63,14 @@ export default defineConfig(({ command }) => ({
     // 同内容，被覆盖无副作用（该文件只由 Mini App 的 index.html 引用）。
   },
   server: {
+    // dev server 的 URL 基路径。与 output.assetPrefix 是两回事（Vite 的 base
+    // 一个选项管两端，rsbuild 拆成两个）：只设 assetPrefix 会让 dev 下应用挂在
+    // 根路径 /，与运行时代码硬编码的 /admin/ 前缀不匹配。
+    base: '/admin/',
+    // 入口名是 admin，rsbuild dev 按入口名给 URL（/admin/admin），而 /admin/ 会 404。
+    // 生产由 Go 做同样的回退（admin_panel.go 的 adminDistFile + adminIndex），
+    // 所以 dev 也要有：否则本地开发打不开 /admin/，刷新与深链全部 404。
+    historyApiFallback: { index: '/admin.html' },
     // 本地开发把面板 API 代理到 Go 服务（默认监听 127.0.0.1:8081）。
     proxy: { '/admin/api': 'http://127.0.0.1:8081' },
   },

@@ -307,12 +307,12 @@ Dockerfile 的两条 `test -f`（index.html + admin.html）、CI 的 `npm run bu
 | b | 共享产物目录两次构建 | ✅ 成立（**前置构建 `true` / 后置 `false`**），无退路 |
 | c | `html.template` 按 entryName 分派 | ✅ 成立（`rsbuild.config.ts` 用函数形式，`index`→`index.html`、`public`→`public.html`） |
 | d | Tailwind 4 在 rsbuild 下 `@theme inline` | ✅ 成立，**未走 `@tailwindcss/postcss` 退路**（实测产出 8168 字节 CSS） |
-| e | MSW worker 由 `public/` 复制替代 dev 中间件 | ✅ 生产构建成立（worker 进产物根、Go 侧可达）；**dev 下另有缺陷，见下** |
+| e | MSW worker 由 `public/` 复制替代 dev 中间件 | ✅ 成立（worker 进产物根、Go 侧可达；dev 路径缺陷已修复，见下） |
 
-**⚠️ 未满足的完成标准：dev server 在 `VITE_MOCK=1` 下白屏**
+**dev server 白屏缺陷（已修复）**
 
-验收时发现一个 **Phase 0 完成标准第 4 条未真正满足**的问题（生产构建与托管全部正常，
-仅开发模式受影响）：
+验收时发现 Phase 0 完成标准第 4 条在 **dev 模式**下未满足（生产构建与托管始终正常）。
+审查判定为 Important（dev 不可用即标准 4 未满足），已在本阶段内修复，未顺延到 Phase 1。
 
 - **现象**：`VITE_MOCK=1 npm run dev` 后打开 `http://localhost:3000/miniapp/` ——
   `#root` 永远空白，页面什么都不渲染。
@@ -337,22 +337,50 @@ Dockerfile 的两条 `test -f`（index.html + admin.html）、CI 的 `npm run bu
 - **迁移根因**：Vite 的 `base` 一个选项**同时**管 dev 与 build；rsbuild 拆成
   **`server.base`（dev 的 URL 基路径）** 与 **`output.assetPrefix`（产物里的资源前缀）**
   两个选项。Task 4 只迁了 `output.assetPrefix: '/miniapp/'`，漏了 `server.base`。
-- **修法**（Phase 1 开头补）：在两个 rsbuild 配置里加
-  `server: { base: '/miniapp/' }` / `{ base: '/admin/' }`。加完之后
-  `/miniapp/telegram-web-app.js` 与 `/miniapp/mockServiceWorker.js` 在 dev 下才会返回
-  真实文件，MSW 才能注册成功。
-  **修法已实测验证**（临时改配置起 dev、验证后还原）：
-  - dev URL 从 `http://localhost:3000/` 变为 `http://localhost:3000/miniapp/`（符合预期）；
-  - `/miniapp/telegram-web-app.js` 与 `/miniapp/mockServiceWorker.js` 的 Content-Type
-    从 `text/html` 变为 `text/javascript`；
-  - 浏览器 console 的消息数从 1（MSW MIME 报错）变为 **0**；
-  - 页面正常渲染（显示 `unavailable-guide` 引导页，这是普通浏览器无 Telegram SDK 时的预期）。
+
+**修复内容（两处，均已落地并实测）**
+
+1. **两个配置各加 `server.base`** —— `rsbuild.config.ts` 加 `base: '/miniapp/'`，
+   `rsbuild.admin.config.ts` 加 `base: '/admin/'`。
+2. **admin 再加 `server.historyApiFallback: { index: '/admin.html' }`** ——
+   加完 `base` 后暴露的第二层问题：入口名是 `admin`，rsbuild dev 按入口名给 URL
+   （`/admin/admin`），而 `/admin/`、`/admin/logs/9` 等会 404。生产由 Go 做同样的回退
+   （`admin_panel.go` 的 `adminDistFile` + `adminIndex`），dev 也要对齐，否则本地
+   打不开面板、刷新与深链全 404。Mini App 无需此项（入口名是 `index`，天然正确）。
+
+**修复后的实测验证（`npm run dev` / `npm run dev:admin`）**
+
+| 检查项 | 修复前 | 修复后 |
+|---|---|---|
+| Mini App dev URL | `http://localhost:3000/` | `http://localhost:3000/miniapp/` ✅ |
+| `/miniapp/telegram-web-app.js` | `text/html` | `text/javascript` ✅ |
+| `/miniapp/mockServiceWorker.js` | `text/html` | `text/javascript` ✅ |
+| 浏览器 console 消息数 | 1（MSW MIME 报错） | **0** ✅ |
+| 页面渲染 | `#root` 空 | 正常渲染 ✅ |
+| Mini App 深链（`/miniapp/bots/12`、`/miniapp/logs/9`、`/miniapp/records`） | — | 全部 200 HTML ✅ |
+| admin `/admin`、`/admin/`、`/admin/logs/9` | 404 | 全部 200 HTML ✅ |
+
+**proxy key 复验（加 `base` 后是否仍需按原路径匹配）**：仍按原路径匹配，**无需随 base 改**。
+实测（Go 服务未起，故表现为转发失败而非返回 dev 自己的 HTML —— 这恰好证明转发发生了）：
+
+```
+POST /miniapp/api/state  → HTTP 504  Error occurred while trying to proxy: localhost:3000/miniapp/api/state
+GET  /admin/api/state    → HTTP 504
+```
+
+返回 `504` + proxy 错误文案说明请求已被转发到 `127.0.0.1:8081`（连接被拒）；
+若未转发会得到 dev server 自己的 HTML。
+
+**修复未影响生产构建**：`npm run build` 产物哈希与修复前**完全一致**
+（`lib-react.875be40ab7.js`、`admin.6ee65c18a8.js`、`u.0867847a85.js`，Total 650.1 kB），
+三 html 齐全；`npm run typecheck` exit 0；51 files / 339 tests 通过；lint exit 0；
+`internal/panel` 的托管用例（`TestMiniAppServesEmbeddedApp`、`TestMiniAppRouteBoundaries`、
+`TestAdminPanelRoutes`、`TestPublicShellHandler`）全部 PASS。
+`server.base` 与 `historyApiFallback` 都只作用于 dev server，不进产物。
+
 - **不受影响的部分**：生产构建产物的路径**完全正确**（`assets/` 扁平、引用带
-  `/miniapp/` 前缀、SDK 排在入口脚本之前），Go 侧托管与全部 339 个前端测试、
-  `internal/panel` 的 handler 测试都通过。这个缺陷**只在 dev**。
-- **验收时的旁证**：不设 `VITE_MOCK` 起 dev —— 页面正常渲染出
-  `data-testid="unavailable-guide"`（「请通过 Telegram 里打开本页」引导页），
-  控制台无任何消息。这条反证了「应用能挂载、只是 MSW 那条路断了」。
+  `/miniapp/` 前缀、SDK 排在入口脚本之前），Go 侧托管与全部前端测试都通过。
+  该缺陷**只在 dev**。
 
 **构建耗时**（`npm run build`，含 `tsc -b` + 两次 rsbuild 构建）
 
@@ -370,7 +398,7 @@ Vite 基线无法对比（Vite 配置与依赖已在 Task 4 删除，为对比�
 | 1 | `npm run build` 一条命令产三个 html | ✅ `index.html` + `public.html` + `admin.html` |
 | 2 | typecheck / test / lint 全绿（测试文件一个不改） | ✅ `tsc -b` exit 0；51 files / 339 tests 通过；lint exit 0（2 个既有 warning，非本次引入） |
 | 3 | 有产物与无产物两种状态下 `go build` 都成功 | ✅ 两者均通过；无产物时 `go test ./internal/panel/` 也通过（回到 503 占位页路径） |
-| 4 | 三个面在浏览器里打开正常 | ⚠️ **部分**：生产构建的托管已由 handler 测试覆盖并通过；但 **dev 模式白屏**（见上，待 Phase 1 修） |
+| 4 | 三个面在浏览器里打开正常 | ✅ **通过**（dev 缺陷已在本阶段修复，见上「dev server 白屏缺陷（已修复）」）。生产托管由 handler 测试覆盖；dev 下两个 app 的入口页、静态文件、SPA 深链均已实测正常 |
 | 5 | vite 配置已删、依赖已移除 | ✅ 两个配置删除；`package.json` 无 `vite` / `@vitejs/*` |
 | 6 | `.gitkeep` 在 git 索引、`.gitignore` 未排掉 | ✅ `git ls-files` 列出它；规则为 `webdist/*` + `!webdist/.gitkeep` |
 | 7 | 设计文档已写入实测结论 | ✅ 本节 |

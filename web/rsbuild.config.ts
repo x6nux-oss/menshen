@@ -95,6 +95,12 @@ export default defineConfig(({ command, envMode }) => {
       // checksum 是常量比对，不是文件哈希），功能仍可用。
     },
     server: {
+      // dev server 的 URL 基路径。Vite 的 base 一个选项同时管 dev 与 build，
+      // rsbuild 拆成两个：server.base（dev 的 URL 基路径）与 output.assetPrefix
+      // （产物里的资源前缀）。只设后者会让 dev 下应用挂在根路径 /，而运行时代码
+      // 硬编码 /miniapp/ 前缀 → /miniapp/* 全落到 SPA 回退返回 text/html，
+      // 于是 MSW 注册失败（unsupported MIME type 'text/html'）、白屏。
+      base: '/miniapp/',
       // 本地开发把 API 代理到 Go 服务（默认监听 127.0.0.1:8081）。
       proxy: { '/miniapp/api': 'http://127.0.0.1:8081' },
     },
