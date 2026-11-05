@@ -112,3 +112,6 @@ export { Skeleton } from './skeleton'
 export { ScrollArea } from './scroll-area'
 
 export { Avatar, AvatarImage, AvatarFallback } from './avatar'
+
+export { Spinner } from './spinner'
+export type { SpinnerProps } from './spinner'
