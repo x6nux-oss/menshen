@@ -101,55 +101,51 @@ function TokenSection() {
   )
 }
 
-/** Backdrop 是玻璃的垫底：彩色渐变 + 网格线。
- *  玻璃必须有东西可透才看得出模糊与折射 —— 垫在纯色底上等于没做。 */
-function Backdrop({ children }: { children: ReactNode }) {
-  return (
-    <div
-      data-testid="preview-glass-backdrop"
-      className="relative overflow-hidden rounded-xl bg-[linear-gradient(135deg,#2563eb_0%,#7c3aed_35%,#db2777_70%,#f59e0b_100%)] p-4"
-    >
-      {/* 网格线：模糊后会被糊开，比纯渐变更容易看出「背后确实被糊了」 */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(to_right,rgba(255,255,255,.5)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,.5)_1px,transparent_1px)] [background-size:24px_24px]"
-      />
-      <div className="relative z-10">{children}</div>
-    </div>
-  )
-}
-
-/** GlassSection 展示玻璃三层。每张卡各自垫一块背景 —— 便于逐张对比。 */
+/** GlassSection 展示玻璃三层。三张卡悬浮在同一块彩色画布上 —— 见下方注释。 */
 function GlassSection() {
   return (
     <Section title="玻璃层">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Backdrop>
+      {/* 一块大画布，三张玻璃悬浮其上 —— 而不是「每个小格子各垫一块渐变」。
+          真实界面里玻璃背后是整页内容（列表、图表、图片），不是一张贴纸；
+          用小格子垫底会把玻璃效果压成「彩纸上的白卡片」，看不出悬浮感。 */}
+      <div
+        data-testid="preview-glass-backdrop"
+        className="relative overflow-hidden rounded-2xl p-6 sm:p-10"
+        style={{
+          backgroundImage:
+            'radial-gradient(38rem 24rem at 12% 18%, #2563eb 0%, transparent 62%),' +
+            'radial-gradient(32rem 22rem at 88% 12%, #7c3aed 0%, transparent 60%),' +
+            'radial-gradient(30rem 20rem at 62% 96%, #db2777 0%, transparent 62%),' +
+            'linear-gradient(150deg, #1e3a8a 0%, #4c1d95 55%, #831843 100%)',
+        }}
+      >
+        {/* 细网格：模糊后会被糊开，比纯色块更容易看出「背后确实被模糊了」 */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(to_right,rgba(255,255,255,.7)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,.7)_1px,transparent_1px)] [background-size:28px_28px]"
+        />
+        <div className="relative z-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <GlassCard data-testid="preview-glass-base">
             <div className="text-sm font-semibold">Layer 1 基线毛玻璃</div>
             <p className="mt-1 text-[13px] opacity-80">
               模糊 + 描边 + 内外高光。所有设备都有这一层。
             </p>
           </GlassCard>
-        </Backdrop>
 
-        <Backdrop>
           <GlassCard data-testid="preview-glass-refract" refract>
             <div className="text-sm font-semibold">Layer 3 边缘折射</div>
             <p className="mt-1 text-[13px] opacity-80">
               Chromium 上边缘有位移；Safari 拿不到，退回 Layer 1+2（平台限制，非缺陷）。
             </p>
           </GlassCard>
-        </Backdrop>
 
-        <Backdrop>
           <GlassPanel sheen data-testid="preview-glass-sheen">
             <div className="text-sm font-semibold">镜面扫光（常显）</div>
             <p className="mt-1 text-[13px] opacity-80">
               Layer 2 的另一个成分：斜向高光扫过。噪点纹理也在这一层。
             </p>
           </GlassPanel>
-        </Backdrop>
+        </div>
       </div>
       <p className="mt-3 text-[13px] text-muted-foreground">
         核对要点：背后色块应被模糊（不是清晰透出）；边缘有 1px 描边与顶部高光；噪点让表面
@@ -475,7 +471,12 @@ export function PreviewPage() {
     <ToastProvider>
       {/* 折射滤镜定义：Layer 3 的 backdrop-filter 引用它，全页渲染一次即可 */}
       <GlassFilterDefs />
-      <div className="min-h-dvh bg-background px-4 py-6 text-foreground sm:px-6 lg:px-8">
+      {/* 不要在这里加 bg-background：那会盖住 body::before 的景深光晕，
+          玻璃背后就只剩纯色、模糊效果完全看不出来。背景交给 body 的基线样式。 */}
+      <div className="min-h-dvh px-4 py-6 text-foreground sm:px-6 lg:px-8">
+        {/* 内容限宽居中：不限宽时在宽屏上内容全挤左侧、右侧大片空白，
+            看起来像「没做完」。1360 与桌面面板的内容区一致。 */}
+        <div className="mx-auto max-w-[1360px]">
         <header className="mb-8 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
           <div>
             <h1 className="text-xl font-bold">门神 · 组件预览</h1>
@@ -486,13 +487,16 @@ export function PreviewPage() {
           <ThemeToggle />
         </header>
 
-        <main className="mx-auto max-w-5xl">
+        {/* 预览页是组件画廊而非长文，用比 5xl（1024）更宽的容器，
+            否则三列玻璃卡在宽屏上会挤成窄条、右侧留大片空白。 */}
+        <main className="mx-auto max-w-[1200px]">
           <TokenSection />
           <GlassSection />
           <BasicSection />
           <MobileSection />
           <FeedbackSection />
         </main>
+        </div>
       </div>
     </ToastProvider>
   )

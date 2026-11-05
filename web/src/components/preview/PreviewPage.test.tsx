@@ -31,7 +31,12 @@ describe('组件预览页', () => {
 
   it('玻璃层样本背后有色块可透（否则看不出模糊）', () => {
     render(<PreviewPage />)
-    expect(screen.getAllByTestId('preview-glass-backdrop').length).toBeGreaterThanOrEqual(3)
+    // 三张玻璃卡悬浮在**同一块**彩色画布上（而非各自垫一块小格子）——
+    // 真实界面里玻璃背后是整页内容，共享画布才看得出悬浮与模糊。
+    const canvas = screen.getByTestId('preview-glass-backdrop')
+    for (const id of ['preview-glass-base', 'preview-glass-refract', 'preview-glass-sheen']) {
+      expect(canvas.contains(screen.getByTestId(id)), `${id} 应在这块画布内`).toBe(true)
+    }
   })
 
   it('基础组件节渲染了按钮与徽标', () => {

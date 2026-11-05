@@ -12,6 +12,8 @@
   --radius-xl: 1.25rem;
 
   /* ---- 基础色 ---- */
+  /* 背景不是纯色：带一点冷蓝的浅灰，让白卡片与玻璃有分离感。
+     纯白底上的白卡片 = 没有层次，这是「AI 塑料感」的头号来源。 */
   --background: oklch(0.985 0.003 250);
   --foreground: oklch(0.205 0.015 255);
   --card: oklch(1 0 0);
@@ -22,6 +24,17 @@
   --muted-foreground: oklch(0.5 0.015 255);
   --accent: oklch(0.955 0.012 250);
   --accent-foreground: oklch(0.205 0.015 255);
+
+  /* ---- 景深画布（§4.7）----
+   * 应用底色不是单一颜色，而是几团品牌色光晕叠在底色上。
+   * 玻璃的 backdrop-filter 模糊的是「它背后的东西」—— 背后是纯色时，
+   * 模糊结果与不模糊完全一样，玻璃就退化成一块半透明白板。
+   * 这些光晕给了玻璃可模糊的内容，也让页面有了视觉焦点。
+   *
+   * 浓度取 22%/18%：再低在这个尺度下几乎看不出（实测 14% 时整页仍像纯白）。 */
+  --canvas-glow-1: oklch(0.62 0.19 258 / 22%);
+  --canvas-glow-2: oklch(0.64 0.18 320 / 18%);
+  --canvas-glow-3: oklch(0.68 0.14 200 / 14%);
 
   /* ---- 品牌与语义色 ---- */
   --primary: oklch(0.55 0.185 258);
@@ -38,12 +51,16 @@
   --input: oklch(0.9 0.008 255);
   --ring: oklch(0.55 0.185 258);
 
-  /* ---- 玻璃层（§4.3 契约）---- */
-  --glass-bg: oklch(1 0 0 / 62%);
-  --glass-border: oklch(1 0 0 / 55%);
-  --glass-highlight: oklch(1 0 0 / 70%);
+  /* ---- 玻璃层（§4.3 契约）----
+   * 底色刻意做得**薄**（42%）：太不透明会把背后的光晕与内容盖死，玻璃就退化成
+   * 一块半透明白板。可读性靠两条兜底：玻璃上的正文用 --foreground（深色）、
+   * 以及描边 + 内高光勾勒边界。低视力用户在 prefers-reduced-transparency 下
+   * 会退回不透明卡片（见 glass.css 的回退 2）。 */
+  --glass-bg: oklch(1 0 0 / 42%);
+  --glass-border: oklch(1 0 0 / 62%);
+  --glass-highlight: oklch(1 0 0 / 78%);
   --glass-shade: oklch(0.5 0.01 255 / 8%);
-  --glass-shadow: oklch(0.3 0.02 255 / 12%);
+  --glass-shadow: oklch(0.3 0.02 255 / 14%);
   --glass-blur: 20px;
   --glass-saturate: 180%;
   --glass-noise-opacity: 0.03;
@@ -66,6 +83,10 @@
   --accent: oklch(0.3 0.018 255);
   --accent-foreground: oklch(0.955 0.005 250);
 
+  /* 暗色画布：光晕更浓（暗底上低透明度会被吃掉，需比亮色高一档） */
+  --canvas-glow-1: oklch(0.6 0.18 258 / 26%);
+  --canvas-glow-2: oklch(0.6 0.17 320 / 20%);
+
   --primary: oklch(0.68 0.16 258);
   --primary-foreground: oklch(0.16 0.015 255);
   --destructive: oklch(0.68 0.19 25);
@@ -79,12 +100,13 @@
   --input: oklch(1 0 0 / 16%);
   --ring: oklch(0.68 0.16 258);
 
-  /* 暗色玻璃：底色更透、高光更弱（浅色底打白光会过曝） */
-  --glass-bg: oklch(0.3 0.015 255 / 55%);
-  --glass-border: oklch(1 0 0 / 14%);
-  --glass-highlight: oklch(1 0 0 / 20%);
-  --glass-shade: oklch(0 0 0 / 20%);
-  --glass-shadow: oklch(0 0 0 / 40%);
+  /* 暗色玻璃：底色更薄、高光更弱（暗底上白光会过曝）。
+     暗底本身对比度低，薄玻璃反而更容易看出层次。 */
+  --glass-bg: oklch(0.32 0.015 255 / 38%);
+  --glass-border: oklch(1 0 0 / 16%);
+  --glass-highlight: oklch(1 0 0 / 22%);
+  --glass-shade: oklch(0 0 0 / 24%);
+  --glass-shadow: oklch(0 0 0 / 45%);
   --glass-sheen: oklch(1 0 0 / 12%);
 }
 
