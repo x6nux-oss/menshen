@@ -1,37 +1,35 @@
 // 群组列表：本地搜索 + intent 过滤条 + 添加群抽屉 +
 // `管理` 批量模式（一次只允许同一 bot，底部操作条走 chat.bulk_update）。
-import Add from '@mui/icons-material/Add'
-import Close from '@mui/icons-material/Close'
-import {
-  Box,
-  Button,
-  Checkbox,
-  Chip,
-  IconButton,
-  MenuItem,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Plus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { errorStatus } from '../api/client'
 import { useMiniState } from '../api/hooks'
 import { useChatMutation } from '../api/mutations'
 import type { Bot, Chat } from '../api/types'
-import { filterRows } from '../lib/filters'
-import { muteOptLabel, chatURL } from '../lib/format'
-import { BULK_CHAT_LIMIT, toggleChatSelection } from '../lib/selection'
-import { useNav, usePageParam } from '../nav'
+import { EmptyState, ErrorState, Skeletons, useToast } from '../components/feedback'
 import {
   ChatRef,
-  EmptyState,
-  ErrorState,
   FormDrawer,
   ListRow,
   SearchField,
   SectionCard,
-  Skeletons,
-  useToast,
-} from '../ui'
+} from '../components/mobile'
+import {
+  Badge,
+  Button,
+  Checkbox,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui'
+import { filterRows } from '../lib/filters'
+import { chatURL, muteOptLabel } from '../lib/format'
+import { BULK_CHAT_LIMIT, toggleChatSelection } from '../lib/selection'
+import { useNav, usePageParam } from '../nav'
 import { ChatStatusBadge } from './shared'
 
 function chatKey(c: Pick<Chat, 'bot_id' | 'chat_id'>): string {
@@ -56,7 +54,8 @@ function botLabelOf(bots: Bot[], botID: number): string {
 /** 批量操作条未测到高度前的兜底预留（窄屏换行时约 135px，取 140 更稳）。 */
 const BATCH_BAR_MIN_RESERVE = 140
 
-const BULK_BUTTON_SX = { minWidth: 0, minHeight: 32, px: 1.25, fontSize: 13 }
+/** 批量操作条的紧凑按钮：全局 Button 默认 h-9，这里压回 32 让五个按钮一屏放下。 */
+const BULK_BUTTON = 'h-8 min-w-0 px-1.25 text-[13px]'
 
 export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number } = {}) {
   const nav = useNav()
@@ -188,52 +187,54 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
   }
 
   const punishOptions = [
-    { value: -1, label: '跟随 bot 设置' },
+    { value: '-1', label: '跟随 bot 设置' },
     {
-      value: 0,
+      value: '0',
       label: `当前禁言档（${selected.length > 0 ? muteOptLabel(state.data.bot_settings, state.data.global_defaults, selected[0].bot_id) : '—'}）`,
     },
-    { value: 1, label: '封禁出群（永久）' },
+    { value: '1', label: '封禁出群（永久）' },
   ]
 
   return (
-    <Box
+    <div
       data-testid="chats-page"
       data-reserved={reserved}
-      sx={{
-        // Shell 已为 TabBar 留了 72px；这里补批量操作条实测高度（未测到时用兜底值）。
-        pb: batch ? `calc(${reserved}px + env(safe-area-inset-bottom))` : 0,
+      // Shell 已为 TabBar 留了 72px；这里补批量操作条实测高度（未测到时用兜底值）。
+      style={{
+        paddingBottom: batch ? `calc(${reserved}px + env(safe-area-inset-bottom))` : undefined,
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+      <div className="mb-2 flex items-center gap-1.5">
         <SearchField
           value={q}
           onChange={setQ}
           placeholder="搜索群名 / chat_id / 机器人"
           ariaLabel="搜索群组"
-          sx={{ flex: 1 }}
+          className="flex-1"
         />
-        <Button size="small" onClick={() => (batch ? exitBatch() : setBatch(true))}>
+        <Button size="sm" variant="secondary" onClick={() => (batch ? exitBatch() : setBatch(true))}>
           {batch ? '取消' : '管理'}
         </Button>
         {!batch && (
-          <IconButton aria-label="添加群" size="small" onClick={openAdd}>
-            <Add />
-          </IconButton>
+          <Button size="icon" variant="ghost" aria-label="添加群" onClick={openAdd}>
+            <Plus aria-hidden />
+          </Button>
         )}
-      </Box>
+      </div>
 
       {intentLabel && (
-        <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 0.25 }}>
-          <Chip size="small" color="primary" variant="outlined" label={`只看：${intentLabel}`} />
-          <IconButton
+        <div className="mb-2 flex items-center gap-1">
+          <Badge tone="neutral">只看：{intentLabel}</Badge>
+          <Button
+            size="icon"
+            variant="ghost"
             aria-label="清除筛选"
-            size="small"
+            className="size-8"
             onClick={() => nav.switchTab('chats')}
           >
-            <Close sx={{ fontSize: 18 }} />
-          </IconButton>
-        </Box>
+            <X className="size-4" aria-hidden />
+          </Button>
+        </div>
       )}
 
       {visible.length === 0 ? (
@@ -242,9 +243,7 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
             title="还没有接入群组"
             description="点右上角「＋」添加：把这个 bot 拉进群后填群 ID，添加后默认演练。"
             action={
-              <Button variant="contained" onClick={openAdd}>
-                添加群
-              </Button>
+              <Button onClick={openAdd}>添加群</Button>
             }
           />
         ) : (
@@ -258,10 +257,7 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
               <ListRow
                 key={chatKey(chat)}
                 primary={
-                  <ChatRef
-                    name={chat.title || String(chat.chat_id)}
-                    url={chatURL(chat.username)}
-                  />
+                  <ChatRef name={chat.title || String(chat.chat_id)} url={chatURL(chat.username)} />
                 }
                 secondary={
                   chat.username
@@ -270,15 +266,18 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
                 }
                 badge={<ChatStatusBadge chat={chat} />}
                 chevron={!batch}
-                onClick={() => (batch ? toggleSelect(chat) : nav.push({ k: 'chat', botId: chat.bot_id, chatId: chat.chat_id }))}
+                onClick={() =>
+                  batch
+                    ? toggleSelect(chat)
+                    : nav.push({ k: 'chat', botId: chat.bot_id, chatId: chat.chat_id })
+                }
                 trailing={
                   batch ? (
                     <Checkbox
-                      size="small"
                       checked={picked}
-                      onChange={() => toggleSelect(chat)}
+                      aria-label={`选择 ${chat.title || chat.chat_id}`}
+                      onCheckedChange={() => toggleSelect(chat)}
                       onClick={(event) => event.stopPropagation()}
-                      slotProps={{ input: { 'aria-label': `选择 ${chat.title || chat.chat_id}` } }}
                     />
                   ) : undefined
                 }
@@ -289,74 +288,65 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
       )}
 
       {batch && (
-        <Box
+        <div
           ref={barRef}
           data-testid="batch-bar"
-          sx={{
-            position: 'fixed',
-            left: 0,
-            right: 0,
-            bottom: 'calc(56px + env(safe-area-inset-bottom))',
-            bgcolor: 'background.paper',
-            borderTop: '1px solid',
-            borderColor: 'divider',
-            px: 1,
-            py: 1,
-            zIndex: (theme) => theme.zIndex.appBar,
-          }}
+          className="fixed inset-x-0 z-20 border-t border-border bg-card px-2 py-2"
+          // TabBar 是 z-30、高 56px（含安全区），这里贴在它上面。
+          style={{ bottom: 'calc(56px + env(safe-area-inset-bottom))' }}
         >
-          <Typography sx={{ mb: 0.75, fontSize: 12, color: 'text.secondary', textAlign: 'center' }}>
+          <p className="mb-1.5 text-center text-[12px] text-muted-foreground">
             已选 {selected.length} 个群
             {selected.length > 0 ? ` · ${botLabel(selected[0].bot_id)}` : ''}
-          </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'center' }}>
+          </p>
+          <div className="flex flex-wrap justify-center gap-1">
             <Button
-              size="small"
-              variant="outlined"
-              sx={BULK_BUTTON_SX}
+              size="sm"
+              variant="outline"
+              className={BULK_BUTTON}
               disabled={selected.length === 0 || bulkMut.isPending}
               onClick={() => bulkUpdate({ enabled: true })}
             >
               启用
             </Button>
             <Button
-              size="small"
-              variant="outlined"
-              sx={BULK_BUTTON_SX}
+              size="sm"
+              variant="outline"
+              className={BULK_BUTTON}
               disabled={selected.length === 0 || bulkMut.isPending}
               onClick={() => bulkUpdate({ enabled: false })}
             >
               停用
             </Button>
             <Button
-              size="small"
-              variant="outlined"
-              sx={BULK_BUTTON_SX}
+              size="sm"
+              variant="outline"
+              className={BULK_BUTTON}
               disabled={selected.length === 0 || bulkMut.isPending}
               onClick={() => bulkUpdate({ dryrun: true })}
             >
               开启演练
             </Button>
             <Button
-              size="small"
-              variant="outlined"
-              sx={BULK_BUTTON_SX}
+              size="sm"
+              variant="outline"
+              className={BULK_BUTTON}
               disabled={selected.length === 0 || bulkMut.isPending}
               onClick={() => bulkUpdate({ dryrun: false })}
             >
               关闭演练
             </Button>
             <Button
-              size="small"
-              variant="outlined"
-              sx={BULK_BUTTON_SX}
+              size="sm"
+              variant="outline"
+              className={BULK_BUTTON}
               disabled={selected.length === 0 || bulkMut.isPending}
               onClick={() => setPunishOpen(true)}
             >
               处罚方式
             </Button>
-          </Box>
-        </Box>
+          </div>
+        </div>
       )}
 
       <FormDrawer
@@ -368,44 +358,46 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
         submitDisabled={addBotID === 0 || addChatID.trim() === ''}
         onSubmit={submitAdd}
       >
-        <TextField
-          select
-          fullWidth
-          size="small"
-          label="机器人"
+        <Label htmlFor="add-bot" className="mb-1 block">
+          机器人
+        </Label>
+        <Select
           value={String(addBotID)}
-          onChange={(event) => setAddBotID(Number(event.target.value))}
+          onValueChange={(value) => setAddBotID(Number(value))}
         >
-          {bots.map((bot) => (
-            <MenuItem key={bot.bot_id} value={String(bot.bot_id)}>
-              {bot.label} · {bot.bot_id}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          fullWidth
-          size="small"
-          label="群 ID"
+          <SelectTrigger id="add-bot" aria-label="机器人">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {bots.map((bot) => (
+              <SelectItem key={bot.bot_id} value={String(bot.bot_id)}>
+                {bot.label} · {bot.bot_id}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Label htmlFor="add-chat-id" className="mt-3 mb-1 block">
+          群 ID
+        </Label>
+        <Input
+          id="add-chat-id"
+          inputMode="numeric"
           placeholder="-1001234567890"
           value={addChatID}
           onChange={(event) => setAddChatID(event.target.value)}
-          slotProps={{ htmlInput: { inputMode: 'numeric' } }}
-          helperText="以 -100 开头的群 ID；先把机器人拉进群再加。"
-          sx={{ mt: 1.5 }}
         />
-        <Typography sx={{ mt: 1, fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
+        <p className="mt-1 text-[12px] leading-[1.6] text-muted-foreground">
+          以 -100 开头的群 ID；先把机器人拉进群再加。
+        </p>
+        <p className="mt-2 text-[13px] leading-[1.6] text-muted-foreground">
           添加后默认「演练」：只记录判定结果、不处罚，确认无误后再关闭演练。
-        </Typography>
+        </p>
       </FormDrawer>
 
-      <FormDrawer
-        open={punishOpen}
-        onClose={() => setPunishOpen(false)}
-        title="批量设置处罚方式"
-      >
-        <Typography sx={{ mb: 1, fontSize: 13, color: 'text.secondary' }}>
+      <FormDrawer open={punishOpen} onClose={() => setPunishOpen(false)} title="批量设置处罚方式">
+        <p className="mb-1 text-[13px] text-muted-foreground">
           将对已选的 {selected.length} 个群生效。
-        </Typography>
+        </p>
         {punishOptions.map((option) => (
           <ListRow
             key={option.value}
@@ -413,11 +405,11 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
             chevron
             onClick={() => {
               setPunishOpen(false)
-              bulkUpdate({ punish: option.value })
+              bulkUpdate({ punish: Number(option.value) })
             }}
           />
         ))}
       </FormDrawer>
-    </Box>
+    </div>
   )
 }

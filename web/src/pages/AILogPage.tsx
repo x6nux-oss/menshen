@@ -4,73 +4,68 @@
 //   - 搜索是服务端子串匹配（model / upstream / status / error），300ms 防抖；
 //   - 流水的输入/输出全文在详情页（点行进入）；固定提示词在落库时已剥成
 //     占位符，这里看到的就是存下的样子。
-import { Box, Button, Chip, Typography } from "@mui/material";
-import { useEffect, useRef, useState } from "react";
-import { errorStatus } from "../api/client";
-import { useInfiniteAILogs, useMiniState } from "../api/hooks";
-import type { AILogRow } from "../api/types";
-import { displayTz, fmtTSFull } from "../lib/format";
-import { usePageParam, useNav } from "../nav";
-import { Badge, EmptyState, ErrorState, SearchField, Skeletons } from "../ui";
-import { InfiniteFooter, ListCount, ListLoading } from "./shared";
+import { useEffect, useRef, useState } from 'react'
+import { errorStatus } from '../api/client'
+import { useInfiniteAILogs, useMiniState } from '../api/hooks'
+import type { AILogRow } from '../api/types'
+import { EmptyState, ErrorState, Skeletons } from '../components/feedback'
+import { SearchField, Segmented } from '../components/mobile'
+import { Badge, Button } from '../components/ui'
+import { displayTz, fmtTSFull } from '../lib/format'
+import { useNav, usePageParam } from '../nav'
+import { InfiniteFooter, ListCount, ListLoading } from './shared'
 
-const SEARCH_DEBOUNCE_MS = 300;
+const SEARCH_DEBOUNCE_MS = 300
 
 /** STATUS_FILTERS 是结果筛选：全部 / 成功 / 失败。value 直接发给后端。 */
 const STATUS_FILTERS: { value: string; label: string }[] = [
-  { value: "", label: "全部" },
-  { value: "ok", label: "成功" },
-  { value: "err", label: "失败" },
-];
+  { value: '', label: '全部' },
+  { value: 'ok', label: '成功' },
+  { value: 'err', label: '失败' },
+]
 
 export function AILogPage() {
-  const state = useMiniState(true);
-  const nav = useNav();
+  const state = useMiniState(true)
+  const nav = useNav()
   const [status, setStatus] = usePageParam(
-    "status",
-    "",
+    'status',
+    '',
     STATUS_FILTERS.map((s) => s.value),
-  );
-  const [q, setQ] = usePageParam("q");
-  const [serverQ, setServerQ] = useState(q);
-  const debounceRef = useRef<number | null>(null);
+  )
+  const [q, setQ] = usePageParam('q')
+  const [serverQ, setServerQ] = useState(q)
+  const debounceRef = useRef<number | null>(null)
 
   useEffect(
     () => () => {
-      if (debounceRef.current !== null)
-        window.clearTimeout(debounceRef.current);
+      if (debounceRef.current !== null) window.clearTimeout(debounceRef.current)
     },
     [],
-  );
+  )
 
-  const isMain = state.data?.me.main === true;
-  const logs = useInfiniteAILogs({ q: serverQ, status, enabled: isMain });
+  const isMain = state.data?.me.main === true
+  const logs = useInfiniteAILogs({ q: serverQ, status, enabled: isMain })
 
   const changeQ = (next: string) => {
-    setQ(next);
-    if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
+    setQ(next)
+    if (debounceRef.current !== null) window.clearTimeout(debounceRef.current)
     debounceRef.current = window.setTimeout(() => {
-      debounceRef.current = null;
-      setServerQ(next);
-    }, SEARCH_DEBOUNCE_MS);
-  };
+      debounceRef.current = null
+      setServerQ(next)
+    }, SEARCH_DEBOUNCE_MS)
+  }
 
   const submitQ = () => {
     if (debounceRef.current !== null) {
-      window.clearTimeout(debounceRef.current);
-      debounceRef.current = null;
+      window.clearTimeout(debounceRef.current)
+      debounceRef.current = null
     }
-    setServerQ(q);
-  };
+    setServerQ(q)
+  }
 
-  if (state.isPending) return <Skeletons rows={3} />;
+  if (state.isPending) return <Skeletons rows={3} />
   if (state.isError) {
-    return (
-      <ErrorState
-        status={errorStatus(state.error)}
-        onRetry={() => void state.refetch()}
-      />
-    );
+    return <ErrorState status={errorStatus(state.error)} onRetry={() => void state.refetch()} />
   }
   if (!isMain) {
     return (
@@ -78,68 +73,49 @@ export function AILogPage() {
         title="需要主管理员权限"
         description="模型调用流水带着所有机器人的判定上下文，只有主管理员可以查看。"
       />
-    );
+    )
   }
 
-  const tz = displayTz(state.data);
-  const rows = logs.data?.pages.flatMap((page) => page.logs) ?? [];
-  const total = logs.data?.pages[0]?.total;
-  const countLoading = logs.isPending || logs.isPlaceholderData;
+  const tz = displayTz(state.data)
+  const rows = logs.data?.pages.flatMap((page) => page.logs) ?? []
+  const total = logs.data?.pages[0]?.total
+  const countLoading = logs.isPending || logs.isPlaceholderData
 
   return (
-    <Box data-testid="ailog-page">
-      <Box sx={{ display: "flex", gap: 1, mb: 1, alignItems: "center" }}>
+    <div data-testid="ailog-page">
+      <div className="mb-1 flex items-center gap-2">
         <SearchField
           value={q}
           onChange={changeQ}
           onSubmit={submitQ}
           placeholder="搜模型 / 上游 / 错误"
           ariaLabel="搜索模型调用流水"
+          className="flex-1"
         />
         <Button
-          size="small"
-          variant="outlined"
+          size="sm"
+          variant="outline"
           onClick={() => void logs.refetch()}
-          sx={{ flex: "0 0 auto", minHeight: 40, px: 1.5 }}
+          className="h-10 shrink-0 px-3"
         >
           刷新
         </Button>
-      </Box>
+      </div>
 
-      <Box
-        sx={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 0.75,
-          alignItems: "center",
-          mb: 0.5,
-        }}
-      >
-        {STATUS_FILTERS.map((item) => (
-          <Chip
-            key={item.value || "all"}
-            data-testid={`ailog-status-${item.value || "all"}`}
-            size="small"
-            label={item.label}
-            color={status === item.value ? "primary" : "default"}
-            variant={status === item.value ? "filled" : "outlined"}
-            onClick={() => setStatus(item.value)}
-          />
-        ))}
-      </Box>
+      <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
+        <Segmented
+          value={status}
+          onChange={setStatus}
+          options={STATUS_FILTERS}
+          ariaLabel="调用结果"
+        />
+      </div>
 
       {logs.isError && logs.data === undefined ? (
-        <ErrorState
-          status={errorStatus(logs.error)}
-          onRetry={() => void logs.refetch()}
-        />
+        <ErrorState status={errorStatus(logs.error)} onRetry={() => void logs.refetch()} />
       ) : (
         <>
-          <ListCount
-            total={total}
-            loading={countLoading}
-            testId="ailog-total"
-          />
+          <ListCount total={total} loading={countLoading} testId="ailog-total" />
           {logs.isPending ? (
             <Skeletons rows={3} />
           ) : rows.length === 0 ? (
@@ -153,16 +129,16 @@ export function AILogPage() {
             )
           ) : (
             <>
-              <Box sx={{ mt: 0.5 }}>
+              <div className="mt-0.5">
                 {rows.map((row) => (
                   <AILogListRow
                     key={row.id}
                     row={row}
                     tz={tz}
-                    onOpen={() => nav.push({ k: "ailogitem", id: row.id })}
+                    onOpen={() => nav.push({ k: 'ailogitem', id: row.id })}
                   />
                 ))}
-              </Box>
+              </div>
               <InfiniteFooter
                 hasNextPage={logs.hasNextPage}
                 isFetchingNextPage={logs.isFetchingNextPage}
@@ -176,94 +152,39 @@ export function AILogPage() {
         </>
       )}
 
-      <Typography
-        sx={{
-          px: 1.5,
-          mt: 1,
-          fontSize: 12,
-          color: "text.secondary",
-          lineHeight: 1.7,
-        }}
-      >
+      <p className="mt-2 px-3 text-[12px] leading-[1.7] text-muted-foreground">
         固定系统提示词（判定/复判等）对所有请求都一样，落库时已换成占位符；正文、资料与上下文原样保留。
         保留天数在「全局设置 → 护栏与成本」调整。
-      </Typography>
-    </Box>
-  );
+      </p>
+    </div>
+  )
 }
 
 /** AILogListRow：时间 + 结果徽标 + 模型/上游 + 用量与时延；点行看全文。 */
-function AILogListRow({
-  row,
-  tz,
-  onOpen,
-}: {
-  row: AILogRow;
-  tz?: string;
-  onOpen: () => void;
-}) {
-  const ok = row.status === "ok";
+function AILogListRow({ row, tz, onOpen }: { row: AILogRow; tz?: string; onOpen: () => void }) {
+  const ok = row.status === 'ok'
   return (
-    <Box
+    <button
+      type="button"
       data-testid={`ailog-row-${row.id}`}
       onClick={onOpen}
-      sx={{
-        px: 0.5,
-        py: 0.75,
-        borderBottom: "1px solid",
-        borderColor: "divider",
-        cursor: "pointer",
-      }}
+      className="block min-h-[52px] w-full border-b border-border px-2 py-1.5 text-left transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
     >
-      <Box sx={{ display: "flex", gap: 0.75, alignItems: "center" }}>
-        <Badge tone={ok ? "ok" : "no"}>{ok ? "成功" : "失败"}</Badge>
-        <Typography
-          sx={{
-            fontSize: 13,
-            fontWeight: 600,
-            flex: 1,
-            minWidth: 0,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {row.model || "（未记录）"}
-        </Typography>
-        <Typography
-          sx={{ fontSize: 12, color: "text.secondary", flex: "0 0 auto" }}
-        >
-          {row.latency_ms}ms
-        </Typography>
-      </Box>
-      <Typography
-        sx={{
-          fontSize: 12,
-          color: "text.secondary",
-          mt: 0.25,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {fmtTSFull(row.ts, tz)} · {row.endpoint} · {row.upstream || "—"} ·{" "}
+      <span className="flex items-center gap-1.5">
+        <Badge tone={ok ? 'ok' : 'no'}>{ok ? '成功' : '失败'}</Badge>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+          {row.model || '（未记录）'}
+        </span>
+        <span className="shrink-0 text-[12px] text-muted-foreground">{row.latency_ms}ms</span>
+      </span>
+      <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
+        {fmtTSFull(row.ts, tz)} · {row.endpoint} · {row.upstream || '—'} ·{' '}
         {row.prompt_tokens}+{row.completion_tokens} tok · {row.cost_text}
-        {!ok && row.status ? ` · ${row.status}` : ""}
-      </Typography>
+        {!ok && row.status ? ` · ${row.status}` : ''}
+      </span>
       {!ok && row.error && (
-        <Typography
-          sx={{
-            fontSize: 12,
-            color: "text.secondary",
-            mt: 0.25,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {row.error}
-        </Typography>
+        <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">{row.error}</span>
       )}
-    </Box>
-  );
+    </button>
+  )
 }
