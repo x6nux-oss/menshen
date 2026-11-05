@@ -39,4 +39,23 @@ describe('设计系统样式入口', () => {
       expect(css, `index.css 应 @import ${dep}`).toContain(dep)
     }
   })
+
+  it('glass.css 的 .glass 规则在 @layer components 内', () => {
+    // 无 layer 的声明胜过任何 layer 内的声明（与源码顺序无关）。若 .glass 的
+    // position: relative 处于无 layer 状态，调用方传的 fixed/absolute 工具类
+    // 会被它压掉 —— 底部栏不固定、弹层不限位，且无任何告警。
+    const css = readFileSync(resolve(webRoot, 'src/styles/glass.css'), 'utf-8')
+    const layerIdx = css.indexOf('@layer components')
+    const glassIdx = css.indexOf('.glass {')
+    expect(layerIdx, 'glass.css 应有 @layer components').toBeGreaterThan(-1)
+    expect(glassIdx, 'glass.css 应有 .glass 规则').toBeGreaterThan(-1)
+    expect(glassIdx, '.glass 必须在 @layer components 之后（即在其内部）').toBeGreaterThan(layerIdx)
+  })
+
+  it('glass-refract.css 不写 -webkit- 前缀副本（lightningcss 去前缀会让折射失效）', () => {
+    const css = readFileSync(resolve(webRoot, 'src/styles/glass-refract.css'), 'utf-8')
+    const decls = css.replace(/\/\*[\s\S]*?\*\//g, '') // 去掉注释再查，注释里提到的前缀不算
+    expect(decls, '不得写 -webkit-backdrop-filter（会被去重成只剩前缀那条，Chromium 不认 url() 前缀形式）')
+      .not.toContain('-webkit-backdrop-filter')
+  })
 })

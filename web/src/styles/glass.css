@@ -4,55 +4,64 @@
  *   Layer 2 噪点 + 镜面扫光 —— 纯 CSS，100% 设备
  *   Layer 3 边缘折射 —— 见 glass-refract.css，@supports 才启用
  * 三条回退缺一不可：@supports not / prefers-reduced-transparency / prefers-reduced-motion。
+ *
+ * **必须放在 @layer components 里**：Tailwind 的工具类在 `@layer utilities`，
+ * 而**无 layer 的声明胜过任何 layer 内的声明**（与源码顺序无关）。若这里的
+ * `.glass { position: relative }` 处于无 layer 状态，调用方传的 `fixed`/`absolute`
+ * 定位工具类会被它压掉 —— 表现为底部栏不固定、弹层不限位，且无任何告警。
+ * 放进 components 层后，utilities 按 Tailwind 的层序（theme, base, components,
+ * utilities）正常胜出。
  */
 
-.glass {
-  position: relative;
-  isolation: isolate;
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  border: 1px solid var(--glass-border);
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    inset 0 -1px 0 var(--glass-shade),
-    0 8px 32px var(--glass-shadow);
-}
+@layer components {
+  .glass {
+    position: relative;
+    isolation: isolate;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      inset 0 1px 0 var(--glass-highlight),
+      inset 0 -1px 0 var(--glass-shade),
+      0 8px 32px var(--glass-shadow);
+  }
 
-/* Layer 2a：噪点纹理。打破大面积纯色的塑料感。 */
-.glass::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: var(--glass-noise);
-  opacity: var(--glass-noise-opacity);
-  mix-blend-mode: overlay;
-  border-radius: inherit;
-  z-index: -1;
-}
+  /* Layer 2a：噪点纹理。打破大面积纯色的塑料感。 */
+  .glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: var(--glass-noise);
+    opacity: var(--glass-noise-opacity);
+    mix-blend-mode: overlay;
+    border-radius: inherit;
+    z-index: -1;
+  }
 
-/* Layer 2b：镜面扫光。斜向渐变，默认隐藏，hover 或 data-sheen=in 时显现。 */
-.glass::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    115deg,
-    transparent 30%,
-    var(--glass-sheen) 46%,
-    transparent 62%
-  );
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  border-radius: inherit;
-  z-index: -1;
-}
+  /* Layer 2b：镜面扫光。斜向渐变，默认隐藏，hover 或 data-sheen=in 时显现。 */
+  .glass::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      var(--glass-sheen) 46%,
+      transparent 62%
+    );
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    border-radius: inherit;
+    z-index: -1;
+  }
 
-.glass:hover::after,
-.glass[data-sheen='in']::after {
-  opacity: 1;
+  .glass:hover::after,
+  .glass[data-sheen='in']::after {
+    opacity: 1;
+  }
 }
 
 /* 回退 1：浏览器不支持 backdrop-filter —— 退成不透明卡片，不做假模糊 */
