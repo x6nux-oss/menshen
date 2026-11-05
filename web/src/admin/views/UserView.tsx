@@ -1,10 +1,10 @@
 // 用户资料：画像概览 + 该用户的判定记录（分段：已处置 / 全部）。
 import { useState } from 'react'
-import { Box, Button, Typography } from '@mui/material'
 import { useUser, useMiniState } from '../../api/hooks'
 import { actionLabel, displayTz, fmtTS, fmtTSFull } from '../../lib/format'
 import { verdictInfo } from '../../lib/status'
-import { Segmented, ChatRef } from '../../ui'
+import { Button } from '../../components/ui'
+import { ChatRef, Segmented } from '../../components/mobile'
 import { CardBlock, DataTable, InfoList, PageHeader, StatCard, StatusBadge } from '../components'
 import type { Column } from '../components'
 import type { UserLogRow } from '../../api/types'
@@ -17,11 +17,11 @@ export function UserView({ id }: { id: number }) {
   const [page, setPage] = useState(1)
   const user = useUser(id, filter, page)
 
-  if (user.isPending) return <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>加载中…</Typography>
+  if (user.isPending) return <span className="text-sm text-muted-foreground">加载中…</span>
   if (user.isError || !user.data) {
     return (
       <CardBlock>
-        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>用户资料加载失败或不存在。</Typography>
+        <span className="text-sm text-muted-foreground">用户资料加载失败或不存在。</span>
       </CardBlock>
     )
   }
@@ -39,9 +39,9 @@ export function UserView({ id }: { id: number }) {
       key: 'text',
       header: '正文',
       render: (row) => (
-        <Typography sx={{ fontSize: 12.5, color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span className="block truncate text-[12.5px] text-muted-foreground">
           {row.text || row.reason || '—'}
-        </Typography>
+        </span>
       ),
     },
   ]
@@ -53,12 +53,12 @@ export function UserView({ id }: { id: number }) {
         subtitle={d.username ? `@${d.username} · uid ${d.user_id}` : `uid ${d.user_id}`}
       />
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 1.5, mb: 2 }}>
+      <div className="mb-2 grid gap-1.5 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
         <StatCard label="留底消息" value={d.msgs} hint={`缓存 ${d.kept} 条`} />
         <StatCard label="命中记录" value={d.hits} hint={`共 ${d.total} 条记录`} />
         <StatCard label="涉及群组" value={d.chats} />
         <StatCard label="入群时间" value={d.first_seen ? fmtTS(d.first_seen, tz) : '未知'} />
-      </Box>
+      </div>
 
       <CardBlock title="画像">
         <InfoList
@@ -89,25 +89,25 @@ export function UserView({ id }: { id: number }) {
           loading={user.isFetching}
           rows={d.logs}
           rowKey={(row) => row.id}
-          empty={<Typography sx={{ fontSize: 13, color: 'text.secondary' }}>没有匹配的记录。</Typography>}
+          empty={<span className="text-[13px] text-muted-foreground">没有匹配的记录。</span>}
           columns={columns}
         />
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1.5 }}>
-          <Button size="small" variant="outlined" disabled={page <= 1 || user.isFetching} onClick={() => setPage(page - 1)}>
+        <div className="mt-1.5 flex items-center gap-2">
+          <Button size="sm" variant="outline" disabled={page <= 1 || user.isFetching} onClick={() => setPage(page - 1)}>
             上一页
           </Button>
-          <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+          <span className="text-[13px] text-muted-foreground">
             第 {page} / {pages} 页（{d.shown} 条）
-          </Typography>
+          </span>
           <Button
-            size="small"
-            variant="outlined"
+            size="sm"
+            variant="outline"
             disabled={page >= pages || user.isFetching}
             onClick={() => setPage(page + 1)}
           >
             下一页
           </Button>
-        </Box>
+        </div>
       </CardBlock>
     </>
   )
