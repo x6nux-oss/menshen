@@ -484,6 +484,73 @@ Telegram 真机 iOS + Android（玻璃在 Safari 的实际观感、滚动不掉�
 Phase 之间不留新旧组件共存态（主人选的是「全部页面一次重写」），
 但 Phase 0 是个例外：它只换构建器，组件保持 MUI，用来隔离构建链风险。
 
+### 10.1 Phase 1 验收结论（2026-11-06 实测）
+
+**结论：全部 7 条完成标准满足。** 设计系统落地，与现有 MUI 界面并存，未改动任何现有页面。
+
+#### 产出清单
+
+| 路径 | 内容 |
+|---|---|
+| `src/styles/token.css` | oklch 语义 token（`:root` 亮色 + `.dark` 暗色两套），含 10 个玻璃 token 与 feTurbulence 噪点 data-URI |
+| `src/styles/index.css` | Tailwind 入口 + `@theme inline`（保持 `var()` 引用，暗色切换时工具类跟着变）+ `@custom-variant dark` |
+| `src/styles/glass.css` | 玻璃 Layer 1（毛玻璃）+ Layer 2（噪点/扫光）+ 三条回退 |
+| `src/styles/glass-refract.css` | 玻璃 Layer 3（折射，`@supports` 包裹） |
+| `src/lib/utils.ts` | `cn()`（clsx + tailwind-merge） |
+| `src/lib/theme-mode.ts` | 亮暗模式解析与订阅（三个面共用） |
+| `src/components/glass/` | `Glass` + 四个预设（Card/Panel/Sheet/Toolbar）+ `GlassFilterDefs`（SVG 滤镜定义） |
+| `src/components/ui/` | 21 个 shadcn 组件（Button/Badge/Input/…/Table） |
+| `src/components/mobile/` | 8 个移动端组件（ListRow/SectionCard/SwitchRow/Segmented/ActionSheet/SearchField/TabBar/TopBar） |
+| `src/components/feedback/` | 5 件（Toast/EmptyState/ErrorState/Skeletons/ErrorBoundary） |
+| `src/components/preview/` | 组件预览页（dev-only 入口 `/miniapp/_preview`，Phase 4 后删除） |
+
+#### 门禁结果
+
+```
+npm run typecheck  → exit 0
+npm run test       → 58 files / 472 tests 全绿（Phase 0 结束时 51/339）
+npm run lint       → exit 0（2 个既有 warning，非本阶段引入）
+npm run build      → 成功；CSS 产物 41.2 KB（含 backdrop-filter、三条回退、glass--refract）
+go build / go test ./internal/panel/  → 通过（Go 侧零改动）
+```
+
+**测试数 339 → 472（+133）**，且**既有 339 个一个未改** —— 这是「Phase 1 只新增、不破坏」的直接证据。
+
+#### 未改动现有页面（承重验证）
+
+```
+git diff --stat <Phase1 base> HEAD -- web/src/pages/ web/src/admin/ web/src/ui/ web/src/public/
+→ 仅 main.tsx × 2（各加一行设计系统样式 import）
+→ 其余零改动
+```
+
+#### 玻璃三层在真实浏览器的表现
+
+| 层 | 实测结果 |
+|---|---|
+| Layer 1 基线毛玻璃 | `backdrop-filter: blur(20px) saturate(180%)`，移动端降为 12px |
+| Layer 2 噪点 + 扫光 | 噪点 SVG data-URI 平铺（opacity 0.03，mix-blend overlay）；扫光 hover/`data-sheen=in` 时显现 |
+| Layer 3 折射 | Chromium 上 `url(#menshen-glass-refract)` 生效；**Safari 无位移但仍保留毛玻璃**（平台差异，属预期） |
+
+三条回退均实测存在于产物 CSS：`@supports not (backdrop-filter)` / `prefers-reduced-transparency` / `prefers-reduced-motion`。
+
+#### Phase 1 踩到的三个真实缺陷（都已修）
+
+1. **token 与玻璃层从未进入构建产物** —— 三个入口都没 `import` 样式入口文件。Tailwind 只处理被 import 到的 CSS，于是构建成功、产物里却**没有任何 CSS**，所有新组件无样式且无告警。这个缺陷溜过了两轮人工审查。修法：三个入口各加一行 import（`src/main.tsx` 用 `../`，`src/public/` 与 `src/admin/` 用 `../../`）。**并新增 `src/styles/entry.test.ts` 用断言钉住**，防同类回归。
+
+2. **lightningcss 去前缀导致 Layer 3 折射整条静默失效** —— 同值的标准 + `-webkit-` 两条声明被去重成只留前缀那条，而 Chromium 的 `url()` 形式只认标准属性。表现为 `@supports` 返回 true、选择器匹配、但规则为空。修法：`glass-refract.css` 只写标准属性。
+
+3. **模板注释里的 `</head>` 字面量**（Phase 0 遗留同类）—— rsbuild 的 HTML 插件按字面量替换，会命中注释里那一处，把入口脚本注进注释内部从而使它们失效。
+
+#### 与 new-api 的取舍差异
+
+new-api 的玻璃只用标准 `backdrop-blur`；本设计多了一层**显式 opt-in 的折射**（`.glass--refract`），并按附录 B 的调研结论把它限定在少量静态装饰元素（概览大卡、公开页顶部、空状态），列表与表格区域不用 —— 滚动时每帧重算位移会掉帧。
+
+#### 遗留（不阻塞 Phase 2）
+
+- 若干注释类 Minor（rsbuild 配置的归因注释、`env.d.ts` 一行冗余声明等），已记入 SDD ledger 待 Phase 2 一并处理。
+- `Skeletons` 的 `rows` 语义、`ConfirmOptions` 的 `danger` 字段名等**计划文本与旧实现不符**的地方，实现时一律以旧实现为准（已在 ledger 记录）。
+
 ## 11. 风险
 
 | 风险 | 影响 | 缓解 |
