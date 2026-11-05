@@ -239,6 +239,8 @@ func liftJoinMute(b *core.Bot, dmChat, groupID int64, u *tg.TGUser,
 // humanDuration 把等待时长格式化为可读文本。
 func humanDuration(d time.Duration) string {
 	switch {
+	case d >= 24*time.Hour:
+		return fmt.Sprintf("%d 天", int(d.Hours()/24)+1)
 	case d >= time.Hour:
 		return fmt.Sprintf("%d 小时", int(d.Hours())+1)
 	case d >= time.Minute:

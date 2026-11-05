@@ -70,33 +70,33 @@ func videoMsg(msgID int64, unique string, size int64) *tg.Message {
 // 没有文件句柄的不取（连下载都无从谈起）。
 func TestVisualOfMovingMedia(t *testing.T) {
 	cases := []struct {
-		name  string
-		m     *tg.Message
-		label string
+		name string
+		m    *tg.Message
+		tag  string
 	}{
 		{"视频", func() *tg.Message {
 			m := testutil.GroupMsg(-100, 42, 1, "")
 			m.Video = &tg.MovingMedia{FileID: "v", FileUniqueID: "vu"}
 			return m
-		}(), "［视频］"},
+		}(), "video"},
 		{"动图", func() *tg.Message {
 			m := testutil.GroupMsg(-100, 42, 1, "")
 			m.Animation = &tg.MovingMedia{FileID: "a", FileUniqueID: "au"}
 			return m
-		}(), "［动图］"},
+		}(), "animation"},
 		{"视频消息", func() *tg.Message {
 			m := testutil.GroupMsg(-100, 42, 1, "")
 			m.VideoNote = &tg.MovingMedia{FileID: "n", FileUniqueID: "nu"}
 			return m
-		}(), "［视频消息］"},
+		}(), "video_note"},
 	}
 	for _, c := range cases {
 		v, ok := visualOf(c.m)
 		if !ok {
 			t.Fatalf("%s：应当抽帧识图", c.name)
 		}
-		if v.label != c.label {
-			t.Errorf("%s：标签 = %q，期望 %q", c.name, v.label, c.label)
+		if v.tag != c.tag {
+			t.Errorf("%s：标签 = %q，期望 %q", c.name, v.tag, c.tag)
 		}
 		want := []int{0, 1, 2}
 		if len(v.frames) != len(want) {
@@ -180,7 +180,7 @@ func TestVideoFramesJudgedWithVision(t *testing.T) {
 	HandleGroupMessage(b, videoMsg(1, "vu1", 1024))
 	waitIdle(t, b)
 
-	if s := seen.Load().(string); !strings.Contains(s, "［视频］") || !strings.Contains(s, "abc123") {
+	if s := seen.Load().(string); !strings.Contains(viewBody(s), "<video") || !strings.Contains(s, "abc123") {
 		t.Fatalf("送检正文应带抽帧识图结果: %s", s)
 	}
 	var text string

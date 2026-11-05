@@ -36,9 +36,16 @@ type caches struct {
 	// link 缓存简介/昵称里挂的频道、群组、bot 查出来的样子，键为小写用户名。
 	// 按用户名共享：群里十个人挂同一个频道也只查一次。
 	link core.TTLMap[string, linkInfo]
+	// linkPreview 缓存 t.me 链接的公开预览，键为归一化后的小写链接。
+	// 刷屏式引流会反复贴同一个链接，缓存后只取一次；空结果也缓存，
+	// 已删/私密的帖子不必每条消息重试。
+	linkPreview core.TTLMap[string, adLinkPreview]
 	// vision 是识图结果，键为 file_unique_id：刷屏号反复发同一张图、
 	// 群友反复用同一个贴纸，不必每次都花钱。
 	vision core.TTLMap[string, string]
+	// ocr 是 OCR 结果，键为 "模型file_unique_id"：OCR 优先于识图，空串
+	// 表示「这张图没有文字」（已确认过，下次直接回落识图，不再重复烧 OCR）。
+	ocr core.TTLMap[string, string]
 	// doomedAlbums 记下已判成广告的相册，判定之后才到的那几张照删。
 	doomedAlbums core.TTLMap[string, struct{}]
 	// unbanGate 是申诉的重试闸，键为 uid。
@@ -103,7 +110,9 @@ func GCCaches(sh *core.Shared) {
 	c.bio.GC(now)
 	c.photo.GC(now)
 	c.link.GC(now)
+	c.linkPreview.GC(now)
 	c.vision.GC(now)
+	c.ocr.GC(now)
 	c.doomedAlbums.GC(now)
 	c.unbanGate.GC(now)
 	c.joinNotice.GC(now)

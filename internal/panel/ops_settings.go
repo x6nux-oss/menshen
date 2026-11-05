@@ -15,12 +15,14 @@ import (
 // 权限、取值校验、`-` 的含义、清旧键都只在这里实现一次，避免同一设置项
 // 在不同入口有不同规则。
 
-// globalToggles 是一键切换的全局 0/1 开关（不在 settingSpecs 里）。
+// globalToggles 是一键切换的全局 0/1 开关。多数不在 settingSpecs 里；
+// archive_enabled 例外：它同时是每个 bot 可覆盖的 antiad 组设置，全局
+// 这一层用开关切换，bot 层仍走 settingSpecs 的输入校验。
 var globalToggles = []string{"antiad_enabled", "alert_copy_main", "gban_enabled",
-	"antiad_rule_auto", "captcha_demo"}
+	"antiad_rule_auto", "captcha_demo", "archive_enabled"}
 
 // singleModelKeys 是单值模型设置；列表型的见 legacyModelKey。
-var singleModelKeys = []string{"antiad_vision_model", "antiad_rule_model"}
+var singleModelKeys = []string{"antiad_ocr_model", "antiad_vision_model", "antiad_rule_model"}
 
 // setSetting 写一项设置。botID 为 0 写全局值（只有主管理员能写）；否则写
 // 该 bot 的覆盖值（只有 antiad / both 组的整数项能覆盖），val 为空或 `-`

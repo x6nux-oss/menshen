@@ -1,14 +1,9 @@
 package antiad
 
 import (
-	"bufio"
 	"context"
-	_ "embed"
 	"encoding/json"
-	"fmt"
 	"log/slog"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,6 +11,7 @@ import (
 	"time"
 
 	"menshen/internal/core"
+	"menshen/internal/mtproto"
 )
 
 // ---- 历史成员入群时间补全 ----
@@ -29,28 +25,20 @@ import (
 // chat_member 更新实时记录（那是 Bot API 有的），补全只负责入群之前就在
 // 群里、入群时间未知的那批历史成员 —— 年龄轴（新人/老人分档）靠它。
 //
-// 需要宿主上有 python3 + telethon，以及配置里的 tg_api_id / tg_api_hash
-// （my.telegram.org 申请）。缺任何一样都只记一条日志、不影响判定。
+// 用纯 Go 的 gotd/td 登录 MTProto，不再依赖 python / telethon；需要配置里
+// 的 tg_api_id / tg_api_hash（my.telegram.org 申请）。缺任何一样都只记
+// 一条日志、不影响判定。
 
-//go:embed scripts/tgjoin_backfill.py
-var joinBackfillScript string
-
-// joinBackfillTimeout 是一次补全的整体超时。万人大群要翻很多页，给足；
-// 但子进程不能无限期挂着。
+// joinBackfillTimeout 是一次补全的整体超时。万人大群要翻很多页，给足。
 const joinBackfillTimeout = 10 * time.Minute
 
 // joinBackfillCooldown 是同一个群两次补全之间的间隔：管理员权限变更会推
 // 好几次 my_chat_member（改权限、置顶…），不该每次都跑一遍。
 const joinBackfillCooldown = 24 * time.Hour
 
-var (
-	// joinBackfillRunning 是全局单飞：同一个进程同时只跑一个补全。
-	joinBackfillRunning sync.Mutex
-	// joinBackfillScriptOnce 保证嵌入脚本只落盘一次。
-	joinBackfillScriptOnce sync.Once
-	joinBackfillScriptPath string
-	joinBackfillScriptErr  error
-)
+// joinBackfillRunning 是全局单飞：整个进程同时只允许一个 MTProto 客户端
+// 使用会话文件（gotd 的 session 文件不能并发写）。
+var joinBackfillRunning sync.Mutex
 
 // backfillRow 是补全脚本输出的一行。
 type backfillRow struct {
@@ -59,8 +47,8 @@ type backfillRow struct {
 	Joined int64
 }
 
-// backfillRunner 是跑一次补全脚本的实现，测试里替换掉。
-var backfillRunner = runJoinBackfillScript
+// backfillRunner 是跑一次补全的实现，测试里替换掉。
+var backfillRunner = runJoinBackfillMTProto
 
 // BackfillRow 是补全结果的一行（导出版，供测试与其他包使用）。
 type BackfillRow = backfillRow
@@ -202,7 +190,7 @@ var (
 	// joinLookupMu 让单人查询排队：同一个 bot 的 MTProto 会话文件不能并发。
 	joinLookupMu sync.Mutex
 	// joinLookupRunner 是单人查询的实现，测试里替换。
-	joinLookupRunner = runJoinLookupScript
+	joinLookupRunner = runJoinLookupMTProto
 )
 
 // ResolveJoinTime 实时查一个人在某群的入群时间，查到就写回 group_members。
@@ -286,132 +274,102 @@ func ensureJoinAgeFresh(b *core.Bot, chatID, uid int64, p *senderProfile) {
 	ensureJoinAge(b, chatID, p)
 }
 
-// runJoinLookupScript 起一次单人查询，返回入群时间（0 表示查不到）。
-func runJoinLookupScript(b *core.Bot, chatID, uid int64) (int64, error) {
-	script, err := ensureJoinBackfillScript(b)
-	if err != nil {
-		return 0, err
+// mtprotoOptions 构造这个 bot 的 MTProto 连接参数。目录按 bot 分开：
+// 会话文件与 access_hash 缓存互不干扰。
+func mtprotoOptions(b *core.Bot) mtproto.Options {
+	return mtproto.Options{
+		AppID:   b.Cfg.TGAPIID,
+		AppHash: b.Cfg.TGAPIHash,
+		Token:   b.Token,
+		BotID:   b.BotID(),
+		Dir: filepath.Join(filepath.Dir(b.Cfg.DBPath), "mtproto",
+			strconv.FormatInt(b.BotID(), 10)),
 	}
+}
+
+// runJoinLookupMTProto 实时查一个人在某群的入群时间（0 表示查不到）。
+func runJoinLookupMTProto(b *core.Bot, chatID, uid int64) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), joinLookupTimeout)
 	defer cancel()
 
-	args := []string{script, "--chat", strconv.FormatInt(chatID, 10),
-		"--lookup", strconv.FormatInt(uid, 10)}
-	if username := chatUsername(b, chatID); username != "" {
-		args = append(args, "--username", username)
-	}
-	cmd := exec.CommandContext(ctx, "python3", args...)
-	cmd.Env = append(os.Environ(),
-		"TG_BOT_TOKEN="+b.Token,
-		"TG_API_ID="+strconv.Itoa(b.Cfg.TGAPIID),
-		"TG_API_HASH="+b.Cfg.TGAPIHash,
-		"TG_SESSION_DIR="+sessionsDir(b),
-		"PYTHONUNBUFFERED=1",
-	)
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	username := chatUsername(b, chatID)
+	var ts int64
+	err := mtproto.Run(ctx, mtprotoOptions(b), func(ctx context.Context, c *mtproto.Client) error {
+		var err error
+		ts, err = mtproto.LookupJoinTime(ctx, c, chatID, username, uid,
+			func(ctx context.Context) []string { return joinLookupNames(b, chatID, uid) })
+		return err
+	})
 	if err != nil {
-		return 0, errWithStderr(err, stderr.String())
+		return 0, err
 	}
-	for _, line := range strings.Split(string(out), "\n") {
-		parts := strings.Split(strings.TrimSpace(line), "\t")
-		if len(parts) != 3 {
-			continue
-		}
-		if ts, e := strconv.ParseInt(parts[2], 10, 64); e == nil && ts > 0 {
-			return ts, nil
-		}
-	}
-	return 0, nil
+	return ts, nil
 }
 
-// runJoinBackfillScript 把嵌入的脚本落到数据目录下再执行，读回 TSV。
-func runJoinBackfillScript(b *core.Bot, chatID int64, username string) ([]backfillRow, error) {
-	script, err := ensureJoinBackfillScript(b)
+// joinLookupNames 用 Bot API getChatMember 拿名字，供 MTProto 按名字搜索
+// 成员列表兜底（部分账号单查 participant 拿不到记录）。
+func joinLookupNames(b *core.Bot, chatID, uid int64) []string {
+	raw, err := b.TG.Call("getChatMember", map[string]any{
+		"chat_id": chatID, "user_id": uid,
+	})
 	if err != nil {
-		return nil, err
+		return nil
 	}
+	var resp struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			Status string `json:"status"`
+			User   struct {
+				FirstName string `json:"first_name"`
+				LastName  string `json:"last_name"`
+				Username  string `json:"username"`
+			} `json:"user"`
+		} `json:"result"`
+	}
+	if json.Unmarshal(raw, &resp) != nil || !resp.OK {
+		return nil
+	}
+	switch resp.Result.Status {
+	case "member", "restricted", "administrator", "creator":
+	default:
+		return nil
+	}
+	u := resp.Result.User
+	fn, ln, un := strings.TrimSpace(u.FirstName), strings.TrimSpace(u.LastName),
+		strings.TrimSpace(u.Username)
+	var names []string
+	if fn != "" {
+		names = append(names, fn)
+	}
+	if ln != "" {
+		names = append(names, ln)
+	}
+	if fn != "" && ln != "" {
+		names = append(names, fn+" "+ln)
+	}
+	if un != "" {
+		names = append(names, un)
+	}
+	return names
+}
+
+// runJoinBackfillMTProto 扫一遍成员列表，返回能拿到入群时间的成员。
+func runJoinBackfillMTProto(b *core.Bot, chatID int64, username string) ([]backfillRow, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), joinBackfillTimeout)
 	defer cancel()
 
-	args := []string{script, "--chat", strconv.FormatInt(chatID, 10)}
-	if username != "" {
-		args = append(args, "--username", username)
-	}
-	cmd := exec.CommandContext(ctx, "python3", args...)
-	cmd.Env = append(os.Environ(),
-		"TG_BOT_TOKEN="+b.Token,
-		"TG_API_ID="+strconv.Itoa(b.Cfg.TGAPIID),
-		"TG_API_HASH="+b.Cfg.TGAPIHash,
-		"TG_SESSION_DIR="+sessionsDir(b),
-		"PYTHONUNBUFFERED=1",
-	)
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-	stdout, err := cmd.StdoutPipe()
+	var rows []mtproto.JoinRow
+	err := mtproto.Run(ctx, mtprotoOptions(b), func(ctx context.Context, c *mtproto.Client) error {
+		var err error
+		rows, err = mtproto.JoinTimes(ctx, c, chatID, username)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
-	if err := cmd.Start(); err != nil {
-		return nil, err
+	out := make([]backfillRow, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, backfillRow{ChatID: r.ChatID, UserID: r.UserID, Joined: r.Joined})
 	}
-	var rows []backfillRow
-	sc := bufio.NewScanner(stdout)
-	sc.Buffer(make([]byte, 64*1024), 1<<20)
-	for sc.Scan() {
-		parts := strings.Split(strings.TrimSpace(sc.Text()), "\t")
-		if len(parts) != 3 {
-			continue
-		}
-		chat, err1 := strconv.ParseInt(parts[0], 10, 64)
-		uid, err2 := strconv.ParseInt(parts[1], 10, 64)
-		ts, err3 := strconv.ParseInt(parts[2], 10, 64)
-		if err1 != nil || err2 != nil || err3 != nil || uid == 0 || ts <= 0 {
-			continue
-		}
-		rows = append(rows, backfillRow{ChatID: chat, UserID: uid, Joined: ts})
-	}
-	if err := cmd.Wait(); err != nil {
-		return rows, errWithStderr(err, stderr.String())
-	}
-	return rows, nil
-}
-
-// errWithStderr 把脚本的 stderr 末尾附进错误里：python/telethon 的报错只有
-// 这里看得到。
-func errWithStderr(err error, stderr string) error {
-	s := strings.TrimSpace(stderr)
-	if s == "" {
-		return err
-	}
-	if i := strings.LastIndex(s, "\n"); i >= 0 {
-		s = s[i+1:]
-	}
-	return fmt.Errorf("%w：%s", err, s)
-}
-
-// ensureJoinBackfillScript 把嵌入脚本写到数据目录（只写一次），返回路径。
-func ensureJoinBackfillScript(b *core.Bot) (string, error) {
-	joinBackfillScriptOnce.Do(func() {
-		dir := filepath.Join(filepath.Dir(b.Cfg.DBPath), "join_backfill")
-		if err := os.MkdirAll(dir, 0o700); err != nil {
-			joinBackfillScriptErr = err
-			return
-		}
-		p := filepath.Join(dir, "tgjoin_backfill.py")
-		if err := os.WriteFile(p, []byte(joinBackfillScript), 0o700); err != nil {
-			joinBackfillScriptErr = err
-			return
-		}
-		joinBackfillScriptPath = p
-	})
-	return joinBackfillScriptPath, joinBackfillScriptErr
-}
-
-// sessionsDir 是 MTProto 会话文件的目录（与数据同处，重启后复用）。
-func sessionsDir(b *core.Bot) string {
-	dir := filepath.Join(filepath.Dir(b.Cfg.DBPath), "join_backfill", "sessions")
-	_ = os.MkdirAll(dir, 0o700)
-	return dir
+	return out, nil
 }

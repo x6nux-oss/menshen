@@ -28,6 +28,10 @@ type Config struct {
 	// 它必须留在配置文件里而不能进管理面板：面板本身要靠它才连得上 TG。
 	TGAPIBase string
 	DBPath    string // 默认 ./data.db
+	// ArchiveDir 是消息存档的根目录（见 internal/archive）。为空时取
+	// DBPath 同目录下的 archive/。存档完全独立于数据库：原文与图片都
+	// 按群写成普通文件，数据库只留一份去重索引。
+	ArchiveDir string
 
 	// PublicURL 非空即启用 webhook 模式，否则走长轮询。
 	//
@@ -202,6 +206,7 @@ var envKeys = []struct{ env, key string }{
 	{"MENSHEN_TG_PROXY", "tg_proxy"},
 	{"MENSHEN_AI_PROXY", "ai_proxy"},
 	{"MENSHEN_DB_PATH", "db_path"},
+	{"MENSHEN_ARCHIVE_DIR", "archive_dir"},
 	{"MENSHEN_PUBLIC_URL", "public_url"},
 	{"MENSHEN_LISTEN_ADDR", "listen_addr"},
 	{"MENSHEN_TURNSTILE_SITE_KEY", "turnstile_site_key"},
@@ -256,6 +261,8 @@ func assign(c *Config, key, val string) error {
 		if val != "" {
 			c.DBPath = val
 		}
+	case "archive_dir":
+		c.ArchiveDir = strings.TrimSpace(val)
 	case "public_url":
 		c.PublicURL = strings.TrimRight(val, "/")
 	case "listen_addr":

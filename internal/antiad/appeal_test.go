@@ -646,3 +646,139 @@ func TestJudgeAppealPrewarmPayload(t *testing.T) {
 		t.Errorf("载荷 bio = %q，期望 喜欢摄影", payload.Sender.Bio)
 	}
 }
+
+// saveRejectedAppeal 落一张已驳回的申诉单：statement 是被驳回时的理由，
+// updatedAt 即驳回时刻（结案 rejected 的两条路都经 updateAppeal 刷新它）。
+func saveRejectedAppeal(t *testing.T, b *core.Bot, uid int64,
+	statement string, updatedAt int64) {
+	t.Helper()
+	if _, err := b.Store.Write.Exec(`INSERT INTO appeals
+		(bot_id,user_id,status,statement,created_at,updated_at)
+		VALUES (?,?,'rejected',?,?,?)`,
+		b.BotID(), uid, statement, updatedAt, updatedAt); err != nil {
+		t.Fatalf("落驳回单失败: %v", err)
+	}
+}
+
+func appealCount(t *testing.T, b *core.Bot, uid int64) int {
+	t.Helper()
+	var n int
+	if err := b.Store.Read.QueryRow(
+		`SELECT COUNT(*) FROM appeals WHERE user_id=?`, uid).Scan(&n); err != nil {
+		t.Fatalf("读申诉单数失败: %v", err)
+	}
+	return n
+}
+
+// TestAppealRejectCooldownBlocksRetry：申诉被驳回后 7 天内不能再次发起。
+// 冷却排在频控闸门之前，挡下时说明剩余等待时间，不建新单。
+func TestAppealRejectCooldownBlocksRetry(t *testing.T) {
+	b, fake := testutil.NewTestBot(t, 1)
+	saveRejectedAppeal(t, b, 555, "我是被误判的", time.Now().Unix())
+
+	HandleAppealCallback(b, appealGo(555))
+
+	last := fake.LastCall("sendMessage")
+	if last == nil {
+		t.Fatal("应回一条说明")
+	}
+	if text, _ := last["text"].(string); !strings.Contains(text, "7 天") {
+		t.Errorf("冷却期内应告知 7 天冷却:\n%s", text)
+	}
+	if n := appealCount(t, b, 555); n != 1 {
+		t.Errorf("冷却期内不该建新申诉单，实际 %d 张", n)
+	}
+}
+
+// TestAppealRejectCooldownExpires：驳回冷却只挡 7 天，过后能照常重新发起。
+func TestAppealRejectCooldownExpires(t *testing.T) {
+	b, fake := testutil.NewTestBot(t, 1)
+	saveRejectedAppeal(t, b, 555, "我是被误判的",
+		time.Now().Unix()-int64(8*24*time.Hour/time.Second))
+
+	HandleAppealCallback(b, appealGo(555))
+
+	if last := fake.LastCall("sendMessage"); last == nil ||
+		!strings.Contains(fmt.Sprint(last["text"]), "申诉理由") {
+		t.Errorf("冷却过后应照常进入写理由流程，得到 %v", last)
+	}
+	if n := appealCount(t, b, 555); n != 2 {
+		t.Errorf("冷却过后应建新申诉单，实际 %d 张", n)
+	}
+}
+
+// TestAppealStatementMustDifferAfterReject：驳回后再次申诉必须换一份理由。
+// 原样重交（含只改空白、大小写）在 capture 处被拦下，不推进 AI、留在
+// statement；换一份理由才照常复核并解除。
+func TestAppealStatementMustDifferAfterReject(t *testing.T) {
+	b, fake := testutil.NewTestBot(t, 1)
+	appealAI(t, b, false, "资料已改正")
+	saveJoinMute(b, -100, 555, kindProfile, "简介里有联系方式", 88)
+	old := "我是被误判的，简介里没有联系方式"
+	saveRejectedAppeal(t, b, 555, old,
+		time.Now().Unix()-int64(8*24*time.Hour/time.Second))
+
+	HandleAppealCallback(b, appealGo(555))
+	if st := appealStatus(t, b, 555); st != "statement" {
+		t.Fatalf("冷却过后应进 statement，得到 %q", st)
+	}
+
+	send := func(text string) {
+		m := appealDM(555)
+		m.Text = text
+		HandleNonStaffPrivate(b, m, text)
+	}
+
+	// 原样重交：拦下，留在 statement，不建第三张单。
+	send(old)
+	if st := appealStatus(t, b, 555); st != "statement" {
+		t.Errorf("原样重交不该推进 AI，应留在 statement，得到 %q", st)
+	}
+	if last := fake.LastCall("sendMessage"); last == nil ||
+		!strings.Contains(fmt.Sprint(last["text"]), "一样") {
+		t.Errorf("原样重交应被告知换一份理由，得到 %v", last)
+	}
+	if n := appealCount(t, b, 555); n != 2 {
+		t.Errorf("拦下原样重交不该另建单，实际 %d 张", n)
+	}
+
+	// 只改空白与大小写：算同一份，同样拦下。
+	send("我是被误判的，  简介里没有联系方式 ")
+	if st := appealStatus(t, b, 555); st != "statement" {
+		t.Errorf("只改空白不该推进 AI，得到 %q", st)
+	}
+
+	// 换一份理由：照常推进复核并解除。
+	send("资料上周已清理干净，群里只是请教剪辑问题，请核对留底")
+	waitIdle(t, b)
+	if st := appealStatus(t, b, 555); st != "lifted" {
+		t.Errorf("换了理由应照常推进复核，得到 %q", st)
+	}
+}
+
+// TestAdminRejectAppealExplainsRules：人工驳回的结案通知要说清冷却与换理由
+// 两条规则，且驳回单的 updated_at 立即参与冷却。
+func TestAdminRejectAppealExplainsRules(t *testing.T) {
+	b, fake := testutil.NewTestBot(t, 1)
+	if _, err := b.Store.Write.Exec(`INSERT INTO appeals
+		(bot_id,user_id,status,statement,created_at,updated_at)
+		VALUES (?,?,'noweb','我是被误判的',unixepoch(),unixepoch())`,
+		b.BotID(), 555); err != nil {
+		t.Fatal(err)
+	}
+	var apID int64
+	b.Store.Read.QueryRow(`SELECT id FROM appeals WHERE user_id=555`).Scan(&apID)
+
+	if err := AdminRejectAppeal(b, apID, 1); err != nil {
+		t.Fatal(err)
+	}
+	if last := fake.LastCall("sendMessage"); last == nil ||
+		!strings.Contains(fmt.Sprint(last["text"]), "7 天") {
+		t.Errorf("驳回通知应说明冷却规则，得到 %v", last)
+	}
+
+	HandleAppealCallback(b, appealGo(555))
+	if n := appealCount(t, b, 555); n != 1 {
+		t.Errorf("刚驳回就再申诉应被冷却挡下，实际 %d 张", n)
+	}
+}

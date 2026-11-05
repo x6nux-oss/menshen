@@ -83,10 +83,10 @@ const MASTER_TOGGLES: { key: string; label: string; hint: string }[] = [
   },
 ]
 
-type ModelWhich = 'so' | 'llm' | 'vision' | 'rule'
+type ModelWhich = 'so' | 'llm' | 'ocr' | 'vision' | 'rule'
 
-/** SINGLE_MODELS 是单值模型项：识图与规则发现各只接受一个模型。 */
-const SINGLE_MODELS: ReadonlySet<ModelWhich> = new Set(['vision', 'rule'])
+/** SINGLE_MODELS 是单值模型项：OCR、识图与规则发现各只接受一个模型。 */
+const SINGLE_MODELS: ReadonlySet<ModelWhich> = new Set(['ocr', 'vision', 'rule'])
 
 const MODEL_ROWS: { which: ModelWhich; key: string; label: string; hint: string }[] = [
   {
@@ -100,6 +100,12 @@ const MODEL_ROWS: { which: ModelWhich; key: string; label: string; hint: string 
     key: 'antiad_llm_models',
     label: '复判模型（大模型）',
     hint: '按重试顺序，逗号分隔',
+  },
+  {
+    which: 'ocr',
+    key: 'antiad_ocr_model',
+    label: 'OCR 模型',
+    hint: '优先逐字识别图里的文字；留空 = 跳过 OCR',
   },
   { which: 'vision', key: 'antiad_vision_model', label: '识图模型', hint: '留空 = 图片与贴纸不判' },
   {
@@ -629,9 +635,11 @@ export function SettingsPage() {
             value={modelDraft}
             onChange={(event) => setModelDraft(event.target.value)}
             helperText={
-              modelEdit === 'vision'
-                ? '留空 = 图片与贴纸不判'
-                : '形如 上游名/模型ID；留空 = 复判模型列表里第一个 OpenAI 兼容模型'
+              modelEdit === 'ocr'
+                ? '留空 = 跳过 OCR，直接使用识图模型'
+                : modelEdit === 'vision'
+                  ? '留空 = 图片与贴纸不判'
+                  : '形如 上游名/模型ID；留空 = 复判模型列表里第一个 OpenAI 兼容模型'
             }
           />
         ) : (

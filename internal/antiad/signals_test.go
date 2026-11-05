@@ -107,7 +107,7 @@ func TestAdKindLabel(t *testing.T) {
 func TestPromptsCoverNewSignals(t *testing.T) {
 	for name, p := range map[string]string{"so": soInstructions, "llm": llmSystemPrompt} {
 		for _, must := range []string{"bio_links", "porn_bait", "mentioned_bots",
-			"is_edited", "is_channel", "［图片］", "［访客 bot］"} {
+			"is_edited", "is_channel", "<image", "<guest_bot>"} {
 			if !strings.Contains(p, must) {
 				t.Errorf("%s 提示词未提到 %s", name, must)
 			}

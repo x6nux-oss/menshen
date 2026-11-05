@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"menshen/internal/archive"
 	"menshen/internal/billing"
 	"menshen/internal/core"
 	"menshen/internal/store"
@@ -53,6 +54,12 @@ func HandleGroupMessage(b *core.Bot, m *tg.Message) {
 			m = &cp
 		}
 	}
+
+	// 消息存档放在守门之前：它有自己的开关（archive_enabled + 群配置），
+	// 与反广告总开关无关。总开关关掉时仍然可以留档。放在这里而不是
+	// dispatch，是为了拿到 asSender / 访客召唤者纠正后的真实发言人。
+	archive.HandleMessage(b, m)
+
 	at := m.Date
 	if at == 0 {
 		at = time.Now().Unix()
@@ -206,7 +213,7 @@ func HandleGroupMessage(b *core.Bot, m *tg.Message) {
 	}
 
 	snap := b.Cache.Snap()
-	// 纯图/贴纸配了识图模型才判（识图在判定 worker 里做，见 judgeAndAct）。
+	// 纯图/贴纸配了 OCR 或识图模型才判（识图在判定 worker 里做，见 judgeAndAct）。
 	if _, seeable := visualOf(m); text == "" && !(seeable && visionOn(snap)) {
 		return
 	}
@@ -360,6 +367,11 @@ func judgeAndAct(b *core.Bot, snap *store.Snapshot, conf store.BotChat, m *tg.Me
 		return
 	}
 
+	// 正文只挂一个 t.me 链接时，载荷全在链接指向的帖子或频道简介里：取一次
+	// 公开预览补进判定载荷（见 linkpreview.go）。同在异步段，走 HTTP 不占
+	// 更新处理。
+	enrichLinkPreviews(b, snap, conf, m, &state)
+
 	// 必封规则命中时不跑 systemone：规则本身就是初判（启用前经过全库
 	// 零误封测试），直接用规则作为 prior 交给大模型复判定案。命中就先删
 	// + 临时禁言，不必等一次初判往返；没有复判模型时才按处置矩阵定案。
@@ -416,7 +428,12 @@ func judgeAndAct(b *core.Bot, snap *store.Snapshot, conf store.BotChat, m *tg.Me
 	act := botSenderAction(m, planAction(b, snap, conf, isNewbie(b, snap, profile), v))
 	// 规则命中时必须过大模型复判（systemone 已被跳过）；其余沿用采信线与
 	// 要罚才复判。
-	forceReview := ruleHit && hasLLM(b, snap)
+	//
+	// 带链接预览的消息在初判判正常时也交复判：预览是初判读不懂的新载荷
+	// （它可能只看了正文里那个链接），而这恰恰是「只发一个链接」的引流形态。
+	// 初判不可用、已由大模型顶上的不重复跑；判广告的走正常采信线。
+	forceReview := hasLLM(b, snap) && (ruleHit ||
+		(!v.IsAd && v.Decider == "systemone" && len(state.Message.LinkPreviews) > 0))
 	if !needReview(b, snap, v, act) && !forceReview && !belowFloor {
 		finish(v, adAction{}, "")
 		return

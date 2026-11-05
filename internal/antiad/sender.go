@@ -26,6 +26,10 @@ type linkInfo struct {
 	// AdKnown 表示这个账号在本服务里有广告案底：仍在联合封禁名单里，
 	// 或被判过广告。名字分不出正常 bot 与广告 bot，这个字段能。
 	AdKnown bool `json:"ad_known,omitempty"`
+	// ID 是解析出来的 chat/user id（0 = 没解析出来）。不进提示词：
+	// 模型看名字与简介就够了，判定对象里多一个数字只是噪声。链接预览
+	// 用它判断目标是不是本群/关联频道/白名单（见 skipLinkPreview）。
+	ID int64 `json:"-"`
 }
 
 const (
@@ -138,6 +142,11 @@ func resolveLink(b *core.Bot, handle string) linkInfo {
 	if err == nil && json.Unmarshal(raw, &resp) == nil && resp.OK {
 		r := resp.Result
 		info.Kind, info.Title, info.About = r.Type, r.Title, r.Description
+		// 只有 getChat 真的给了类型才算解析成功：异常响应里可能只有 id
+		// 没有 type，拿它去和白名单、关联频道比对会张冠李戴。
+		if r.Type != "" {
+			info.ID = r.ID
+		}
 		if r.Type == "private" {
 			// 用户与 bot 的 getChat 都是 private。TG 规定 bot 用户名必须以 bot 结尾。
 			info.Kind = "user"

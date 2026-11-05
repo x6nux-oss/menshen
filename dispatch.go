@@ -179,6 +179,15 @@ func handleMessage(b *core.Bot, m *tg.Message) {
 		}
 		antiad.HandleClearCommandDM(b, m, strings.TrimSpace(arg))
 		return
+	case text == "/export" || strings.HasPrefix(text, "/export ") ||
+		strings.HasPrefix(text, "/export@"):
+		// 把 SQLite 里仍有留底的历史消息与判定流水补写进文件存档。
+		arg := strings.TrimPrefix(text, "/export")
+		if strings.HasPrefix(arg, "@") { // /export@botname [all|chat_id]
+			_, arg, _ = strings.Cut(arg, " ")
+		}
+		antiad.HandleExportCommandDM(b, m, strings.TrimSpace(arg))
+		return
 	case text == "/log" || strings.HasPrefix(text, "/log ") ||
 		strings.HasPrefix(text, "/log@"):
 		panel.HandleLogCommand(b, m, text)
@@ -268,6 +277,11 @@ func handleCallback(b *core.Bot, q *tg.CallbackQuery) {
 		// 私聊清理清单的按钮：能不能点由发起人身份决定，见
 		// HandleClearCallback（它自己也再查一次 IsStaff）。
 		antiad.HandleClearCallback(b, q)
+		return
+	}
+	if strings.HasPrefix(q.Data, "a:ex:") {
+		// 私聊导出清单的按钮，权限同样由 HandleExportCallback 再查。
+		antiad.HandleExportCallback(b, q)
 		return
 	}
 	panel.HandleAdminCallback(b, q)

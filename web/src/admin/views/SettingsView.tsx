@@ -31,6 +31,7 @@ const MASTER_TOGGLES: { key: string; label: string; hint: string }[] = [
 const MODEL_KEYS: { key: string; label: string; hint: string }[] = [
   { key: 'antiad_so_models', label: '初判模型（systemone）', hint: '逗号分隔的有序列表，重试按顺序轮换。' },
   { key: 'antiad_llm_models', label: '复判模型（llm）', hint: '逗号分隔的有序列表。' },
+  { key: 'antiad_ocr_model', label: 'OCR 模型', hint: '优先逐字识别图里的文字；形如 上游名/模型ID，留空 = 跳过 OCR。' },
   { key: 'antiad_vision_model', label: '识图模型', hint: '形如 上游名/模型ID；不启用识图可留空。' },
   { key: 'antiad_rule_model', label: '规则发现模型', hint: '留空用回退模型。' },
 ]

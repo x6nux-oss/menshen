@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"menshen/internal/archive"
 	"menshen/internal/core"
 	"menshen/internal/store"
 	"menshen/internal/tg"
@@ -51,6 +52,12 @@ func logAd(b *core.Bot, m *tg.Message, v adVerdict, action, reason string) int64
 		return 0
 	}
 	id, _ := res.LastInsertId()
+	// 判定流水同时进文件存档（开关与群配置在 archive 包内判断）。
+	// 放在 INSERT 之后、返回之前：导出与实时存档共用同一份去重索引，
+	// 后到的 /export 不会重复写。
+	if id > 0 {
+		archive.RecordJudgment(b, id)
+	}
 	return id
 }
 

@@ -51,6 +51,9 @@ func TestSetSettingRules(t *testing.T) {
 		{main, 0, "antiad_vision_model", "up/none", "bad", ""},
 		{main, 0, "antiad_vision_model", "up/m", "ok", "up/m"},
 		{main, 0, "antiad_vision_model", "-", "ok", ""}, // "-" 撤销视觉模型
+		{main, 0, "antiad_ocr_model", "up/none", "bad", ""},
+		{main, 0, "antiad_ocr_model", "up/m", "ok", "up/m"},
+		{main, 0, "antiad_ocr_model", "-", "ok", ""}, // "-" 撤销 OCR 模型
 		{main, 0, "antiad_so_models", "up/m, up/m", "ok", `["up/m"]`},
 		{main, 0, "antiad_so_models", "-", "ok", "[]"},
 		{main, 0, "antiad_act_hard", "101", "bad", ""},

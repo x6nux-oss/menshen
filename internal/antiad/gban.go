@@ -835,6 +835,17 @@ func CleanupData(sh *core.Shared) {
 	if _, err := deleteBatched(sh, "group_messages", "at < ?", cut); err != nil {
 		slog.Error("清理群消息留底失败", "err", err)
 	}
+	// archive_items 只是文件存档的去重索引。它对应的时间窗与数据库留底
+	// 一致：行被清掉时源记录也已被清掉，之后不会再导出同一条，索引可以
+	// 一起回收，避免这张表随消息量无限增长。
+	if _, err := deleteBatched(sh, "archive_items", "at < ?", cut); err != nil {
+		slog.Error("清理存档去重索引失败", "err", err)
+	}
+	// archive_fetches 记录 MTProto 历史图片回捞的尝试。过期行没有保留价值：
+	// 对应消息的留底也已被清理，之后不会再进候选。
+	if _, err := deleteBatched(sh, "archive_fetches", "tried_at < ?", cut); err != nil {
+		slog.Error("清理历史图片回捞记录失败", "err", err)
+	}
 	// group_members 同样是群聊衍生数据（TG user_id + 发言计数），保留策略
 	// 要与上面一致，否则群从白名单移除后其行会永久保留。
 	// 有命中史的行保留：ad_hits 是风控证据，清掉相当于重置惯犯档案。

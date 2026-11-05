@@ -361,7 +361,7 @@ func TestJudgeUsesPerBotTrustLine(t *testing.T) {
 // 不说明的话模型分不清那是卡片、按钮还是本人说的话。
 func TestPromptsExplainPayloadLines(t *testing.T) {
 	for name, p := range map[string]string{"so": soInstructions, "llm": llmSystemPrompt} {
-		if !strings.Contains(p, "［联系人卡片］") || !strings.Contains(p, "［隐藏链接］") {
+		if !strings.Contains(p, "<contact_card>") || !strings.Contains(p, "<hidden_link>") {
 			t.Errorf("%s 提示词未说明方括号前缀的载荷行", name)
 		}
 	}

@@ -172,18 +172,18 @@ func TestDisplayText(t *testing.T) {
 		{"图片配文", &tg.Message{Caption: "看图"}, "看图"},
 		{"空正文 + 同群引用",
 			&tg.Message{ReplyToMessage: &tg.Message{Text: "加我微信 xxx"}},
-			"［引用］加我微信 xxx"},
+			"<quote>加我微信 xxx</quote>"},
 		{"正文 + 引用",
 			&tg.Message{Text: "u", ReplyToMessage: &tg.Message{Text: "广告正文"}},
-			"u\n［引用］广告正文"},
+			"u\n<quote>广告正文</quote>"},
 		{"手动引文优先于原消息",
 			&tg.Message{Text: "看这个",
 				ReplyToMessage: &tg.Message{Text: "整条原文"},
 				Quote:          &tg.TextQuote{Text: "选中的片段"}},
-			"看这个\n［引用］选中的片段"},
+			"看这个\n<quote>选中的片段</quote>"},
 		{"频道外部引用",
 			&tg.Message{ExternalReply: &tg.ExternalReplyInfo{Text: "频道推广"}},
-			"［引用］频道推广"},
+			"<quote>频道推广</quote>"},
 		{"全空", &tg.Message{}, ""},
 	}
 
@@ -631,7 +631,7 @@ func TestGroupQuoteNotJudged(t *testing.T) {
 		t.Errorf("judgingText = %q，期望只留正文", got)
 	}
 	// 留底 / 告警仍要看得见引用（审计口径），只有判定过滤。
-	if got := displayText(same); got != "鳄鱼\n［引用］你来柬埔寨 我跟你详谈" {
+	if got := displayText(same); got != "鳄鱼\n<quote>你来柬埔寨 我跟你详谈</quote>" {
 		t.Errorf("displayText = %q，引用应照实保留", got)
 	}
 
@@ -684,7 +684,7 @@ func TestChannelQuoteNotRecorded(t *testing.T) {
 	person := testutil.GroupMsg(-100, 43, 12, "加我微信 xxx")
 	pr := testutil.GroupMsg(-100, 42, 13, "这是广告")
 	pr.ReplyToMessage = person
-	if got := displayText(pr); got != "这是广告\n［引用］加我微信 xxx" {
+	if got := displayText(pr); got != "这是广告\n<quote>加我微信 xxx</quote>" {
 		t.Errorf("引用群友的消息应照实保留引用段，得到 %q", got)
 	}
 }
@@ -694,11 +694,24 @@ func TestChannelQuoteNotRecorded(t *testing.T) {
 // 发广告的人。正文里恰好出现该标记时不处理。
 func TestHistoryText(t *testing.T) {
 	cases := []struct{ in, want string }{
+		// 旧版留底（长期数据）：前缀标记仍要认出来。
 		{"我操\n［引用］你来柬埔寨 我跟你详谈",
-			"我操\n［引用·别人的话］你来柬埔寨 我跟你详谈"},
-		{"［引用］纯引用没有正文", "［引用·别人的话］纯引用没有正文"},
+			"我操\n<other_quote>你来柬埔寨 我跟你详谈</other_quote>"},
+		{"［引用］纯引用没有正文", "<other_quote>纯引用没有正文</other_quote>"},
+		// 新版留底：闭合标签换成带归属的标签。
+		{"我操\n<quote>你来柬埔寨</quote>",
+			"我操\n<other_quote>你来柬埔寨</other_quote>"},
+		{"<quote>纯引用</quote>", "<other_quote>纯引用</other_quote>"},
 		{"普通发言", "普通发言"},
 		{"正文里提到［引用］这个词但没换行", "正文里提到［引用］这个词但没换行"},
+		// 旧版载荷前缀行：读取历史时换成闭合标签。
+		{"旧载荷\n［联系人卡片］张三 123",
+			"旧载荷\n<contact_card>张三 123</contact_card>"},
+		{"旧图\n［图片］加我微信", "旧图\n<image>加我微信</image>"},
+		{"［抽奖开始］", "<giveaway_created/>"},
+		{"正文\n［引用］加我\n［联系人卡片］张三 123",
+			"正文\n<other_quote>加我\n<contact_card>张三 123</contact_card></other_quote>"},
+		{"行中 ［图片］不是前缀", "行中 ［图片］不是前缀"},
 	}
 	for _, c := range cases {
 		if got := historyText(c.in); got != c.want {
@@ -725,8 +738,8 @@ func TestRecentContextKeepsQuotesWithAttribution(t *testing.T) {
 		got = append(got, c.Text)
 	}
 	want := []string{
-		"我操\n［引用·别人的话］你来柬埔寨 我跟你详谈",
-		"［引用·别人的话］纯引用没有正文",
+		"我操\n<other_quote>你来柬埔寨 我跟你详谈</other_quote>",
+		"<other_quote>纯引用没有正文</other_quote>",
 		"普通发言",
 	}
 	if !slices.Equal(got, want) {
@@ -937,39 +950,39 @@ func TestMsgTextAllTypes(t *testing.T) {
 		want     []string
 	}{
 		{"poll", `{"poll":{"question":"加群领福利?","options":[{"text":"t.me/+abc"},{"text":"不要"}]}}`,
-			[]string{"［投票］", "加群领福利?", "t.me/+abc", "不要"}},
+			[]string{"<poll>加群领福利? t.me/+abc 不要</poll>"}},
 		{"venue", `{"venue":{"title":"茶楼上门","address":"加V: abc123"}}`,
-			[]string{"［地点］", "茶楼上门", "加V: abc123"}},
+			[]string{"<venue>茶楼上门 加V: abc123</venue>"}},
 		{"game", `{"game":{"title":"日赚500","description":"注册送U"}}`,
-			[]string{"［游戏］", "日赚500", "注册送U"}},
+			[]string{"<game>日赚500 注册送U</game>"}},
 		{"invoice", `{"invoice":{"title":"VIP群","description":"一次付费终身"}}`,
-			[]string{"［账单］", "VIP群", "一次付费终身"}},
+			[]string{"<invoice>VIP群 一次付费终身</invoice>"}},
 		{"checklist", `{"checklist":{"title":"兼职步骤","tasks":[{"text":"加微信"},{"text":"做单返利"}]}}`,
-			[]string{"［清单］", "兼职步骤", "加微信", "做单返利"}},
+			[]string{"<checklist>兼职步骤 加微信 做单返利</checklist>"}},
 		{"document", `{"document":{"file_name":"日入5000教程@abc.pdf"}}`,
-			[]string{"［文件］", "日入5000教程@abc.pdf"}},
+			[]string{"<file>日入5000教程@abc.pdf</file>"}},
 		{"audio", `{"audio":{"title":"加我","performer":"@spam","file_name":"a.mp3"}}`,
-			[]string{"［音频］", "加我", "@spam"}},
-		{"video", `{"video":{"file_name":"看主页.mp4"}}`, []string{"［文件］", "看主页.mp4"}},
-		{"animation", `{"animation":{"file_name":"t.me-xx.gif"}}`, []string{"［文件］", "t.me-xx.gif"}},
+			[]string{"<audio>加我 @spam a.mp3</audio>"}},
+		{"video", `{"video":{"file_name":"看主页.mp4"}}`, []string{"<file>看主页.mp4</file>"}},
+		{"animation", `{"animation":{"file_name":"t.me-xx.gif"}}`, []string{"<file>t.me-xx.gif</file>"}},
 		{"hidden link", `{"text":"点这里","entities":[{"type":"text_link","offset":0,"length":3,"url":"https://t.me/+hid"}]}`,
-			[]string{"点这里", "［隐藏链接］https://t.me/+hid"}},
+			[]string{"点这里", "<hidden_link>https://t.me/+hid</hidden_link>"}},
 		{"buttons", `{"text":"福利","reply_markup":{"inline_keyboard":[[{"text":"进群","url":"https://t.me/+btn"}]]}}`,
-			[]string{"［按钮］进群 https://t.me/+btn"}},
+			[]string{"<button>进群 https://t.me/+btn</button>"}},
 		{"via bot", `{"text":"x","via_bot":{"id":1,"is_bot":true,"username":"adbot"}}`,
-			[]string{"［经由］@adbot"}},
+			[]string{"<via_bot>@adbot</via_bot>"}},
 		{"forward channel", `{"forward_origin":{"type":"channel","chat":{"id":-1,"title":"日赚频道","username":"rz"}}}`,
-			[]string{"［转发自］日赚频道 @rz"}},
+			[]string{"<forwarded_from>日赚频道 @rz</forwarded_from>"}},
 		{"forward user", `{"forward_origin":{"type":"user","sender_user":{"id":2,"first_name":"兼职","username":"jz"}}}`,
-			[]string{"［转发自］兼职 @jz"}},
+			[]string{"<forwarded_from>兼职 @jz</forwarded_from>"}},
 		{"forward hidden", `{"forward_origin":{"type":"hidden_user","sender_user_name":"刷单客服"}}`,
-			[]string{"［转发自］刷单客服"}},
+			[]string{"<forwarded_from>刷单客服</forwarded_from>"}},
 		{"link preview", `{"text":"看看","link_preview_options":{"url":"https://ad.example"}}`,
-			[]string{"［预览］https://ad.example"}},
+			[]string{"<link_preview>https://ad.example</link_preview>"}},
 		{"story", `{"story":{"id":1,"chat":{"id":-1,"title":"引流号","username":"yl"}}}`,
-			[]string{"［故事］引流号 @yl"}},
+			[]string{"<story>引流号 @yl</story>"}},
 		{"contact", `{"contact":{"phone_number":"+1 361","first_name":"假钱群"}}`,
-			[]string{"［联系人卡片］假钱群 +1 361"}},
+			[]string{"<contact_card>假钱群 +1 361</contact_card>"}},
 		{"caption", `{"caption":"图下广告","photo":[{"file_id":"x"}]}`, []string{"图下广告"}},
 	}
 	for _, c := range cases {
@@ -1023,7 +1036,7 @@ func TestContactCardIsJudged(t *testing.T) {
 	json.Unmarshal([]byte(`{"contact":{"phone_number":"+1 361 789 8440",
 		"first_name":"假钱喜前交流群🔥","last_name":"快递面交都可"}}`), &m)
 	got := msgText(&m)
-	for _, want := range []string{"联系人卡片", "假钱喜前交流群🔥 快递面交都可", "+1 361 789 8440"} {
+	for _, want := range []string{"<contact_card>", "假钱喜前交流群🔥 快递面交都可", "+1 361 789 8440"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("msgText = %q, 缺 %q", got, want)
 		}

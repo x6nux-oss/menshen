@@ -202,10 +202,18 @@ type MessageEntity struct {
 	URL  string `json:"url"`
 }
 
-// FileNamed 是只取文件名的媒体。文件名是攻击者可控的文字，
-// 常被用于投放广告。
+// FileNamed 是带文件名的媒体。文件名是攻击者可控的文字，常被用于投放
+// 广告；file_id / mime_type 则是消息存档把「文件形式的图片」下载下来的
+// 依据（见 internal/archive）。
 type FileNamed struct {
 	FileName string `json:"file_name"`
+	// FileID / FileUniqueID 用于 getFile 与去重；只在 document 里有。
+	FileID       string `json:"file_id"`
+	FileUniqueID string `json:"file_unique_id"`
+	// MimeType 用来判断这是不是一张图片（image/jpeg、image/png…）。
+	MimeType string `json:"mime_type"`
+	// FileSize 是字节数，下载前按上限粗筛。
+	FileSize int64 `json:"file_size"`
 }
 
 // MsgPayload 是 text/caption 之外携带文字的消息类型。Message 与
@@ -284,6 +292,10 @@ type PhotoSize struct {
 	FileUniqueID string `json:"file_unique_id"`
 	Width        int    `json:"width"`
 	Height       int    `json:"height"`
+	// FileSize 是这一档文件的字节数。Bot API 对普通照片不给这个字段
+	// （只对 video/sticker 等给），拿不到时为 0；图片存档只用它做
+	// 下载前的粗筛，不依赖它一定存在。
+	FileSize int64 `json:"file_size"`
 }
 
 // Sticker 是贴纸。动态（TGS）与视频（WEBM）贴纸没法当图片看，只能看缩略图。

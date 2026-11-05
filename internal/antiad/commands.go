@@ -92,8 +92,8 @@ func isCommandToken(text string) bool {
 // 就已接住，走到这里的 /ad 是发给别人的。）
 //
 // 只在消息除命令外什么都没有时才成立：配图、文件、卡片、按钮、隐藏链接、
-// 转发、召唤者任一存在都可能挂着载荷（msgText 会为它们多出一行带方括号的
-// 前缀），外部聊天引用更是「正文极短、载荷全在引用」的主要规避形态，
+// 转发、召唤者任一存在都可能挂着载荷（msgText 会为它们多出一段闭合标签），
+// 外部聊天引用更是「正文极短、载荷全在引用」的主要规避形态，
 // 这些照旧送检。调用点在本服务自己的命令识别之后。
 func otherBotCommand(m *tg.Message) bool {
 	if m.ExternalReply != nil || hasMediaCarrier(m) {
@@ -233,6 +233,9 @@ func HandleAdCommand(b *core.Bot, conf store.BotChat, m *tg.Message, arg string)
 		// 复查同样按需补入群时间：worker 上查，不拖更新处理；负缓存清掉，
 		// 给一次全新的实时查询。
 		ensureJoinAgeFresh(b, m.Chat.ID, target.ID, &state.Sender)
+		// 复查的代表消息如果只有 t.me 链接，同样展开一次预览：复查要看的
+		// 正是链接指向的内容。
+		enrichLinkPreviews(b, snap, conf, tgt, &state)
 		reviewAndAct(b, snap, conf, tgt, profile, state, p)
 	}) {
 		p.busy(alertTTLOf(b, snap))

@@ -9,11 +9,14 @@ import (
 )
 
 // msgText 返回参与判定的正文：本人正文（为空时取图片/视频配文），再加上
-// 消息附带的非文字载荷，每种一行、带方括号前缀。
+// 消息附带的非文字载荷，每种一段闭合标签。
 //
-// 只看 Text 会漏掉图片 + 配文这一整类；只看 Text/Caption 又会漏掉联系人
+// 只用 Text 会漏掉图片 + 配文这一整类；只看 Text/Caption 又会漏掉联系人
 // 卡片、投票、文件名、文字背后的链接、内联按钮 —— 它们在无正文守门处被
 // 直接放过，而卡片的名字与号码本身就是广告。
+//
+// 载荷用 `<tag>…</tag>` 而不是 `［tag］` 前缀：模型要能看出卡片、引用、
+// 图片内容各到哪里结束，值里再出现换行或同类标记也不会串段。
 func msgText(m *tg.Message) string {
 	var parts []string
 	if m.Text != "" {
@@ -29,7 +32,7 @@ func msgText(m *tg.Message) string {
 	for _, es := range [][]tg.MessageEntity{m.Entities, m.CaptionEntities} {
 		for _, e := range es {
 			if e.Type == "text_link" && e.URL != "" {
-				parts = append(parts, "［隐藏链接］"+e.URL)
+				parts = append(parts, tag("hidden_link", e.URL))
 			}
 		}
 	}
@@ -41,74 +44,74 @@ func msgText(m *tg.Message) string {
 	if m.ReplyMarkup != nil {
 		for _, row := range m.ReplyMarkup.InlineKeyboard {
 			for _, btn := range row {
-				parts = append(parts, joinNonEmpty("［按钮］", btn.Text, btn.URL))
+				parts = append(parts, tagOf("button", btn.Text, btn.URL))
 			}
 		}
 	}
 	if m.ViaBot != nil && m.ViaBot.Username != "" {
-		parts = append(parts, "［经由］@"+m.ViaBot.Username)
+		parts = append(parts, tag("via_bot", "@"+m.ViaBot.Username))
 	}
 	if m.GuestBot != nil {
-		parts = append(parts, "［访客 bot］@"+m.GuestBot.Username)
+		parts = append(parts, tag("guest_bot", "@"+m.GuestBot.Username))
 	}
 	if src := forwardSource(m.ForwardOrigin); src != "" {
-		parts = append(parts, "［转发自］"+src)
+		parts = append(parts, tag("forwarded_from", src))
 	}
 	return strings.Join(parts, "\n")
 }
 
-// payloadLines 把非文字载荷渲染成带类型前缀的文字，每种一行。
-// 前缀让模型分得清哪段是卡片、哪段是文件名，而不是本人说的话。
+// payloadLines 把非文字载荷渲染成闭合标签，每种一段。
+// 标签名说明这是卡片、投票还是文件名，模型不会把内容当成本人说的话。
 func payloadLines(p *tg.MsgPayload) []string {
 	var out []string
-	add := func(prefix string, fields ...string) {
-		if s := joinNonEmpty(prefix, fields...); s != prefix {
-			out = append(out, s)
+	add := func(name string, fields ...string) {
+		if content := joinNonEmpty("", fields...); content != "" {
+			out = append(out, tag(name, content))
 		}
 	}
 	if c := p.Contact; c != nil {
-		add("［联系人卡片］", strings.TrimSpace(c.FirstName+" "+c.LastName), c.PhoneNumber)
+		add("contact_card", strings.TrimSpace(c.FirstName+" "+c.LastName), c.PhoneNumber)
 	}
 	if v := p.Poll; v != nil {
 		f := []string{v.Question}
 		for _, o := range v.Options {
 			f = append(f, o.Text)
 		}
-		add("［投票］", f...)
+		add("poll", f...)
 	}
 	if v := p.Venue; v != nil {
-		add("［地点］", v.Title, v.Address)
+		add("venue", v.Title, v.Address)
 	}
 	if v := p.Game; v != nil {
-		add("［游戏］", v.Title, v.Description)
+		add("game", v.Title, v.Description)
 	}
 	if v := p.Invoice; v != nil {
-		add("［账单］", v.Title, v.Description)
+		add("invoice", v.Title, v.Description)
 	}
 	if v := p.Checklist; v != nil {
 		f := []string{v.Title}
 		for _, t := range v.Tasks {
 			f = append(f, t.Text)
 		}
-		add("［清单］", f...)
+		add("checklist", f...)
 	}
 	if v := p.Audio; v != nil {
-		add("［音频］", v.Title, v.Performer, v.FileName)
+		add("audio", v.Title, v.Performer, v.FileName)
 	}
 	if v := p.Document; v != nil {
-		add("［文件］", v.FileName)
+		add("file", v.FileName)
 	}
 	// 视频与动图另有抽帧识图；文件名本身仍是攻击者可控的文字。
 	for _, v := range []*tg.MovingMedia{p.Video, p.Animation} {
 		if v != nil {
-			add("［文件］", v.FileName)
+			add("file", v.FileName)
 		}
 	}
 	if v := p.Story; v != nil && v.Chat != nil {
-		add("［故事］", chatLabel(v.Chat.Title, v.Chat.Username))
+		add("story", chatLabel(v.Chat.Title, v.Chat.Username))
 	}
 	if v := p.LinkPreviewOptions; v != nil {
-		add("［预览］", v.URL)
+		add("link_preview", v.URL)
 	}
 	// 付费媒体把内容锁在星数后面，能读到的只有价格、项数与配文。
 	if v := p.PaidMedia; v != nil {
@@ -116,13 +119,13 @@ func payloadLines(p *tg.MsgPayload) []string {
 		for _, it := range v.PaidMedia {
 			f = append(f, it.Caption)
 		}
-		add("［付费媒体］", f...)
+		add("paid_media", f...)
 	}
 	if v := p.Giveaway; v != nil {
-		add("［抽奖］", v.PrizeDescription, fmt.Sprintf("%d 名", v.WinnerCount))
+		add("giveaway", v.PrizeDescription, fmt.Sprintf("%d 名", v.WinnerCount))
 	}
 	if v := p.GiveawayWinners; v != nil {
-		add("［开奖］", v.PrizeDescription, fmt.Sprintf("%d 名", v.WinnerCount))
+		add("giveaway_winners", v.PrizeDescription, fmt.Sprintf("%d 名", v.WinnerCount))
 	}
 	// 实况照片、视频消息、语音、定位、骰子只有媒体本身或数值，没有可判的
 	// 文字：不进正文（进了的话每条语音都要花一次 AI），只在 hasMediaCarrier
@@ -137,73 +140,73 @@ func payloadLines(p *tg.MsgPayload) []string {
 // 同一段正文：正文、留底、告警、去重共用一个口径。
 func fieldLines(m *tg.Message) []string {
 	var out []string
-	add := func(prefix string, fields ...string) {
-		if s := joinNonEmpty(prefix, fields...); s != prefix {
-			out = append(out, s)
+	add := func(name string, fields ...string) {
+		if content := joinNonEmpty("", fields...); content != "" {
+			out = append(out, tag(name, content))
 		}
 	}
 	if v := m.Gift; v != nil {
-		add("［礼物］", v.Label(), v.Text)
+		add("gift", v.Label(), v.Text)
 	}
 	if v := m.GiftUpgradeSent; v != nil {
-		add("［礼物升级］", v.Label(), v.Text)
+		add("gift_upgrade", v.Label(), v.Text)
 	}
 	if v := m.UniqueGift; v != nil {
-		add("［独特礼物］", v.Label(), v.Text)
+		add("unique_gift", v.Label(), v.Text)
 	}
 	if m.GiveawayCreated != nil {
-		out = append(out, "［抽奖开始］")
+		out = append(out, tag("giveaway_created", ""))
 	}
 	if v := m.GiveawayCompleted; v != nil {
-		add("［抽奖结束］", fmt.Sprintf("%d 名中奖", v.WinnerCount))
+		add("giveaway_completed", fmt.Sprintf("%d 名中奖", v.WinnerCount))
 	}
 	if v := m.UsersShared; v != nil {
 		f := []string{fmt.Sprintf("%d 人", len(v.Users))}
 		for _, u := range v.Users {
 			f = append(f, chatLabel(strings.TrimSpace(u.FirstName+" "+u.LastName), u.Username))
 		}
-		add("［分享用户］", f...)
+		add("users_shared", f...)
 	}
 	if v := m.ChatShared; v != nil {
-		add("［分享聊天］", chatLabel(v.Title, v.Username))
+		add("chat_shared", chatLabel(v.Title, v.Username))
 	}
 	if v := m.WebAppData; v != nil {
-		add("［网页数据］", v.ButtonText, v.Data)
+		add("web_app_data", v.ButtonText, v.Data)
 	}
 	if v := m.SuccessfulPayment; v != nil {
-		add("［支付］", v.InvoicePayload,
+		add("payment", v.InvoicePayload,
 			fmt.Sprintf("%d %s", v.TotalAmount, v.Currency), v.Order())
 	}
 	if v := m.RefundedPayment; v != nil {
-		add("［退款］", v.InvoicePayload, fmt.Sprintf("%d %s", v.TotalAmount, v.Currency))
+		add("refund", v.InvoicePayload, fmt.Sprintf("%d %s", v.TotalAmount, v.Currency))
 	}
 	if v := m.ProximityAlert; v != nil {
-		add("［雷达提醒］", displayUserName(v.Traveler), displayUserName(v.Watcher),
+		add("proximity_alert", displayUserName(v.Traveler), displayUserName(v.Watcher),
 			fmt.Sprintf("%d 米", v.Distance))
 	}
 	if m.ConnectedWebsite != "" {
-		add("［登录网站］", m.ConnectedWebsite)
+		add("connected_website", m.ConnectedWebsite)
 	}
 	if v := m.PaidMessagePrice; v != nil {
-		add("［付费消息］", fmt.Sprintf("%d 星", v.StarCount))
+		add("paid_message", fmt.Sprintf("%d 星", v.StarCount))
 	}
 	if v := m.PollOptionAdded; v != nil {
-		add("［投票新增选项］", v.Text())
+		add("poll_option_added", v.Text())
 	}
 	if v := m.PollOptionDeleted; v != nil {
-		add("［投票删除选项］", v.Text())
+		add("poll_option_deleted", v.Text())
 	}
 	if v := m.ChecklistTasksAdded; v != nil {
-		add("［清单新增任务］", v.Texts()...)
+		add("checklist_tasks_added", v.Texts()...)
 	}
 	if v := m.ChecklistTasksDone; v != nil {
-		add("［清单完成任务］", v.Texts()...)
+		add("checklist_tasks_done", v.Texts()...)
 	}
 	if m.NewChatTitle != "" {
-		add("［群改名］", m.NewChatTitle)
+		add("chat_title_changed", m.NewChatTitle)
 	}
 	if v := m.PinnedMessage; v != nil {
-		add("［置顶消息］", oneLine(v.Text), oneLine(v.Caption))
+		add("pinned_message", oneLine(v.Text), oneLine(v.Caption))
 	}
 	return out
 }
@@ -229,34 +232,34 @@ func blockLines(b tg.RichBlock, depth string) []string {
 	}
 	var out []string
 
-	text := func(prefix string, nodes ...*tg.RichText) {
+	text := func(name string, nodes ...*tg.RichText) {
 		f := make([]string, 0, len(nodes))
 		for _, n := range nodes {
 			f = append(f, n.Line())
 		}
-		if s := joinNonEmpty(prefix, f...); s != prefix {
-			out = append(out, s)
+		if content := joinNonEmpty("", f...); content != "" {
+			out = append(out, tag(name, content))
 		}
 	}
 
 	switch b.Type {
 	case "paragraph", "heading", "pre", "footer", "blockquote",
 		"expandable_blockquote", "pullquote", "thinking":
-		text("［富消息］", b.Text, b.Credit)
+		text("rich_message", b.Text, b.Credit)
 	case "mathematical_expression":
 		if s := strings.TrimSpace(b.Expression); s != "" {
-			out = append(out, "［富消息］"+s)
+			out = append(out, tag("rich_math", s))
 		}
 	case "buttons":
 		for _, btn := range b.Buttons {
-			if s := joinNonEmpty("［按钮］", btn.Parts()...); s != "［按钮］" {
-				out = append(out, s)
+			if s := joinNonEmpty("", btn.Parts()...); s != "" {
+				out = append(out, tag("button", s))
 			}
 		}
 	case "list":
 		for _, it := range b.Items {
 			if s := strings.TrimSpace(it.Label); s != "" {
-				out = append(out, "［富消息］"+s)
+				out = append(out, tag("rich_message", s))
 			}
 			for _, sub := range it.Blocks {
 				out = append(out, blockLines(sub, depth+".")...)
@@ -268,8 +271,8 @@ func blockLines(b tg.RichBlock, depth string) []string {
 			for _, cell := range row {
 				f = append(f, cell.Text.Line())
 			}
-			if s := joinNonEmpty("［表格］", f...); s != "［表格］" {
-				out = append(out, s)
+			if content := joinNonEmpty("", f...); content != "" {
+				out = append(out, tag("table", content))
 			}
 		}
 	case "divider", "anchor":
@@ -277,11 +280,12 @@ func blockLines(b tg.RichBlock, depth string) []string {
 	case "photo", "animation", "audio", "document", "video", "voice_note":
 		out = append(out, mediaBlockLine(b))
 		if b.Caption != nil {
-			text("［配文］", b.Caption.Text, b.Caption.Credit)
+			text("caption", b.Caption.Text, b.Caption.Credit)
 		}
 	case "map":
 		if b.Location != nil {
-			out = append(out, fmt.Sprintf("［地图］%.4f,%.4f", b.Location.Latitude, b.Location.Longitude))
+			out = append(out, tag("map", fmt.Sprintf("%.4f,%.4f",
+				b.Location.Latitude, b.Location.Longitude)))
 		}
 	default:
 		// 容器类块（collage / slideshow / details / 引用块的子块）与
@@ -291,13 +295,13 @@ func blockLines(b tg.RichBlock, depth string) []string {
 			out = append(out, blockLines(sub, depth+".")...)
 		}
 		if b.Summary != nil {
-			text("［富消息］", b.Summary)
+			text("rich_message", b.Summary)
 		}
 		if b.Caption != nil {
-			text("［配文］", b.Caption.Text, b.Caption.Credit)
+			text("caption", b.Caption.Text, b.Caption.Credit)
 		}
 		if len(out) == 0 && b.Type != "" {
-			out = append(out, "［富消息·未识别的块］"+b.Type)
+			out = append(out, tag("rich_message_unknown_block", b.Type))
 		}
 	}
 	return out
@@ -331,7 +335,7 @@ func mediaBlockLine(b tg.RichBlock) string {
 	if len(b.Photo) > 0 {
 		f = append(f, fmt.Sprintf("%d 张", len(b.Photo)))
 	}
-	return joinNonEmpty("［富消息·媒体］", f...)
+	return tagOf("rich_message_media", f...)
 }
 
 // hasPayload 报告这条消息有没有可识别的载荷。
@@ -418,9 +422,37 @@ func forwardSource(raw json.RawMessage) string {
 	return ""
 }
 
-// quoteMark 是拼接被引用内容的标记，displayText / judgingText / 留底回填
-// （stripQuotedTail）共用同一个字面量。
-const quoteMark = "［引用］"
+// tag 渲染一个闭合标签。内容为空时输出自闭合形式，避免模型看到没有
+// 闭合的开标签。
+func tag(name, content string) string {
+	if content == "" {
+		return "<" + name + "/>"
+	}
+	return "<" + name + ">" + content + "</" + name + ">"
+}
+
+// tagOf 用空格拼接非空字段，再包成闭合标签。
+func tagOf(name string, fields ...string) string {
+	return tag(name, joinNonEmpty("", fields...))
+}
+
+// quoteOpen/quoteClose 是拼进留底正文的引用段标签。用闭合标签而不是
+// 前缀：引用里可能还有换行与同类标记，模型要能看出引用段到哪里结束。
+const (
+	quoteOpen  = "<quote>"
+	quoteClose = "</quote>"
+	// otherQuoteOpen/otherQuoteClose 是喂给模型的历史条目里引用段的标签：
+	// 与 quote 同指一段内容，但写明归属 —— 那是被引用者的话，不是
+	// 发言者本人说的。
+	otherQuoteOpen  = "<other_quote>"
+	otherQuoteClose = "</other_quote>"
+	// legacyQuoteMark 是旧版留底用的引用前缀。留底是长期数据，读到旧行
+	// 时仍要能认出引用段。
+	legacyQuoteMark = "［引用］"
+)
+
+// quoteTag 把引用内容包成闭合标签。
+func quoteTag(text string) string { return tag("quote", text) }
 
 // displayText 是这条消息在群里实际可见的全部文字：本人正文加上被引用的
 // 内容（引用本群频道／群身份发的帖子时只有本人正文，见 quotedInfo）。
@@ -459,14 +491,91 @@ func joinQuote(t string, q *adQuotedInfo) string {
 		return t
 	}
 	if t == "" {
-		return quoteMark + q.Text
+		return quoteTag(q.Text)
 	}
-	return t + "\n" + quoteMark + q.Text
+	return t + "\n" + quoteTag(q.Text)
 }
 
-// historyQuoteMark 是历史条目里引用段的标记：与 quoteMark 同指一段内容，
-// 但写明归属 —— 引用段是被引用者的原话，不是发言者本人说的。
-const historyQuoteMark = "［引用·别人的话］"
+// legacyMarker 是旧版留底里的载荷前缀。留底是长期数据（默认保留 30 天），
+// 旧行不迁移；喂给模型的历史条目在读取时统一换成闭合标签，避免同一段
+// 上下文里新旧格式混用。
+type legacyMarker struct{ prefix, name string }
+
+var legacyMarkers = []legacyMarker{
+	{"［图片］", "image"},
+	{"［实况照片］", "live_photo"},
+	{"［视频］", "video"},
+	{"［动图］", "animation"},
+	{"［视频消息］", "video_note"},
+	{"［贴纸］", "sticker"},
+	{"［联系人卡片］", "contact_card"},
+	{"［投票］", "poll"},
+	{"［地点］", "venue"},
+	{"［游戏］", "game"},
+	{"［账单］", "invoice"},
+	{"［清单］", "checklist"},
+	{"［音频］", "audio"},
+	{"［文件］", "file"},
+	{"［故事］", "story"},
+	{"［预览］", "link_preview"},
+	{"［付费媒体］", "paid_media"},
+	{"［抽奖］", "giveaway"},
+	{"［开奖］", "giveaway_winners"},
+	{"［隐藏链接］", "hidden_link"},
+	{"［按钮］", "button"},
+	{"［经由］", "via_bot"},
+	{"［访客 bot］", "guest_bot"},
+	{"［转发自］", "forwarded_from"},
+	{"［礼物］", "gift"},
+	{"［礼物升级］", "gift_upgrade"},
+	{"［独特礼物］", "unique_gift"},
+	{"［抽奖开始］", "giveaway_created"},
+	{"［抽奖结束］", "giveaway_completed"},
+	{"［分享用户］", "users_shared"},
+	{"［分享聊天］", "chat_shared"},
+	{"［网页数据］", "web_app_data"},
+	{"［支付］", "payment"},
+	{"［退款］", "refund"},
+	{"［雷达提醒］", "proximity_alert"},
+	{"［登录网站］", "connected_website"},
+	{"［付费消息］", "paid_message"},
+	{"［投票新增选项］", "poll_option_added"},
+	{"［投票删除选项］", "poll_option_deleted"},
+	{"［清单新增任务］", "checklist_tasks_added"},
+	{"［清单完成任务］", "checklist_tasks_done"},
+	{"［群改名］", "chat_title_changed"},
+	{"［置顶消息］", "pinned_message"},
+	{"［富消息·媒体］", "rich_message_media"},
+	{"［富消息·未识别的块］", "rich_message_unknown_block"},
+	{"［富消息］", "rich_message"},
+	{"［表格］", "table"},
+	{"［配文］", "caption"},
+	{"［地图］", "map"},
+}
+
+// legacyTagLines 把旧版前缀行换成闭合标签。新格式的行没有这些前缀，
+// 原样返回。
+func legacyTagLines(text string) string {
+	if text == "" {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		lines[i] = legacyTagLine(line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// legacyTagLine 转换一行旧前缀。前缀总是行首，值延伸到行尾（msgText 每种
+// 载荷单独一行）；引用段由 splitQuote 先拆走，不在这里。
+func legacyTagLine(line string) string {
+	for _, m := range legacyMarkers {
+		if strings.HasPrefix(line, m.prefix) {
+			return tag(m.name, strings.TrimSpace(line[len(m.prefix):]))
+		}
+	}
+	return line
+}
 
 // historyText 把留底文本转成喂给模型的历史条目（recent_context 与 /check
 // 的 review_history 都从这里走）。
@@ -475,32 +584,66 @@ const historyQuoteMark = "［引用·别人的话］"
 //   - 剥掉：本人正文失去对话语境，整体复查时可能被误读。
 //   - 原样保留：引用广告提醒管理员的人，历史里那段广告看起来像他在发。
 //
-// 带归属的标记让模型既能用引用段理解本人在回应什么，又不会把别人的话
-// 记在发言者头上。
+// 换成 <other_quote>…</other_quote>：模型既能用引用段理解本人在回应什么，
+// 又不会把别人的话记在发言者头上。旧版留底的 `［引用］` 前缀在这里一并
+// 认出来，历史数据不需要迁移。
 func historyText(text string) string {
-	// 引用段由 displayText 接在正文后面（换行 + 标记），或整条都是引用；
-	// 只改第一处标记 —— 引用内容里再出现“［引用］”字样是原文，不动。
-	if strings.HasPrefix(text, quoteMark) {
-		return historyQuoteMark + text[len(quoteMark):]
+	body, quote, ok := splitQuote(text)
+	body = legacyTagLines(body)
+	if !ok {
+		return body
 	}
-	if i := strings.Index(text, "\n"+quoteMark); i >= 0 {
-		return text[:i] + "\n" + historyQuoteMark +
-			text[i+len("\n"+quoteMark):]
+	quote = legacyTagLines(quote)
+	if body == "" {
+		return otherQuoteOpen + quote + otherQuoteClose
 	}
-	return text
+	return body + "\n" + otherQuoteOpen + quote + otherQuoteClose
+}
+
+// splitQuote 把留底文本拆成正文与引用段，新旧两种标记都认。引用段总是
+// 最后一段：joinQuote 把它接在正文后面。
+func splitQuote(text string) (body, quote string, ok bool) {
+	if q, yes := trimQuoteTag(text, quoteOpen, quoteClose); yes {
+		return "", q, true
+	}
+	if i := strings.Index(text, "\n"+quoteOpen); i >= 0 {
+		q := text[i+len("\n"+quoteOpen):]
+		return text[:i], strings.TrimSuffix(q, quoteClose), true
+	}
+	if strings.HasPrefix(text, legacyQuoteMark) {
+		return "", text[len(legacyQuoteMark):], true
+	}
+	if i := strings.Index(text, "\n"+legacyQuoteMark); i >= 0 {
+		return text[:i], text[i+len("\n"+legacyQuoteMark):], true
+	}
+	return text, "", false
+}
+
+// trimQuoteTag 判断 text 是否整段就是一个闭合引用标签，是则返回标签内容。
+func trimQuoteTag(text, open, close string) (string, bool) {
+	if !strings.HasPrefix(text, open) || !strings.HasSuffix(text, close) ||
+		len(text) < len(open)+len(close) {
+		return "", false
+	}
+	return text[len(open) : len(text)-len(close)], true
 }
 
 // stripQuotedTail 去掉留底文本里的引用段，返回本人正文。
 //
 // 留底存的是 displayText（正文 + 引用），审计口径要本人正文时用它。
 // 喂给模型的历史条目不走这里 —— 单纯剥掉会丢掉本人正文的对话语境，
-// 那走 historyText（引用保留、换带归属的标记）。
+// 那走 historyText（引用保留、换带归属的标签）。
 func stripQuotedTail(text string) string {
-	// 引用段由 displayText 接在正文后面（换行 + 标记），或整条都是引用。
-	if i := strings.Index(text, "\n"+quoteMark); i >= 0 {
-		return strings.TrimRight(text[:i], "\n")
+	// 引用段由 displayText 接在正文后面（换行 + 标签），或整条都是引用。
+	// 新旧两种标记都认，旧留底才不用迁移。
+	for _, mark := range []string{
+		"\n" + quoteOpen, "\n" + legacyQuoteMark,
+	} {
+		if i := strings.Index(text, mark); i >= 0 {
+			return strings.TrimRight(text[:i], "\n")
+		}
 	}
-	if strings.HasPrefix(text, quoteMark) {
+	if strings.HasPrefix(text, quoteOpen) || strings.HasPrefix(text, legacyQuoteMark) {
 		return ""
 	}
 	return text

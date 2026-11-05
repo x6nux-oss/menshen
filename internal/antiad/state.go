@@ -56,6 +56,10 @@ type adMessageInfo struct {
 	Length   int  `json:"length"`
 	// MentionedBots 是正文里 @ 到的 bot，见 mentionedBots。
 	MentionedBots []string `json:"mentioned_bots,omitempty"`
+	// LinkPreviews 是正文里 t.me 链接的公开预览（见 linkpreview.go）。
+	// 它不属于本人写下的文字，但链接是本人发出来的：指向的帖子/频道简介里
+	// 带广告或返利邀请时，这条消息就是引流。
+	LinkPreviews []adLinkPreview `json:"link_previews,omitempty"`
 }
 
 type adChatInfo struct {
@@ -216,6 +220,10 @@ func buildProfile(b *core.Bot, m *tg.Message, gm groupMember, now int64) senderP
 func (st adState) sanitized() adState {
 	st.Chat.Title = sanitizeVisible(st.Chat.Title)
 	st.Message.Text = sanitizeVisible(st.Message.Text)
+	for i := range st.Message.LinkPreviews {
+		st.Message.LinkPreviews[i].From = sanitizeVisible(st.Message.LinkPreviews[i].From)
+		st.Message.LinkPreviews[i].Text = sanitizeVisible(st.Message.LinkPreviews[i].Text)
+	}
 	if st.Quoted != nil {
 		q := *st.Quoted
 		q.Text, q.From = sanitizeVisible(q.Text), sanitizeVisible(q.From)
@@ -255,7 +263,9 @@ func (p senderProfile) sanitized() senderProfile {
 // buildState 组装送检载荷。recent_context 取自本人留底并排除当前这条，
 // 所以当前消息先留底再调用它是安全的（HandleGroupMessage 正是如此）。
 func buildState(b *core.Bot, snap *store.Snapshot, m *tg.Message, p senderProfile) adState {
-	text := msgText(m)
+	// 旧留底（/check 的代表消息、历史回填）里还是 `［…］` 前缀，统一换成
+	// 闭合标签后再送检，模型不需要同时理解两套格式。
+	text := legacyTagLines(msgText(m))
 	st := adState{
 		Message: adMessageInfo{
 			// 先剥不可见字符再截断：否则攻击者用几千个零宽字符把真实
@@ -310,7 +320,7 @@ func buildState(b *core.Bot, snap *store.Snapshot, m *tg.Message, p senderProfil
 	// 匹配用 judgingText（正文 + 外部引用）：正文为空、载荷全在外部引用
 	// 里的规避形态同样要命中；群内引用是别人的话（引用广告提醒管理员），
 	// 不算引用者发出的载荷。
-	st.MatchedRules = MatchedRuleInfos(snap, judgingText(m))
+	st.MatchedRules = MatchedRuleInfos(snap, legacyTagLines(judgingText(m)))
 	return st
 }
 
@@ -321,7 +331,7 @@ const ctxTextLimit = 200
 
 // recentOwn 取发送者本人在本群最近 n 条留底（不含当前这条），由旧到新。
 //
-// 只取本人的：别人的发言（尤其是带［引用］载荷的广告）混进来，模型
+// 只取本人的：别人的发言（尤其是带 <quote> 载荷的广告）混进来，模型
 // 会把它当成本条消息引用的内容，导致误判。从留底取而不是另开
 // 一个内存环：环按群共享、容量有限，活跃群里本人的上一条容易被挤出；
 // 留底按人建了索引，重启也不丢。

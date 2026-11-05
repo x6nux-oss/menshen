@@ -118,6 +118,14 @@ func evidenceCorpus(st adState) string {
 	sb.WriteString(st.Chat.Title)
 	sb.WriteString("\n")
 	sb.WriteString(st.Message.Text)
+	for _, lp := range st.Message.LinkPreviews {
+		sb.WriteString("\n")
+		sb.WriteString(lp.URL)
+		sb.WriteString("\n")
+		sb.WriteString(lp.From)
+		sb.WriteString("\n")
+		sb.WriteString(lp.Text)
+	}
 	if st.Quoted != nil {
 		sb.WriteString("\n")
 		sb.WriteString(st.Quoted.From)
@@ -183,12 +191,16 @@ func evidenceMisses(st adState, v adVerdict) []string {
 	var misses []string
 
 	// 门一：判词把载荷归到引用头上，判定对象却根本没有 quoted 字段。
-	// recent_context / review_history 里带 `［引用·别人的话］` 时另说：
-	// 那是历史条目的引用段，判词提它不算捏造。
+	// recent_context / review_history 里带 <other_quote>…</other_quote>
+	// （旧留底为 `［引用·别人的话］`）时另说：那是历史条目的引用段，
+	// 判词提它不算捏造。有 link_previews 时同样不算：判词常把链接指向的
+	// 帖子说成「链接里引用的内容」，那是预览字段不是 quoted。
 	corpus := stripInvisible(evidenceCorpus(st))
 	corpusNorm := strings.ToLower(corpus)
 	lowReason := strings.ToLower(v.Reason)
-	if st.Quoted == nil && !strings.Contains(corpus, "引用") &&
+	if st.Quoted == nil && len(st.Message.LinkPreviews) == 0 &&
+		!strings.Contains(corpus, "引用") &&
+		!strings.Contains(corpus, "<other_quote>") &&
 		(strings.Contains(lowReason, "引用") || strings.Contains(lowReason, "quoted")) {
 		misses = append(misses, "判词把载荷归到引用里，本条没有 quoted 字段")
 	}

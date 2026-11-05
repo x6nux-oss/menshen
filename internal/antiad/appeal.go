@@ -60,6 +60,11 @@ type appealPenalty struct {
 
 const appealStatementMax = 200
 
+// appealRejectCooldown 是申诉被驳回后的冷却期：期内不能再次发起申诉。
+// 驳回时刻取单子的 updated_at —— 结案为 rejected 的两条路（人工驳回、
+// 网页验证五次失败）都经由 updateAppeal 刷新它。
+const appealRejectCooldown = 7 * 24 * time.Hour
+
 // ---- 存储 ----
 
 // AppealColumns 是 appeals 表的完整投影。它被多处读单（按 id、按未结、
@@ -79,6 +84,36 @@ func openAppeal(s *store.Store, botID, uid int64) (appealRec, bool) {
 		FROM appeals
 		WHERE bot_id=? AND user_id=? AND status IN (`+store.AppealOpenStatusesSQL+`)
 		ORDER BY id DESC LIMIT 1`, botID, uid))
+}
+
+// lastRejectedAppeal 返回此人在这台 bot 上最近一张被驳回（rejected）的
+// 申诉单。人工驳回与网页验证五次失败结案共用这个状态，两者都是驳回。
+func lastRejectedAppeal(s *store.Store, botID, uid int64) (appealRec, bool) {
+	return scanAppeal(s.Read.QueryRow(`SELECT `+AppealColumns+`
+		FROM appeals
+		WHERE bot_id=? AND user_id=? AND status='rejected'
+		ORDER BY id DESC LIMIT 1`, botID, uid))
+}
+
+// appealRejectionCooldownLeft 计算驳回冷却还剩多久；已过冷却返回 0。
+func appealRejectionCooldownLeft(rejectedAt int64) time.Duration {
+	wait := time.Until(time.Unix(rejectedAt, 0).Add(appealRejectCooldown))
+	if wait < 0 {
+		return 0
+	}
+	return wait
+}
+
+// appealStatementSame 判断两份申诉理由是否算同一份：去掉全部空白、忽略
+// 大小写后比对（中文句子本没有空格，只压缩成一个空格的话，插几个空格就
+// 能绕过）。防的是原样复制重交，不做语义级判重 —— 那得再花一轮 AI，而
+// 换几个字就能绕过的检查不值得那笔开销。
+func appealStatementSame(a, b string) bool {
+	norm := func(s string) string {
+		return strings.ToLower(strings.Join(strings.Fields(s), ""))
+	}
+	n := norm(a)
+	return n != "" && n == norm(b)
 }
 
 type rowScanner interface{ Scan(dest ...any) error }
@@ -435,6 +470,17 @@ func captureAppealStatement(b *core.Bot, dmChat, uid int64, text string) bool {
 		return true
 	}
 	statement := core.TruncateRunes(strings.TrimSpace(text), appealStatementMax)
+	// 驳回后重申诉必须换一份理由：与最近一张被驳回的单子一模一样时不推进
+	// AI，留在 statement 等他重写。保存只为刷新 updated_at —— 10 分钟作废
+	// 窗口从头算，重写有完整的时间。
+	if prev, ok := lastRejectedAppeal(b.Store, b.BotID(), uid); ok &&
+		appealStatementSame(prev.Statement, statement) {
+		updateAppeal(b.Shared, ap.ID, `statement=?`, statement)
+		b.Send(dmChat, "这条申诉理由和你上次被驳回的那份一样。\n\n"+
+			"原样重发无法通过复核。请换一个写法：补充新的说明或证据"+
+			"（比如资料改了哪里、当时的具体语境），再发一次。", nil)
+		return true
+	}
 	// 带状态条件：同一张单被两条消息同时认领时，只该有一条成为理由。
 	res, err := b.Store.Write.Exec(`UPDATE appeals SET statement=?, status='ai',
 		updated_at=? WHERE id=? AND status='statement'`,
@@ -485,6 +531,16 @@ func HandleAppealCallback(b *core.Bot, q *tg.CallbackQuery) {
 				return
 			}
 			// 旧码单已结案：落到下面建新单。
+		}
+		// 驳回冷却：上次申诉被驳回后 7 天内不能再次发起。排在频控闸门
+		// 之前 —— 天级的冷却先说清楚，分钟级的退避才有意义。
+		if prev, ok := lastRejectedAppeal(b.Store, b.BotID(), uid); ok {
+			if wait := appealRejectionCooldownLeft(prev.UpdatedAt); wait > 0 {
+				b.Send(dmChat, fmt.Sprintf(
+					"你上一次申诉被驳回，需要等 7 天才能再次发起申诉，还剩 %s。\n\n"+
+						"这段时间正好用来修改你的账号资料。", humanDuration(wait)), nil)
+				return
+			}
 		}
 		if ok, wait := unbanGateCheck(b.Shared, uid); !ok {
 			b.Send(dmChat, fmt.Sprintf(

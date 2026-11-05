@@ -152,7 +152,7 @@ func buildSystemOneReq(st adState, instructions string) map[string]any {
 						"even with no contact detail or ad copy",
 					"gambling":   "gambling, betting, lottery",
 					"scam":       "scams, including part-time brushing, 「日入」 pitches, pig-butchering, fake customer service, repayment on one's behalf",
-					"promo":      "goods or service promotion, group-invite traffic-driving, driving traffic to DMs or a profile",
+					"promo":      "goods or service promotion, group-invite traffic-driving, referral/affiliate links (aff/ref/invite codes), driving traffic to DMs or a profile",
 					"spam_flood": "flooding with no substantive content",
 				},
 			},

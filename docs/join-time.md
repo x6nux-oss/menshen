@@ -114,10 +114,12 @@ curl -s "https://api.telegram.org/bot$TOKEN/getChatMember?chat_id=@CMLiussss&use
 ## 3. MTProto（curl 不可调，需 MTProto 客户端）
 
 以下按官方 schema 列出方法名、参数与返回；参数名与返回字段名保持 schema
-原样，便于对照官方文档。示例基于 **Telethon**（本项目用的就是它）：
+原样，便于对照官方文档。示例用 **Telethon** 说明协议调用形态；本项目
+实际实现已改为纯 Go 的 [`gotd/td`](https://github.com/gotd/td)，不再依赖
+Python 或 Telethon。
 
 ```bash
-pip install telethon            # Python 3.8+
+pip install telethon            # 仅用于阅读/试验下面的示例
 ```
 
 ### 3.1 auth.importBotAuthorization

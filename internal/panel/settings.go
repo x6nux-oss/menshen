@@ -129,6 +129,7 @@ var settingSpecs = []settingSpec{
 	{"antiad_alert_ttl_hard", "明显广告的短撤回（秒）", "非负整数，0 = 关闭；置信度 ≥ 处置线且危害度 ≥ 阈值时只弹这么久", 0, 0, "antiad"},
 	{"antiad_alert_severe", "短撤回的危害度阈值", "0-3 的整数，危害度达到它才触发短撤回", 0, 3, "antiad"},
 	{"antiad_ctx_msgs", "携带上下文条数", "0-20 的整数，越多越准也越贵", 0, 20, "antiad"},
+	{"antiad_link_preview", "展开 t.me 链接预览", "1 = 开（默认）：判定前取正文里 t.me 链接的公开预览页，把指向的帖子/频道简介一并送检，用来识别只发一个链接的引流；0 = 关。只取 Telegram 自己的域名，不抓其它站点；指向本群、本群关联频道或已拉白名单的频道时不取", 0, 1, "antiad"},
 	{"antiad_dm_admins", "私聊汇总", "1 = 开，0 = 关；命中与判定失败定时汇成一条私聊", 0, 1, "antiad"},
 	{"antiad_alert_every", "私聊汇总间隔（分钟）", "1-1440 的整数，每隔这么久最多一条", 1, 1440, "antiad"},
 	{"antiad_ban", "禁言改为封禁", "1 = 该禁言的改为永久封禁出群，0 = 禁言；每群可单独覆盖", 0, 1, "antiad"},
@@ -136,6 +137,10 @@ var settingSpecs = []settingSpec{
 	{"antiad_bool_verdict", "按模型结论定档", "默认开：模型判为广告就按最高档处置（新人删除+禁言/封禁，老人仍只删不禁），不看置信度——大模型的置信度抖动大，同一条广告可能 88% 也可能 95%。填 0 回到按置信度分档。无论开关，禁言/封禁都还要过「禁言置信度下限」", 0, 1, "antiad"},
 	{"antiad_judge_bots", "判定普通成员 bot", "1 = 判（默认；有管理员权限的 bot 始终豁免），0 = 豁免所有 bot；需对方 bot 开启 Bot-to-Bot 模式才收得到", 0, 1, "antiad"},
 	{"gban_global", "加入全局联合封禁组", "1 = 与其他加入的 bot 共享命中并接收全组执行；0 = 退出全局组，只在本归属人的专属组联动", 0, 1, "antiad"},
+	{"archive_enabled", "消息存档", "1 = 开，0 = 关；按群把文本、图片与头像写进存档目录，判定流水也一并落文件。与反广告总开关无关", 0, 1, "antiad"},
+	{"archive_image_max_side", "存档图片长边上限", "正整数（像素）；图片按长边等比缩到它以内再压成 JPEG。默认 1600", 320, 10000, "both"},
+	{"archive_image_quality", "存档图片 JPEG 质量", "1-100；默认 82，越低文件越小、字越糊", 1, 100, "both"},
+	{"archive_fetch_history", "历史图片回捞（MTProto）", "1 = /export 时用内置纯 Go MTProto 客户端按 message_id 从群历史下载仍存在的图片；需要 tg_api_id/tg_api_hash。默认 0", 0, 1, "both"},
 }
 
 func settingSpecByKey(k string) *settingSpec {
@@ -167,6 +172,7 @@ var settingSections = []struct {
 	}},
 	{"判定与模型", []string{
 		"antiad_so_trust", "antiad_so_floor", "antiad_pre_act_conf", "antiad_ctx_msgs",
+		"antiad_link_preview",
 		"antiad_so_timeout_ms", "antiad_llm_ttft_ms", "antiad_llm_idle_ms",
 		"antiad_hedge_retries", "antiad_hedge_minutes", "antiad_hedge_fanout",
 	}},
@@ -191,6 +197,10 @@ var settingSections = []struct {
 	{"学习与名单", []string{
 		"antiad_digest_min", "antiad_digest_max",
 		"antiad_judge_bots", "gban_global",
+	}},
+	{"存档与导出", []string{
+		"archive_enabled", "archive_image_max_side", "archive_image_quality",
+		"archive_fetch_history",
 	}},
 }
 
@@ -332,7 +342,7 @@ func handleSettingsCallback(b *core.Bot, q *tg.CallbackQuery) {
 		b.AnswerCallback(q.ID, "已切换")
 		showSettings(b, chatID, msgID)
 
-	case "m": // a:st:m:so|llm|vision —— 全局默认模型（列表或单值）
+	case "m": // a:st:m:so|llm|ocr|vision —— 全局默认模型（列表或单值）
 		if !b.IsMain(q.From.ID) {
 			b.AnswerCallback(q.ID, "")
 			return
@@ -346,6 +356,9 @@ func handleSettingsCallback(b *core.Bot, q *tg.CallbackQuery) {
 		switch parts[3] {
 		case "llm":
 			key, label = "antiad_llm_models", "默认复判/总结模型（大模型）"
+		case "ocr":
+			key, label = "antiad_ocr_model", "OCR 模型（优先逐字识别图中的文字；留空则跳过 OCR）"
+			single = true
 		case "vision":
 			key, label = "antiad_vision_model", "识图模型（须支持图片输入；留空则图片与贴纸不判）"
 			single = true
@@ -459,6 +472,11 @@ func showSettings(b *core.Bot, chatID, msgID int64) {
 	} else {
 		sb.WriteString("告警抄送主管理员: 关（各 bot 的告警只发给它的归属人）\n")
 	}
+	if snap.SettingInt("archive_enabled", 0) == 1 {
+		sb.WriteString("消息存档: ✅ 已启用（按群写入存档目录）\n")
+	} else {
+		sb.WriteString("消息存档: ⛔ 已关闭\n")
+	}
 	sb.WriteString("\n")
 
 	for _, g := range specsInSections(func(sp settingSpec) bool {
@@ -473,8 +491,9 @@ func showSettings(b *core.Bot, chatID, msgID int64) {
 
 	sb.WriteString("\n<b>默认模型</b>（按重试顺序，可在每个 bot 上单独覆盖）\n")
 	so, llm := snap.ModelsFor(0)
-	fmt.Fprintf(&sb, "判定: %s\n复判: %s\n识图: %s\n",
+	fmt.Fprintf(&sb, "判定: %s\n复判: %s\nOCR: %s\n识图: %s\n",
 		modelListLabel(so), modelListLabel(llm),
+		modelLabel(snap.Setting("antiad_ocr_model")),
 		modelLabel(snap.Setting("antiad_vision_model")))
 
 	sb.WriteString("\n<i>保留天数同时作用于判定流水、群消息留底与群成员画像" +
@@ -488,14 +507,20 @@ func showSettings(b *core.Bot, chatID, msgID int64) {
 	if snap.SettingInt("alert_copy_main", 0) == 1 {
 		copyLabel = "📭 关闭告警抄送"
 	}
+	archiveLabel := "📦 开启消息存档"
+	if snap.SettingInt("archive_enabled", 0) == 1 {
+		archiveLabel = "📦 关闭消息存档"
+	}
 
 	rows := [][][2]string{
 		{{onLabel, "a:st:t:antiad_enabled"}},
 		{{copyLabel, "a:st:t:alert_copy_main"}},
+		{{archiveLabel, "a:st:t:archive_enabled"}},
 		{
 			{"🤖 默认判定模型", "a:st:m:so"},
 			{"🤖 默认复判模型", "a:st:m:llm"},
 		},
+		{{"🔎 OCR 模型", "a:st:m:ocr"}},
 		{{"👁 识图模型", "a:st:m:vision"}},
 		{{"📝 形态摘要", "a:ad:dg"}},
 	}

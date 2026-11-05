@@ -70,7 +70,7 @@ func TestGuestBotJudgedAsBot(t *testing.T) {
 	var uid int64
 	var text string
 	b.Store.Read.QueryRow(`SELECT user_id,text FROM group_messages WHERE message_id=7`).Scan(&uid, &text)
-	if uid != 999 || !strings.Contains(text, "［访客 bot］@AdsBot") {
+	if uid != 999 || !strings.Contains(text, "<guest_bot>@AdsBot</guest_bot>") {
 		t.Errorf("留底 uid=%d text=%q；应记在代发的 bot 名下并标出访客 bot", uid, text)
 	}
 }

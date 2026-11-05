@@ -61,8 +61,9 @@ func AdminRejectAppeal(b *core.Bot, appealID, byUID int64) error {
 		return fmt.Errorf("该申诉单已结案")
 	}
 	updateAppeal(b.Shared, ap.ID, `status='rejected'`)
-	b.Send(ap.UserID, "你的申诉未通过人工审核，限制维持原样。"+
-		"如仍认为有误，请修改账号资料后联系群管理员。", nil)
+	b.Send(ap.UserID, "你的申诉未通过人工审核，限制维持原样。\n\n"+
+		"驳回后 7 天内不能再次申诉；再次申诉时必须写一份与这次不同的理由，"+
+		"原样重发不会被受理。", nil)
 	slog.Info("申诉：管理员人工驳回", "appeal", ap.ID, "uid", ap.UserID, "by", byUID)
 	return nil
 }

@@ -67,6 +67,14 @@ var settingDefaults = map[string]string{
 	// antiad_enabled 是全平台急停：关掉它，所有 bot 的所有群一起停判。
 	// 单个群的启停在 bot_chats.enabled 上。
 	"antiad_enabled": "0",
+	// 消息存档：按群把文本、图片与判定流水写成文件。默认关 —— 它会持续
+	// 占用磁盘，且图片下载有网络开销，应由管理员显式打开。
+	"archive_enabled":        "0",
+	"archive_image_max_side": "1600",
+	"archive_image_quality":  "82",
+	// 历史图片回捞：/export 时用内置纯 Go MTProto 客户端按 message_id 从
+	// 群历史下载仍存在的图片。需要 tg_api_id/tg_api_hash，默认关。
+	"archive_fetch_history": "0",
 	// 判定模型列表（JSON 数组，按重试顺序）。每项形如 <上游名>/<模型ID>；
 	// 旧格式（无前缀）继续兼容，任选可用上游。空列表 = 该级不跑。
 	"antiad_so_models":  "[]", // systemone 判定模型列表，空则只走大模型
@@ -104,6 +112,9 @@ var settingDefaults = map[string]string{
 	// 识图模型（看图片与贴纸），空则图片与贴纸不判。全局一份：它按图片去重缓存，
 	// 与哪个 bot 收到这张图无关。
 	"antiad_vision_model": "",
+	// OCR 模型（优先逐字转写图里的文字），空则跳过 OCR 直接走识图模型。
+	// 配了它以后文字类广告按原文进判定，只有图里没有文字时才回落识图。
+	"antiad_ocr_model": "",
 	// 规则发现 Agent（AI 必封规则）指定模型，形如 <上游名>/<模型ID>；
 	// 空 = 复判模型列表里第一个 OpenAI 兼容模型（见 antiad/ruleagent.go）。
 	"antiad_rule_model": "",
@@ -134,7 +145,11 @@ var settingDefaults = map[string]string{
 	"antiad_alert_rpm": "3",  // 同一 (群,人) 每分钟告警上限
 	"antiad_cmd_rpm":   "3",  // 每人每分钟 /check、/ban 次数上限
 	"antiad_ctx_msgs":  "6",
-	"antiad_alert_ttl": "300", // 群内告警自动撤回秒数，0 = 永不撤回
+	// 链接预览：判定前展开正文里的 t.me 链接，把指向的帖子/频道简介一并
+	// 送检。只发一个链接、载荷全在对面的引流形态靠它才判得动。只取
+	// Telegram 自己的公开预览页，不抓其它站点。默认开。
+	"antiad_link_preview": "1",
+	"antiad_alert_ttl":    "300", // 群内告警自动撤回秒数，0 = 永不撤回
 	// 高确定性的（置信度 ≥ antiad_act_hard 且危害度 ≥ antiad_alert_severe）
 	// 群内提醒短暂显示：处置已执行，通知仅用于告知在场成员。
 	// 0 = 关闭短撤回，一律用 antiad_alert_ttl。

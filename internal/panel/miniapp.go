@@ -444,6 +444,7 @@ func miniState(sh *core.Shared, w http.ResponseWriter, uid int64, username strin
 	}
 	defaults["antiad_so_models"] = snap.Setting("antiad_so_models")
 	defaults["antiad_llm_models"] = snap.Setting("antiad_llm_models")
+	defaults["antiad_ocr_model"] = snap.Setting("antiad_ocr_model")
 	defaults["antiad_rule_model"] = snap.Setting("antiad_rule_model")
 
 	out := map[string]any{

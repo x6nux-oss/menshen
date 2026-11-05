@@ -52,7 +52,7 @@ func ffmpegReady() bool {
 // 消息的问题，逐条提示只会把日志刷满。
 var ffmpegMissingOnce sync.Once
 
-// movingMediaOf 取出消息里会动的媒体，并给出它的形态标签。
+// movingMediaOf 取出消息里会动的媒体，并给出它的媒体标签名。
 //
 // 三种形态（视频、动图、视频消息）走同一条抽帧路径，但标签要分开：判定
 // 得看得出这是一条视频还是一个动图。没有文件句柄的不取 —— 那样连下载都
@@ -60,11 +60,11 @@ var ffmpegMissingOnce sync.Once
 func movingMediaOf(m *tg.Message) (*tg.MovingMedia, string) {
 	switch {
 	case m.Video != nil && m.Video.FileID != "":
-		return m.Video, "［视频］"
+		return m.Video, "video"
 	case m.Animation != nil && m.Animation.FileID != "":
-		return m.Animation, "［动图］"
+		return m.Animation, "animation"
 	case m.VideoNote != nil && m.VideoNote.FileID != "":
-		return m.VideoNote, "［视频消息］"
+		return m.VideoNote, "video_note"
 	}
 	return nil, ""
 }

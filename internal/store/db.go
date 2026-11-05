@@ -255,6 +255,45 @@ CREATE TABLE IF NOT EXISTS group_messages (
 CREATE INDEX IF NOT EXISTS idx_gmsg_user ON group_messages(chat_id, user_id, at);
 CREATE INDEX IF NOT EXISTS idx_gmsg_at ON group_messages(at);
 
+-- archive_items 是文件存档的去重索引。原文、图片与判定流水都写在磁盘上
+-- （见 internal/archive），这张表只负责回答「这条是否已经入档」：
+--   kind = message  时 ref_id 是 message_id
+--   kind = judgment 时 ref_id 是 antiad_log.id
+-- 同一条群消息被多个 bot 收到、或历史导出与实时存档撞车时，
+-- INSERT OR IGNORE 的受影行数为 1 的一方才写文件。
+CREATE TABLE IF NOT EXISTS archive_items (
+  kind    TEXT    NOT NULL,
+  chat_id INTEGER NOT NULL,
+  ref_id  INTEGER NOT NULL,
+  at      INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (kind, chat_id, ref_id)
+);
+CREATE INDEX IF NOT EXISTS idx_archive_items_at ON archive_items(at);
+
+-- archive_avatars 是每个群已抓取的用户头像记录。头像是用户级的，但存档
+-- 按群分目录，所以按 (chat_id, user_id) 记账：同一个群里的同一个人只抓
+-- 一次，换头像后由 updated_at 的 TTL 触发重抓。
+CREATE TABLE IF NOT EXISTS archive_avatars (
+  chat_id        INTEGER NOT NULL,
+  user_id        INTEGER NOT NULL,
+  file_unique_id TEXT    NOT NULL DEFAULT '',
+  file           TEXT    NOT NULL DEFAULT '',
+  updated_at     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (chat_id, user_id)
+);
+
+-- archive_fetches 记录哪些消息已经尝试过通过 MTProto 回捞图片，避免每次
+-- /export 都为同一条消息重新拉一次历史。status: ok / empty / error；
+-- error 隔 24 小时再试。消息已删除或不是图片记 empty，不再重试。
+CREATE TABLE IF NOT EXISTS archive_fetches (
+  chat_id    INTEGER NOT NULL,
+  message_id INTEGER NOT NULL,
+  status     TEXT    NOT NULL DEFAULT '',
+  tried_at   INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (chat_id, message_id)
+);
+CREATE INDEX IF NOT EXISTS idx_archive_fetches_at ON archive_fetches(tried_at);
+
 -- alert_cleanup 是待撤回的群内告警。记在库里而不是内存计时器上：
 -- 进程一重启计时器就丢了，还没到点的告警会永久留在群里。
 -- bot_id 决定由哪个 bot 去撤：只有发消息的那个 bot 删得掉它。

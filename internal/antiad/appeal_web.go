@@ -323,7 +323,8 @@ func notifyCodeIssued(sh *core.Shared, ap appealRec, ip, fp string, soft []strin
 func notifyAppealRejected(sh *core.Shared, ap appealRec, hard, soft []string, ip, fp string) {
 	strong, weak := relatedAccounts(sh, fp, ip, ap.UserID)
 	if b := botFor(sh, ap.BotID); b != nil {
-		b.Send(ap.UserID, "你的申诉未通过网页验证，请联系群管理员处理。", nil)
+		b.Send(ap.UserID, "你的申诉未通过网页验证，请联系群管理员处理。\n\n"+
+			"驳回后 7 天内不能再次申诉；再次申诉时必须写一份与这次不同的理由。", nil)
 		pushAppealCard(b, ap, effectivePenalties(b.Shared, b.BotID(), ap.UserID), appealCardFailed,
 			apHasGban(sh, ap.UserID), appealCardExtra{
 				Hard: hard, Soft: soft, Strong: strong, Weak: weak})

@@ -74,7 +74,7 @@ func TestVisualOf(t *testing.T) {
 	m.Sticker = &tg.Sticker{FileID: "s", FileUniqueID: "su", IsAnimated: true, Emoji: "😀",
 		SetName: "赚钱群", Thumbnail: &tg.PhotoSize{FileID: "th", FileUniqueID: "thu"}}
 	v, ok := visualOf(m)
-	if !ok || v.fileID != "th" || !strings.Contains(v.label, "赚钱群") {
+	if !ok || v.fileID != "th" || !strings.Contains(v.meta, "赚钱群") {
 		t.Errorf("动态贴纸应看缩略图并带包名，得到 %+v", v)
 	}
 	if _, ok := visualOf(testutil.GroupMsg(-100, 42, 1, "纯文字")); ok {
@@ -94,7 +94,7 @@ func TestPurePhotoNeedsVisionModel(t *testing.T) {
 	}
 }
 
-// TestPurePhotoJudgedWithVision：配了识图模型，图里的文字以`［图片］`行并进正文送检，
+// TestPurePhotoJudgedWithVision：配了识图模型，图里的文字以 `<image>` 标签进正文送检，
 // 留底也带上；同一张图按 file_unique_id 只识一次。
 func TestPurePhotoJudgedWithVision(t *testing.T) {
 	b, fake := testutil.NewTestBot(t, 1)
@@ -104,7 +104,7 @@ func TestPurePhotoJudgedWithVision(t *testing.T) {
 
 	HandleGroupMessage(b, photoMsg(1, "u1"))
 	waitIdle(t, b)
-	if s := seen.Load().(string); !strings.Contains(s, "［图片］") || !strings.Contains(s, "abc123") {
+	if s := seen.Load().(string); !strings.Contains(viewBody(s), "<image") || !strings.Contains(s, "abc123") {
 		t.Fatalf("送检正文应带识图结果: %s", s)
 	}
 	var text string

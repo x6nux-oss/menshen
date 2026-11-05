@@ -377,6 +377,18 @@ const fileMaxBytes = 5 << 20
 // 地址里有 bot token，出错一律过 tg.CallError 剥掉 URL，否则 token 会进日志
 // 与流水。代理与 Bot API 调用同一份（tgRoundTripper）。
 func (b *Bot) DownloadFile(path string) ([]byte, error) {
+	return b.DownloadFileLimit(path, fileMaxBytes)
+}
+
+// DownloadFileLimit 同 DownloadFile，但可以指定体积上限（字节）。
+//
+// 超过上限时返回错误而不是静默截断：截断的图片既解不出来也存不了，
+// 存档宁可放弃这一张并记一条日志，也不要落一个坏文件。Bot API 对 bot
+// 的文件下载上限是 20 MB，调用方按自己的场景取更小的值。
+func (b *Bot) DownloadFileLimit(path string, max int64) ([]byte, error) {
+	if max <= 0 {
+		max = fileMaxBytes
+	}
 	c := &http.Client{Timeout: fileTimeout, Transport: b.tgRoundTripper}
 	resp, err := c.Get(strings.TrimRight(b.Cfg.TGAPIBase, "/") +
 		"/file/bot" + b.Token + "/" + path)
@@ -387,7 +399,15 @@ func (b *Bot) DownloadFile(path string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("download: HTTP %d", resp.StatusCode)
 	}
-	return io.ReadAll(io.LimitReader(resp.Body, fileMaxBytes))
+	// 多读一个字节用来判断是否超限：正好等于上限的文件仍可下载。
+	data, err := io.ReadAll(io.LimitReader(resp.Body, max+1))
+	if err != nil {
+		return nil, tg.CallError("download", err)
+	}
+	if int64(len(data)) > max {
+		return nil, fmt.Errorf("download: 文件超过上限 %d 字节", max)
+	}
+	return data, nil
 }
 
 // ---- 发送与编辑 ----
@@ -661,6 +681,7 @@ var adminCmds = []map[string]string{
 	{"command": "ban", "description": "在你能管的所有群里禁言或封禁某人（/ban user_id [mute|ban]）"},
 	{"command": "gban", "description": "把某人写入联合封禁名单并全平台执行（/gban user_id [mute|ban]）"},
 	{"command": "clear", "description": "清理目标群或全部群的判定上下文"},
+	{"command": "export", "description": "把历史留底与判定流水导出到存档目录（/export [all|chat_id]）"},
 }
 
 // registerAdminCommands 为单个管理员设置 chat scope 的命令菜单。
