@@ -1,26 +1,19 @@
 // 页面内复用的小展示件：状态徽标、指标格、信息行、无限列表页脚、
 // 键盘可达的用户链接与列表计数/加载占位。
 // 纯展示/加载编排，无请求逻辑（请求留给各页的 query hook）。
-import { Box, Button, ButtonBase, Typography } from '@mui/material'
+//
+// Phase 3：展示层换到新组件层（Tailwind + shadcn），**props 与导出名一律不变** ——
+// 19 个页面都在用，改签名会把迁移面从 8 个文件扩散到 19 个。
 import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { errorStatus } from '../api/client'
 import type { Bot, Chat } from '../api/types'
+import { ErrorState } from '../components/feedback'
+import { Badge } from '../components/ui'
+import { Button } from '../components/ui/button'
 import { botStatus, chatStatus } from '../lib/status'
-import { Badge, ErrorState } from '../ui'
 
 /** BotStatusBadge 渲染 运行中/未运行/已停用 徽标。 */
-/** 底部操作条的紧凑按钮：全局 Button 覆盖把 minHeight 提到 44，这里压回 32，
- *  按钮贴底一屏尽量放下，不遮挡正文。记录与申诉详情共用。 */
-export const COMPACT_BTN_SX = {
-  minHeight: 32,
-  px: 1.25,
-  fontSize: 13,
-  flex: '1 1 auto',
-  minWidth: 0,
-  whiteSpace: 'nowrap',
-} as const
-
 export function BotStatusBadge({ bot }: { bot: Pick<Bot, 'enabled' | 'live'> }) {
   const status = botStatus(bot)
   return <Badge tone={status.tone}>{status.label}</Badge>
@@ -32,32 +25,44 @@ export function ChatStatusBadge({ chat }: { chat: Pick<Chat, 'enabled' | 'dryrun
   return <Badge tone={status.tone}>{status.label}</Badge>
 }
 
+/**
+ * 底部操作条的紧凑按钮参数：全局 Button 把触控高度提到 44，这里压回 32，
+ * 按钮贴底一屏尽量放下，不遮挡正文。记录与申诉详情共用。
+ *
+ * ponytail: 仍是 MUI `sx` 的对象形态 —— 它的两个调用点（AppealDetailPage /
+ * LogDetailPage）在 Task 4 才迁移，本任务只换展示层不动调用点。Task 4 一并
+ * 换成 `COMPACT_BTN` 类名并删掉本常量。
+ */
+export const COMPACT_BTN_SX = {
+  minHeight: 32,
+  px: 1.25,
+  fontSize: 13,
+  flex: '1 1 auto',
+  minWidth: 0,
+  whiteSpace: 'nowrap',
+} as const
+
+/** Task 4 起的紧凑按钮类名（Tailwind 版，与 COMPACT_BTN_SX 等效）。 */
+export const COMPACT_BTN =
+  'h-8 min-w-0 flex-1 basis-auto px-1.25 text-[13px] whitespace-nowrap'
+
 /** Metric 是概览 2×2 指标格里的一格。 */
 export function Metric({ label, value }: { label: ReactNode; value: ReactNode }) {
   return (
-    <Box>
-      <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.4 }}>
-        {label}
-      </Typography>
-      <Typography sx={{ fontSize: 20, fontWeight: 600, lineHeight: 1.5 }}>{value}</Typography>
-    </Box>
+    <div>
+      <div className="text-[13px] leading-[1.4] text-muted-foreground">{label}</div>
+      <div className="text-xl leading-[1.5] font-semibold tabular-nums">{value}</div>
+    </div>
   )
 }
 
 /** InfoRow 是详情页信息卡里的一行：左标签（灰色 13px）+ 右内容（可换行）。 */
 export function InfoRow({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, px: 2, py: 0.75 }}>
-      <Typography
-        component="span"
-        sx={{ flex: '0 0 auto', width: 76, fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}
-      >
-        {label}
-      </Typography>
-      <Box sx={{ flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.6, wordBreak: 'break-word' }}>
-        {children}
-      </Box>
-    </Box>
+    <div className="flex items-start gap-4 px-4 py-1.5">
+      <span className="w-19 shrink-0 text-[13px] leading-[1.6] text-muted-foreground">{label}</span>
+      <div className="min-w-0 flex-1 text-sm leading-[1.6] break-words">{children}</div>
+    </div>
   )
 }
 
@@ -75,30 +80,27 @@ export function ListCount({
   testId?: string
 }) {
   return (
-    <Box
-      data-testid={testId}
-      sx={{ px: 0.5, mb: 0.5, fontSize: 13, color: 'text.secondary' }}
-    >
+    <div data-testid={testId} className="mb-1 px-0.5 text-[13px] text-muted-foreground">
       {loading || total === undefined ? '共 … 条' : `共 ${total} 条`}
-    </Box>
+    </div>
   )
 }
 
 /** ListLoading 是筛选/搜索请求进行中的轻量占位，替代会误导的空态。 */
 export function ListLoading() {
   return (
-    <Typography
-      data-testid="list-loading"
-      sx={{ py: 2, textAlign: 'center', fontSize: 13, color: 'text.secondary' }}
-    >
+    <p data-testid="list-loading" className="py-2 text-center text-[13px] text-muted-foreground">
       加载中…
-    </Typography>
+    </p>
   )
 }
 
 /**
- * UserLink 是详情/列表里的 uid 资料链接。用 ButtonBase 渲染成 span（避免嵌在
- * 行按钮里产生嵌套 button/a 的非法结构），自带 Enter/Space 键盘激活；
+ * UserLink 是详情/列表里的 uid 资料链接。
+ *
+ * 渲染成 `<span role="link">` 而**不是** `<button>`：它常常嵌在行按钮
+ * （ListRow 的根就是 `<button>`）内部，button 套 button 是非法 HTML，
+ * 浏览器会拆掉内层节点。span 需要自己处理 Enter/Space 两个键。
  * stopPropagation 保证不触发外层行跳转。
  */
 export function UserLink({
@@ -111,8 +113,7 @@ export function UserLink({
   testId?: string
 }) {
   return (
-    <ButtonBase
-      component="span"
+    <span
       role="link"
       tabIndex={0}
       data-testid={testId}
@@ -120,25 +121,16 @@ export function UserLink({
         event.stopPropagation()
         onClick()
       }}
-      sx={{
-        p: 0,
-        minWidth: 0,
-        fontSize: 'inherit',
-        lineHeight: 'inherit',
-        fontFamily: 'inherit',
-        color: 'primary.main',
-        textAlign: 'inherit',
-        verticalAlign: 'baseline',
-        borderRadius: '2px',
-        '&.Mui-focusVisible': {
-          outline: '2px solid',
-          outlineColor: 'primary.main',
-          outlineOffset: 1,
-        },
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        event.stopPropagation()
+        onClick()
       }}
+      className="inline max-w-full cursor-pointer rounded-[2px] align-baseline text-[length:inherit] leading-[inherit] font-[inherit] text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
     >
       uid {userId}（资料）
-    </ButtonBase>
+    </span>
   )
 }
 
@@ -190,16 +182,16 @@ export function InfiniteFooter({
   }
 
   return (
-    <Box ref={sentinelRef} data-testid="list-footer" sx={{ py: 1.5, textAlign: 'center' }}>
+    <div ref={sentinelRef} data-testid="list-footer" className="py-1.5 text-center">
       {isFetchingNextPage ? (
-        <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>加载中…</Typography>
+        <span className="text-[13px] text-muted-foreground">加载中…</span>
       ) : hasNextPage ? (
-        <Button size="small" onClick={onLoadMore}>
+        <Button size="sm" variant="outline" onClick={onLoadMore}>
           加载更多
         </Button>
       ) : (
-        <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>没有更多了</Typography>
+        <span className="text-[13px] text-muted-foreground/60">没有更多了</span>
       )}
-    </Box>
+    </div>
   )
 }
