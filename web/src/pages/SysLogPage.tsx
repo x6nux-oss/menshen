@@ -4,18 +4,19 @@
 //     运维看日志的默认预期；`各级` 一行给出当前搜索下各档的条数；
 //   - 搜索是服务端子串匹配（消息 + 字段的键和值），300ms 防抖、回车立即；
 //   - 无限滚动（每页 50，新→旧）；日志只在内存、不落库，看最新的点 `刷新`。
-import { Box, Button, Chip, Typography } from '@mui/material'
 import { useEffect, useRef, useState } from 'react'
 import { errorStatus } from '../api/client'
 import { useInfiniteSysLogs, useMiniState } from '../api/hooks'
 import type { SysLogRow } from '../api/types'
+import { EmptyState, ErrorState, Skeletons } from '../components/feedback'
+import { SearchField } from '../components/mobile'
+import { Badge } from '../components/ui'
+import { Button } from '../components/ui/button'
 import { displayTz, fmtTSFull } from '../lib/format'
 import { logLevelInfo } from '../lib/status'
 import { usePageParam } from '../nav'
-import { Badge, EmptyState, ErrorState, SearchField, Skeletons } from '../ui'
 import { InfiniteFooter, ListCount, ListLoading } from './shared'
 
-const MONO = 'ui-monospace, Menlo, monospace'
 const SEARCH_DEBOUNCE_MS = 300
 
 /** LEVELS 是级别下限选项；value 直接发给后端（空串 = 不过滤）。 */
@@ -85,8 +86,8 @@ export function SysLogPage() {
   const countLoading = logs.isPending || logs.isPlaceholderData
 
   return (
-    <Box data-testid="syslog-page">
-      <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+    <div data-testid="syslog-page">
+      <div className="mb-2 flex items-center gap-2">
         <SearchField
           value={q}
           onChange={changeQ}
@@ -95,34 +96,42 @@ export function SysLogPage() {
           ariaLabel="搜索运行日志"
         />
         <Button
-          size="small"
-          variant="outlined"
+          size="sm"
+          variant="outline"
           onClick={() => void logs.refetch()}
-          sx={{ flex: '0 0 auto', minHeight: 40, px: 1.5 }}
+          className="h-10 shrink-0 px-3"
         >
           刷新
         </Button>
-      </Box>
+      </div>
 
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center', mb: 0.5 }}>
-        {LEVELS.map((item) => (
-          <Chip
-            key={item.value || 'all'}
-            data-testid={`syslog-level-${item.value || 'all'}`}
-            size="small"
-            label={item.label}
-            color={level === item.value ? 'primary' : 'default'}
-            variant={level === item.value ? 'filled' : 'outlined'}
-            onClick={() => setLevel(item.value)}
-          />
-        ))}
-        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>级别含更高档</Typography>
-      </Box>
+      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+        {LEVELS.map((item) => {
+          const selected = level === item.value
+          return (
+            <button
+              key={item.value || 'all'}
+              type="button"
+              data-testid={`syslog-level-${item.value || 'all'}`}
+              aria-pressed={selected}
+              onClick={() => setLevel(item.value)}
+              className={
+                selected
+                  ? 'rounded-full bg-primary px-2.5 py-1 text-[13px] leading-[1.4] font-medium text-primary-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
+                  : 'rounded-full border border-border px-2.5 py-1 text-[13px] leading-[1.4] text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50'
+              }
+            >
+              {item.label}
+            </button>
+          )
+        })}
+        <span className="text-[12px] text-muted-foreground">级别含更高档</span>
+      </div>
 
       {counts !== undefined && !countLoading && (
-        <Box data-testid="syslog-counts" sx={{ px: 0.5, mb: 0.5, fontSize: 12.5, color: 'text.secondary' }}>
+        <div data-testid="syslog-counts" className="mb-1 px-0.5 text-[12.5px] text-muted-foreground">
           {`各级：调试 ${counts.debug} · 信息 ${counts.info} · 警告 ${counts.warn} · 错误 ${counts.error}`}
-        </Box>
+        </div>
       )}
 
       {logs.isError && logs.data === undefined ? (
@@ -140,11 +149,11 @@ export function SysLogPage() {
             )
           ) : (
             <>
-              <Box sx={{ mt: 0.5 }}>
+              <div className="mt-1">
                 {rows.map((log) => (
                   <SysLogListRow key={log.seq} log={log} tz={tz} />
                 ))}
-              </Box>
+              </div>
               <InfiniteFooter
                 hasNextPage={logs.hasNextPage}
                 isFetchingNextPage={logs.isFetchingNextPage}
@@ -158,11 +167,11 @@ export function SysLogPage() {
         </>
       )}
 
-      <Typography sx={{ px: 1.5, mt: 1, fontSize: 12, color: 'text.secondary', lineHeight: 1.7 }}>
+      <p className="mt-2 px-3 text-[12px] leading-[1.7] text-muted-foreground">
         这里只保留最近若干条，进程重启后清空；完整日志落在数据库同目录
         （data.db → data.log），单文件与总大小上限在「全局设置 → 护栏与成本」调整。
-      </Typography>
-    </Box>
+      </p>
+    </div>
   )
 }
 
@@ -170,40 +179,28 @@ export function SysLogPage() {
 function SysLogListRow({ log, tz }: { log: SysLogRow; tz?: string }) {
   const info = logLevelInfo(log.level)
   return (
-    <Box
+    <div
       data-testid={`syslog-row-${log.seq}`}
-      sx={{ px: 0.5, py: 0.75, borderBottom: '1px solid', borderColor: 'divider' }}
+      className="border-b border-border px-0.5 py-1.5"
     >
-      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
-        <Box component="span" sx={{ fontFamily: MONO, fontSize: 12.5, color: 'text.secondary' }}>
+      <div className="flex flex-wrap items-baseline gap-2">
+        <span className="font-mono text-[12.5px] text-muted-foreground">
           {fmtTSFull(log.at, tz)}
-        </Box>
+        </span>
         <Badge tone={info.tone}>{info.label}</Badge>
-        <Box
-          component="span"
-          sx={{ flex: '1 1 220px', minWidth: 0, fontSize: 14, lineHeight: 1.6, wordBreak: 'break-word' }}
-        >
+        <span className="min-w-0 flex-[1_1_220px] text-sm leading-[1.6] break-words">
           {log.message}
-        </Box>
-      </Box>
+        </span>
+      </div>
       {log.attrs.length > 0 && (
-        <Box
-          sx={{
-            mt: 0.25,
-            fontFamily: MONO,
-            fontSize: 12,
-            lineHeight: 1.6,
-            color: 'text.secondary',
-            wordBreak: 'break-word',
-          }}
-        >
+        <div className="mt-0.5 font-mono text-[12px] leading-[1.6] break-words text-muted-foreground">
           {log.attrs.map((attr, i) => (
-            <Box component="span" key={`${attr.k}-${i}`} sx={{ mr: 1 }}>
+            <span key={`${attr.k}-${i}`} className="mr-2">
               {attr.k}={attr.v}
-            </Box>
+            </span>
           ))}
-        </Box>
+        </div>
       )}
-    </Box>
+    </div>
   )
 }
