@@ -15,6 +15,17 @@ async function bootstrap() {
     const { startMocks } = await import('./mocks')
     await startMocks()
   }
+
+  // 开发期组件预览页（Phase 1 的人工验收载体，Phase 4 全部页面迁完后删除）。
+  // `import.meta.env.DEV` 在生产构建里恒为 false，整个分支会被摇掉，不进产物。
+  // 只在 dev server 下可达：设计系统的大半质量（玻璃、暗色、对比度、焦点环）
+  // jsdom 测不到，只能在真浏览器里看，所以给它一条独立入口。
+  if (import.meta.env.DEV && location.pathname.startsWith('/miniapp/_preview')) {
+    const { PreviewPage } = await import('./components/preview')
+    createRoot(document.getElementById('root')!).render(<PreviewPage />)
+    return
+  }
+
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />
