@@ -1,12 +1,17 @@
-// 管理面板的桌面外壳：左侧固定导航 + 顶部标题栏 + 内容区。
+// 管理面板的桌面外壳：左侧侧栏 + 顶部标题栏 + 内容区。
 //
-// 这是给桌面端单独写的一套外壳，不用 Mini App 的 TabBar/TopBar/导航栈。
+// 这是给桌面端单独写的一套外壳，不复用 Mini App 的 TabBar/TopBar/导航栈。
 // 路由是简单的一层：一个 section（侧栏项）或它的一个详情页。
-import { Box, Button, Drawer, List, ListItemButton, ListItemText, Skeleton, Typography } from '@mui/material'
+//
+// 侧栏与顶栏用玻璃（设计文档 §4.4：玻璃只给「浮起」的元素 —— 内容从下面滚过、
+// 背后有东西可透的面板）；表格与长列表不用玻璃。
 import { useMiniState } from '../api/hooks'
 import { ApiError } from '../api/client'
+import { ErrorState } from '../components/feedback'
+import { GlassPanel, GlassToolbar } from '../components/glass'
+import { Button, Skeleton } from '../components/ui'
+import { cn } from '../lib/utils'
 import { meLabel } from '../lib/format'
-import { ErrorState } from '../ui'
 import { PageHeader } from './components'
 import { useAdminNav } from './nav'
 import { sectionOf } from './route'
@@ -28,7 +33,8 @@ import { UpstreamDetailView } from './views/UpstreamDetailView'
 import { UpstreamsView } from './views/UpstreamsView'
 import { UserView } from './views/UserView'
 
-const DRAWER_WIDTH = 224
+/** 侧栏宽度：与旧实现的 224px 对齐（`w-56` = 14rem = 224px）。 */
+const SIDEBAR_CLASS = 'w-56'
 
 const PRIMARY: { section: Section; label: string }[] = [
   { section: 'overview', label: '概览' },
@@ -90,14 +96,40 @@ export function AdminShell() {
     const status = state.error instanceof ApiError ? state.error.status : 0
     if (status === 401) return <LoginRequired onRetry={() => void state.refetch()} />
     return (
-      <Box sx={{ p: 4, maxWidth: 720, mx: 'auto' }}>
+      <div className="mx-auto max-w-[720px] p-8">
         <ErrorState status={status} onRetry={() => void state.refetch()} />
-      </Box>
+      </div>
     )
   }
 
   const me = state.data.me
   return <Layout main={me.main} identityLabel={`${me.main ? '主管理员' : '次级管理员'} · ${meLabel(me)}`} />
+}
+
+/** NavItem 是侧栏的一项。当前项标 aria-current="page"（无障碍），并高亮。 */
+function NavItem({
+  label,
+  active,
+  onClick,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'w-full rounded-md px-3 py-2 text-left text-sm transition-colors outline-none',
+        'focus-visible:ring-2 focus-visible:ring-ring/50',
+        active ? 'bg-primary/10 font-medium text-primary' : 'text-foreground hover:bg-accent',
+      )}
+    >
+      {label}
+    </button>
+  )
 }
 
 function Layout({ main, identityLabel }: { main: boolean; identityLabel: string }) {
@@ -106,92 +138,70 @@ function Layout({ main, identityLabel }: { main: boolean; identityLabel: string 
   const isDetail = route.k !== section
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100dvh', bgcolor: 'background.default' }}>
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: DRAWER_WIDTH,
-          flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: DRAWER_WIDTH,
-            boxSizing: 'border-box',
-            borderRight: '1px solid',
-            borderColor: 'divider',
-            display: 'flex',
-          },
-        }}
-      >
-        <Box sx={{ px: 2, py: 2.5 }}>
-          <Typography sx={{ fontSize: 18, fontWeight: 700 }}>🛡 门神</Typography>
-          <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.25 }}>{identityLabel}</Typography>
-        </Box>
-        <List sx={{ px: 1 }}>
-          {PRIMARY.map((item) => (
-            <ListItemButton
-              key={item.section}
-              selected={section === item.section && !isDetail}
-              onClick={() => go(sectionRoute(item.section))}
-            >
-              <ListItemText primary={item.label} slotProps={{ primary: { sx: { fontSize: 14 } } }} />
-            </ListItemButton>
-          ))}
-        </List>
-        <Typography sx={{ px: 2, pt: 1.5, pb: 0.5, fontSize: 12, color: 'text.secondary' }}>管理</Typography>
-        <List sx={{ px: 1 }}>
-          {MANAGE.filter((item) => main || !item.mainOnly).map((item) => (
-            <ListItemButton
-              key={item.section}
-              selected={section === item.section}
-              onClick={() => go(sectionRoute(item.section))}
-            >
-              <ListItemText primary={item.label} slotProps={{ primary: { sx: { fontSize: 14 } } }} />
-            </ListItemButton>
-          ))}
-        </List>
-        <Box sx={{ mt: 'auto', px: 2, py: 2 }}>
-          <Button size="small" variant="outlined" fullWidth href="/admin/logout" component="a">
-            退出登录
-          </Button>
-          <Typography sx={{ mt: 1, fontSize: 11.5, color: 'text.secondary', lineHeight: 1.6 }}>
-            会话 12 小时有效，过期请回 Telegram 重新获取链接。
-          </Typography>
-        </Box>
-      </Drawer>
-      <Box component="main" sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <Box
-          sx={{
-            px: 3,
-            py: 1.75,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.5,
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            bgcolor: 'background.paper',
-            position: 'sticky',
-            top: 0,
-            zIndex: 1,
-          }}
-        >
-          {isDetail && (
-            <Button size="small" variant="text" onClick={() => go(sectionRoute(section), true)}>
-              ← 返回
+    <div className="flex min-h-dvh bg-background text-foreground">
+      {/* 侧栏：玻璃面板 + 粘在视口高度，独立于内容区滚动。 */}
+      <aside className={cn(SIDEBAR_CLASS, 'shrink-0 p-2')}>
+        <GlassPanel className="sticky top-2 flex h-[calc(100dvh-1rem)] flex-col rounded-xl p-0">
+          <div className="px-4 py-5">
+            <p className="text-lg font-bold leading-6">🛡 门神</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{identityLabel}</p>
+          </div>
+
+          <nav className="flex flex-col gap-0.5 px-2" aria-label="主导航">
+            {PRIMARY.map((item) => (
+              <NavItem
+                key={item.section}
+                label={item.label}
+                active={section === item.section && !isDetail}
+                onClick={() => go(sectionRoute(item.section))}
+              />
+            ))}
+          </nav>
+
+          <p className="px-4 pb-1 pt-4 text-xs text-muted-foreground">管理</p>
+          <nav className="flex flex-col gap-0.5 px-2" aria-label="管理导航">
+            {MANAGE.filter((item) => main || !item.mainOnly).map((item) => (
+              <NavItem
+                key={item.section}
+                label={item.label}
+                active={section === item.section}
+                onClick={() => go(sectionRoute(item.section))}
+              />
+            ))}
+          </nav>
+
+          <div className="mt-auto px-4 py-4">
+            <Button variant="outline" size="sm" asChild className="w-full">
+              <a href="/admin/logout">退出登录</a>
             </Button>
-          )}
-          <Typography sx={{ fontSize: 17, fontWeight: 700 }}>
-            {DETAIL_TITLES[route.k] ?? SECTION_TITLES[section]}
-          </Typography>
-          <Typography sx={{ fontSize: 13, color: 'text.secondary', ml: 'auto' }}>
-            {SECTION_TITLES[section]}
-          </Typography>
-        </Box>
-        <Box sx={{ px: 3, py: 3, flex: 1 }}>
-          <Box sx={{ maxWidth: 1360, mx: 'auto' }}>
-            {renderRoute(route, main)}
-          </Box>
-        </Box>
-      </Box>
-    </Box>
+            <p className="mt-2 text-[11.5px] leading-relaxed text-muted-foreground">
+              会话 12 小时有效，过期请回 Telegram 重新获取链接。
+            </p>
+          </div>
+        </GlassPanel>
+      </aside>
+
+      <main className="flex min-w-0 flex-1 flex-col">
+        <div className="sticky top-0 z-10">
+          <GlassToolbar className="flex items-center gap-3 rounded-none px-6 py-2.5">
+            {isDetail && (
+              <Button variant="ghost" size="sm" onClick={() => go(sectionRoute(section), true)}>
+                ← 返回
+              </Button>
+            )}
+            <h1 className="text-[17px] font-bold">
+              {DETAIL_TITLES[route.k] ?? SECTION_TITLES[section]}
+            </h1>
+            <span className="ml-auto text-[13px] text-muted-foreground">
+              {SECTION_TITLES[section]}
+            </span>
+          </GlassToolbar>
+        </div>
+        <div className="flex-1 px-6 py-6">
+          <div className="mx-auto max-w-[1360px]">{renderRoute(route, main)}</div>
+        </div>
+      </main>
+    </div>
   )
 }
 
@@ -254,44 +264,44 @@ function renderRoute(route: AdminRoute, main: boolean) {
 /** MainOnly 次级管理员访问主管理员专属页时的说明。 */
 export function MainOnly() {
   return (
-    <Box>
+    <div>
       <PageHeader title="仅主管理员" />
-      <Typography sx={{ fontSize: 13.5, color: 'text.secondary', lineHeight: 1.8 }}>
+      <p className="text-[13.5px] leading-relaxed text-muted-foreground">
         该功能由主管理员统一配置。你是次级管理员，可以管理自己名下的机器人与群组。
-      </Typography>
-    </Box>
+      </p>
+    </div>
   )
 }
 
 /** LoginRequired 会话缺失/过期时的指引：回 Telegram 重新拿链接。 */
 function LoginRequired({ onRetry }: { onRetry: () => void }) {
   return (
-    <Box sx={{ maxWidth: 520, mx: 'auto', mt: 12, p: 3, bgcolor: 'background.paper', borderRadius: 2 }}>
-      <Typography sx={{ fontSize: 18, fontWeight: 700, mb: 1 }}>需要登录</Typography>
-      <Typography sx={{ fontSize: 14, lineHeight: 1.8 }}>
+    <div className="mx-auto mt-24 max-w-[520px] rounded-lg border border-border bg-card p-6">
+      <h2 className="mb-2 text-lg font-bold">需要登录</h2>
+      <p className="text-sm leading-relaxed">
         请在 Telegram 里打开与 bot 的私聊，点击菜单里的「🖥 网页版（浏览器打开）」获取登录链接；
         链接 10 分钟内有效，打开即登录。
-      </Typography>
-      <Button variant="contained" sx={{ mt: 2 }} onClick={onRetry}>
+      </p>
+      <Button onClick={onRetry} className="mt-4">
         已重新获取，重试
       </Button>
-    </Box>
+    </div>
   )
 }
 
 function ShellSkeleton() {
   return (
-    <Box sx={{ display: 'flex', minHeight: '100dvh' }}>
-      <Box sx={{ width: DRAWER_WIDTH, p: 2, borderRight: '1px solid', borderColor: 'divider' }}>
-        <Skeleton variant="text" width={96} height={30} />
+    <div className="flex min-h-dvh">
+      <div className={cn(SIDEBAR_CLASS, 'shrink-0 border-r border-border p-4')}>
+        <Skeleton className="mb-3 h-7 w-24" />
         {Array.from({ length: 6 }, (_, i) => (
-          <Skeleton key={i} variant="text" height={30} />
+          <Skeleton key={i} className="mb-1 h-7 w-full" />
         ))}
-      </Box>
-      <Box sx={{ flex: 1, p: 3 }}>
-        <Skeleton variant="rounded" height={64} sx={{ mb: 2 }} />
-        <Skeleton variant="rounded" height={240} />
-      </Box>
-    </Box>
+      </div>
+      <div className="flex-1 p-6">
+        <Skeleton className="mb-4 h-16 w-full" />
+        <Skeleton className="h-60 w-full" />
+      </div>
+    </div>
   )
 }
