@@ -52,11 +52,11 @@ describe('SysLogPage', () => {
     await waitFor(() => expect(bodies).toHaveLength(1))
     expect(bodies[0]).toEqual({ level: '', q: '', page: 1 })
 
-    fireEvent.click(screen.getByTestId('syslog-level-warn'))
+    fireEvent.click(screen.getByRole('button', { name: '警告' }))
     await waitFor(() => expect(bodies).toHaveLength(2))
     expect(bodies[1]).toMatchObject({ level: 'warn', page: 1 })
 
-    fireEvent.click(screen.getByTestId('syslog-level-error'))
+    fireEvent.click(screen.getByRole('button', { name: '错误' }))
     await waitFor(() => expect(bodies).toHaveLength(3))
     expect(bodies[2]).toMatchObject({ level: 'error', page: 1 })
   })
@@ -65,7 +65,7 @@ describe('SysLogPage', () => {
     renderPage(<SysLogPage />)
     await screen.findByTestId('syslog-row-1')
 
-    fireEvent.click(screen.getByTestId('syslog-level-warn'))
+    fireEvent.click(screen.getByRole('button', { name: '警告' }))
 
     await waitFor(() => expect(screen.queryByTestId('syslog-row-1')).not.toBeInTheDocument())
     expect(screen.queryByTestId('syslog-row-2')).not.toBeInTheDocument()

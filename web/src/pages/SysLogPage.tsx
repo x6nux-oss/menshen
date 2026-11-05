@@ -9,7 +9,7 @@ import { errorStatus } from '../api/client'
 import { useInfiniteSysLogs, useMiniState } from '../api/hooks'
 import type { SysLogRow } from '../api/types'
 import { EmptyState, ErrorState, Skeletons } from '../components/feedback'
-import { SearchField } from '../components/mobile'
+import { Segmented, SearchField } from '../components/mobile'
 import { Badge } from '../components/ui'
 import { Button } from '../components/ui/button'
 import { displayTz, fmtTSFull } from '../lib/format'
@@ -106,25 +106,12 @@ export function SysLogPage() {
       </div>
 
       <div className="mb-1 flex flex-wrap items-center gap-1.5">
-        {LEVELS.map((item) => {
-          const selected = level === item.value
-          return (
-            <button
-              key={item.value || 'all'}
-              type="button"
-              data-testid={`syslog-level-${item.value || 'all'}`}
-              aria-pressed={selected}
-              onClick={() => setLevel(item.value)}
-              className={
-                selected
-                  ? 'rounded-full bg-primary px-2.5 py-1 text-[13px] leading-[1.4] font-medium text-primary-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
-                  : 'rounded-full border border-border px-2.5 py-1 text-[13px] leading-[1.4] text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50'
-              }
-            >
-              {item.label}
-            </button>
-          )
-        })}
+        <Segmented
+          value={level}
+          onChange={setLevel}
+          options={LEVELS}
+          ariaLabel="日志级别"
+        />
         <span className="text-[12px] text-muted-foreground">级别含更高档</span>
       </div>
 
