@@ -582,6 +582,47 @@ new-api 的玻璃只用标准 `backdrop-blur`；本设计多了一层**显式 op
 - 若干注释类 Minor（rsbuild 配置的归因注释、`env.d.ts` 一行冗余声明等），已记入 SDD ledger 待 Phase 2 一并处理。
 - `Skeletons` 的 `rows` 语义、`ConfirmOptions` 的 `danger` 字段名等**计划文本与旧实现不符**的地方，实现时一律以旧实现为准（已在 ledger 记录）。
 
+### 10.2 Phase 2 验收结论（2026-11-06 实测）
+
+**结论：桌面端迁移完成，两端功能对齐。** `src/admin/` 下零 `@mui` 引用。
+
+#### 产出
+
+| 内容 | 说明 |
+|---|---|
+| 16 个视图全部迁移 | Bots / SysLog / User / Overview / Upstreams / AppealDetail / ChatDetail / LogDetail / UpstreamDetail / Records / Chats / Settings / BotDetail / Lists / Models / Rules |
+| `admin/components.tsx` 重写 | 12 个展示件（PageHeader/Toolbar/StatCard/DataTable/EmptyRow/StatusBadge/ConfirmButton/InfoList/CardBlock/MonoText/Column/DataTableProps） |
+| `data-table.tsx` 新建 | TanStack Table 8 封装，客户端排序（**不做客户端分页** —— admin 已是服务端分页） |
+| `shell.tsx` 重写 | drill-in 侧栏（`GlassPanel`）+ 顶栏（`GlassToolbar`）+ 16 视图映射 + 权限过滤 |
+| `AILogView.tsx` 新建 | **补齐设计文档 §7 记录的唯一功能缺口** |
+| `Spinner` / `ChatRef` | 补两个 Phase 1 遗漏的件 |
+
+#### 门禁结果
+
+```
+npm run typecheck  → exit 0
+npm run test       → 62 files / 524 tests 全绿
+npm run lint       → exit 0（2 个既有 warning）
+npm run build      → 成功（726.2 kB / gzip 213.1 kB，三个 html 齐全）
+go build / go test ./internal/panel/  → 通过
+```
+
+测试数 520 → 524。**Mini App 零改动**（`src/pages/`、`src/App.tsx`、`src/nav.tsx`、`src/route.ts` 的 diff 为空）。
+
+#### 功能对齐
+
+设计文档 §7 记录的缺口 —— 桌面端缺 AI 调用流水页 —— **已补齐**：列表（时间/模型/状态/耗时/用量/开销）+ 搜索防抖 + 状态筛选 + 详情全文，复用已有的 `ailog`/`ailogitem` op（Go 侧零改动）。
+
+#### Phase 2 的两次视觉修正
+
+1. **additive 阶段（§4.6 景深画布）**：玻璃效果的前提是「背后有东西可模糊」。原先整页均匀近白 + 玻璃 62% 不透明，玻璃退化成白板。改为三团品牌色光晕 + 玻璃降到 42%。
+2. **预览页自身两处缺陷**：根容器铺了 `bg-background`（盖住光晕）、`main` 限宽 1024（宽屏右侧空白）。
+
+#### 遗留
+
+- 视图内部的细节样式（间距/字号）未逐一人工验收 —— 建议后续在真实数据下过一遍。
+- `theme-mode` 的用户手动切换 UI 尚未接入（当前跟随系统）；设计文档 §6 要求三面共用，Phase 4 补。
+
 ## 11. 风险
 
 | 风险 | 影响 | 缓解 |
