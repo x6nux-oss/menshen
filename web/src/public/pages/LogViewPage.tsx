@@ -3,7 +3,7 @@ import { Box, Button, CircularProgress, Typography } from '@mui/material'
 import type { LogRecordView, WebRoute } from '../api'
 import { InvalidState } from '../InvalidState'
 import { useGate } from '../useGate'
-import { ChatRef } from '../../ui'
+import { ChatRef } from '../../components/mobile'
 
 const cardSx = { bgcolor: 'background.paper', borderRadius: 2, p: 2, mb: 2 }
 const titleSx = { fontSize: 15, fontWeight: 700, mb: 1 }

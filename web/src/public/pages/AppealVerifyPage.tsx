@@ -7,7 +7,7 @@ import type { AppealData, WebRoute } from '../api'
 import { collectSignals } from '../fingerprint'
 import { errorText, InvalidState } from '../InvalidState'
 import { TurnstileWidget } from '../TurnstileWidget'
-import { ChatRef } from '../../ui'
+import { ChatRef } from '../../components/mobile'
 
 const LIMIT_LABEL: Record<string, string> = {
   join_profile: '进群资料审核限制',

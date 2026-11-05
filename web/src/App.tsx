@@ -29,10 +29,6 @@ import { routeSlug } from './route'
 import { detailTitle, renderStackPage, renderTabPage, TAB_NAMES } from './shellPages'
 import { initTelegram } from './telegram'
 import type { TelegramBridge, TelegramTheme } from './telegram'
-import {
-  ActionSheetProvider as LegacyActionSheetProvider,
-  ToastProvider as LegacyToastProvider,
-} from './ui'
 
 type Boot =
   | { phase: 'booting' }
@@ -106,20 +102,13 @@ function ReadyApp({ bridge }: { bridge: TelegramBridge }) {
   return (
     <QueryClientProvider client={queryClient}>
       <NavProvider backButton={bridge.backButton}>
-        {/* ponytail: 迁移期间两套 Provider 并存 —— 已迁的页面（批次 3-4）用新层，
-            未迁的 7 个页面（批次 5-7）仍用旧 src/ui。两套 Context 互不干扰。
-            Task 9 删 src/ui 时把旧的一层摘掉。 */}
-        <LegacyActionSheetProvider>
-          <LegacyToastProvider>
-            <ActionSheetProvider>
-              <ToastProvider>
-                <ErrorBoundary>
-                  <Shell />
-                </ErrorBoundary>
-              </ToastProvider>
-            </ActionSheetProvider>
-          </LegacyToastProvider>
-        </LegacyActionSheetProvider>
+        <ActionSheetProvider>
+          <ToastProvider>
+            <ErrorBoundary>
+              <Shell />
+            </ErrorBoundary>
+          </ToastProvider>
+        </ActionSheetProvider>
       </NavProvider>
     </QueryClientProvider>
   )

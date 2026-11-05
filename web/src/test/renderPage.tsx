@@ -1,22 +1,17 @@
 // 页面测试渲染器：一次性装上 QueryClient / Nav / ActionSheet / Toast 四层 Provider，
 // 并提供 NavProbe / IntentSetter 观察与预置导航状态。
 //
-// Phase 1 期间新旧两套组件层并存，装配必须**两套都挂**：
-//   - 旧页面（src/pages 等）用 src/ui 的 MUI 版 Provider；
-//   - 新组件（components/*）用 Tailwind 版 Provider。
-// 两个模块的同名导出（ActionSheetProvider / ToastProvider）用别名导入，
-// 它们各自持有独立的 Context，互不干扰。
+// Phase 3 结束后只剩一套组件层（components/*），不再需要新旧双挂。
 /* oxlint-disable react/only-export-components -- 测试辅助文件，导出渲染器与探针组件 */
 /* oxlint-disable react-hooks/exhaustive-deps -- IntentSetter 只在挂载时预置一次导航状态 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { ToastProvider as TwToastProvider } from '../components/feedback'
-import { ActionSheetProvider as TwActionSheetProvider } from '../components/mobile'
+import { ToastProvider } from '../components/feedback'
+import { ActionSheetProvider } from '../components/mobile'
 import { NavProvider, useNav } from '../nav'
 import type { TabKey } from '../nav'
-import { ActionSheetProvider, ToastProvider } from '../ui'
 
 export function makeTestClient(): QueryClient {
   return new QueryClient({
@@ -33,12 +28,7 @@ export function renderPage(ui: ReactNode, options: { client?: QueryClient } = {}
     <QueryClientProvider client={client}>
       <NavProvider>
         <ActionSheetProvider>
-          <ToastProvider>
-            {/* Tailwind 层：新组件的 useToast / useConfirm 从这里取 */}
-            <TwActionSheetProvider>
-              <TwToastProvider>{ui}</TwToastProvider>
-            </TwActionSheetProvider>
-          </ToastProvider>
+          <ToastProvider>{ui}</ToastProvider>
         </ActionSheetProvider>
       </NavProvider>
     </QueryClientProvider>,

@@ -9,7 +9,7 @@ import type { JoinVerifyData, WebRoute } from '../api'
 import { mountCaptcha } from '../captcha'
 import { collectSignals } from '../fingerprint'
 import { errorText, InvalidState } from '../InvalidState'
-import { ChatRef } from '../../ui'
+import { ChatRef } from '../../components/mobile'
 
 const PROVIDER_LABEL: Record<string, string> = {
   turnstile: 'Cloudflare Turnstile',
