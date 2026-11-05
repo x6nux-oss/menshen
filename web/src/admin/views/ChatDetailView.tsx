@@ -1,19 +1,10 @@
 // 群组详情：启停、演练、群内告警、处罚方式、补录入群时间、移除。
-import {
-  Box,
-  Button,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Switch,
-  Typography,
-} from '@mui/material'
 import { useChatMutation } from '../../api/mutations'
 import { useMiniState } from '../../api/hooks'
 import { muteOptLabel, punishLabel, chatURL } from '../../lib/format'
 import { chatStatus } from '../../lib/status'
-import { ChatRef } from '../../ui'
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from '../../components/ui'
+import { ChatRef } from '../../components/mobile'
 import { CardBlock, ConfirmButton, InfoList, PageHeader, StatusBadge } from '../components'
 import { useRunFeedback } from '../feedback'
 
@@ -30,7 +21,7 @@ export function ChatDetailView({ botId, chatId }: { botId: number; chatId: numbe
   if (!chat) {
     return (
       <CardBlock>
-        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>群组不存在，或不在你的管理范围内。</Typography>
+        <span className="text-sm text-muted-foreground">群组不存在，或不在你的管理范围内。</span>
       </CardBlock>
     )
   }
@@ -51,7 +42,7 @@ export function ChatDetailView({ botId, chatId }: { botId: number; chatId: numbe
       />
 
       <CardBlock title="运行状态">
-        <Box sx={{ display: 'grid', gap: 1 }}>
+        <div className="grid gap-2">
           <ToggleRow
             label="启用判定"
             hint="停用后该群的消息不再判定。"
@@ -73,28 +64,31 @@ export function ChatDetailView({ botId, chatId }: { botId: number; chatId: numbe
             disabled={chatMut.isPending}
             onChange={(v) => update({ group_alert: v }, v ? '已开启群内展示' : '已关闭群内展示')}
           />
-        </Box>
+        </div>
       </CardBlock>
 
       <CardBlock title="处罚方式">
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <FormControl size="small" sx={{ minWidth: 240 }}>
-            <InputLabel>处罚</InputLabel>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="min-w-[240px]">
             <Select
-              label="处罚"
-              value={chat.punish}
+              value={String(chat.punish)}
               disabled={chatMut.isPending}
-              onChange={(event) => update({ punish: Number(event.target.value) }, '处罚方式已更新')}
+              onValueChange={(value) => update({ punish: Number(value) }, '处罚方式已更新')}
             >
-              <MenuItem value={-1}>跟随机器人全局</MenuItem>
-              <MenuItem value={0}>{`禁言（${muteOptLabel(bot_settings, global_defaults, botId)}）`}</MenuItem>
-              <MenuItem value={1}>封禁出群（永久）</MenuItem>
+              <SelectTrigger aria-label="处罚">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="-1">跟随机器人全局</SelectItem>
+                <SelectItem value="0">{`禁言（${muteOptLabel(bot_settings, global_defaults, botId)}）`}</SelectItem>
+                <SelectItem value="1">封禁出群（永久）</SelectItem>
+              </SelectContent>
             </Select>
-          </FormControl>
-          <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+          </div>
+          <span className="text-[13px] text-muted-foreground">
             当前生效：{punishLabel(bot_settings, global_defaults, botId, chat.punish)}
-          </Typography>
-        </Box>
+          </span>
+        </div>
       </CardBlock>
 
       <CardBlock title="其他">
@@ -104,9 +98,9 @@ export function ChatDetailView({ botId, chatId }: { botId: number; chatId: numbe
             { label: 'chat id', value: chat.chat_id },
           ]}
         />
-        <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
+        <div className="mt-4 flex flex-wrap gap-2">
           <Button
-            variant="outlined"
+            variant="outline"
             disabled={chatMut.isPending}
             onClick={() => run(chatMut.mutateAsync({ action: 'backfill', bot_id: botId, chat_id: chatId }), '已开始补录')}
           >
@@ -126,7 +120,7 @@ export function ChatDetailView({ botId, chatId }: { botId: number; chatId: numbe
           >
             移除群组
           </ConfirmButton>
-        </Box>
+        </div>
       </CardBlock>
     </>
   )
@@ -146,12 +140,17 @@ function ToggleRow({
   onChange: (v: boolean) => void
 }) {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-      <Box sx={{ flex: 1 }}>
-        <Typography sx={{ fontSize: 13.5 }}>{label}</Typography>
-        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{hint}</Typography>
-      </Box>
-      <Switch checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
-    </Box>
+    <div className="flex items-center gap-4">
+      <div className="flex-1">
+        <p className="text-[13.5px]">{label}</p>
+        <p className="text-[12px] text-muted-foreground">{hint}</p>
+      </div>
+      <Switch
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onChange}
+        aria-label={label}
+      />
+    </div>
   )
 }

@@ -1,11 +1,11 @@
 // 判定记录详情：完整正文与理由，人工处置按钮（AI 复查 / 解封 / 加白 / 标记 / 联封）。
-import { Box, Button, Typography } from '@mui/material'
 import { useLog, useMiniState } from '../../api/hooks'
 import { useLogactMutation, useRulesMutation } from '../../api/mutations'
 import { actionLabel, deciderLabel, displayTz, fmtTSFull, kindLabel, verdictLabel } from '../../lib/format'
 import { verdictInfo } from '../../lib/status'
 import { openLink } from '../../telegram'
-import { ChatRef } from '../../ui'
+import { Button } from '../../components/ui'
+import { ChatRef } from '../../components/mobile'
 import { CardBlock, ConfirmButton, InfoList, PageHeader, StatusBadge } from '../components'
 import { useRunFeedback } from '../feedback'
 import { useAdminNav } from '../nav'
@@ -19,14 +19,14 @@ export function LogDetailView({ id }: { id: number }) {
   const actMut = useLogactMutation()
   const rulesMut = useRulesMutation<{ ok: boolean }>()
 
-  if (log.isPending) return <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>加载中…</Typography>
+  if (log.isPending) return <span className="text-sm text-muted-foreground">加载中…</span>
   if (log.isError) {
     const status = log.error instanceof ApiError ? log.error.status : 0
     return (
       <CardBlock>
-        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>
+        <span className="text-sm text-muted-foreground">
           {status === 404 ? '记录不存在。' : '记录加载失败，请稍后重试。'}
-        </Typography>
+        </span>
       </CardBlock>
     )
   }
@@ -69,14 +69,14 @@ export function LogDetailView({ id }: { id: number }) {
       <CardBlock
         title="处置"
         actions={
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <Button size="small" variant="outlined" disabled={actMut.isPending} onClick={() => act('review', '已发起 AI 复查')}>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" disabled={actMut.isPending} onClick={() => act('review', '已发起 AI 复查')}>
               AI 复查
             </Button>
-            <Button size="small" variant="outlined" disabled={actMut.isPending} onClick={() => act('unmute', '已解除限制')}>
+            <Button size="sm" variant="outline" disabled={actMut.isPending} onClick={() => act('unmute', '已解除限制')}>
               解封
             </Button>
-            <Button size="small" variant="outlined" disabled={actMut.isPending} onClick={() => act('white', '已加入白名单')}>
+            <Button size="sm" variant="outline" disabled={actMut.isPending} onClick={() => act('white', '已加入白名单')}>
               加白名单 24h
             </Button>
             <ConfirmButton
@@ -117,8 +117,8 @@ export function LogDetailView({ id }: { id: number }) {
                   解除联封
                 </ConfirmButton>
                 <Button
-                  size="small"
-                  variant="outlined"
+                  size="sm"
+                  variant="outline"
                   disabled={rulesMut.isPending}
                   onClick={() => run(rulesMut.mutateAsync({ action: 'agent_start', record_id: id }), '已启动规则发现')}
                 >
@@ -126,40 +126,38 @@ export function LogDetailView({ id }: { id: number }) {
                 </Button>
               </>
             )}
-          </Box>
+          </div>
         }
       >
-        <Typography sx={{ fontSize: 12.5, color: 'text.secondary', lineHeight: 1.8 }}>
+        <p className="text-[12.5px] leading-relaxed text-muted-foreground">
           处置会立即作用到群组。解封与加白对之后 24 小时内的发言生效；「AI 写规则」围绕本条原文提炼正则。
-        </Typography>
+        </p>
       </CardBlock>
 
       <CardBlock
         title="正文"
         actions={
           row.view_url ? (
-            <Button size="small" variant="text" onClick={() => openLink(row.view_url)}>
+            <Button size="sm" variant="ghost" onClick={() => openLink(row.view_url)}>
               查看原文
             </Button>
           ) : undefined
         }
       >
-        <Typography sx={{ fontSize: 13.5, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+        <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">
           {row.text || '（无正文留底）'}
-        </Typography>
+        </p>
       </CardBlock>
 
       <CardBlock title="理由">
-        <Typography sx={{ fontSize: 13.5, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-          {row.reason || '—'}
-        </Typography>
+        <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">{row.reason || '—'}</p>
       </CardBlock>
 
-      <Box>
-        <Button size="small" variant="text" onClick={() => nav.go({ k: 'user', id: row.user_id })}>
+      <div>
+        <Button size="sm" variant="ghost" onClick={() => nav.go({ k: 'user', id: row.user_id })}>
           查看该用户资料 →
         </Button>
-      </Box>
+      </div>
     </>
   )
 }
