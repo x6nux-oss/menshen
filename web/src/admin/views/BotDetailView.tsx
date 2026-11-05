@@ -1,22 +1,12 @@
 // oxlint-disable react/set-state-in-effect -- 草稿态需要跟随服务端返回的值重置（保存后刷新）。
 // 机器人详情：基本信息、启用开关、归属与模型（主管理员）、逐项参数覆盖、移除。
 import { useEffect, useState } from 'react'
-import {
-  Box,
-  Button,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Switch,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from '../../components/ui'
 import { useBotMutation, useSetMutation } from '../../api/mutations'
 import { useMiniState } from '../../api/hooks'
 import { controlKind, overrideKeys, specHint, specUnit, specValueText, validateSpecValue } from '../../lib/settings'
 import { botStatus } from '../../lib/status'
-import { Badge } from '../../ui'
+import { Badge } from '../../components/ui'
 import { CardBlock, ConfirmButton, InfoList, PageHeader, StatusBadge } from '../components'
 import { useRunFeedback } from '../feedback'
 import type { Bot, Spec } from '../../api/types'
@@ -31,9 +21,7 @@ export function BotDetailView({ botId }: { botId: number }) {
   if (!bot) {
     return (
       <CardBlock>
-        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>
-          机器人不存在，或不在你的管理范围内。
-        </Typography>
+        <span className="text-sm text-muted-foreground">机器人不存在，或不在你的管理范围内。</span>
       </CardBlock>
     )
   }
@@ -63,31 +51,32 @@ export function BotDetailView({ botId }: { botId: number }) {
       <CardBlock
         title="运行开关"
         actions={
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] text-muted-foreground">
               {bot.enabled ? '已启用' : '已停用'}
-            </Typography>
+            </span>
             <Switch
+              aria-label="启用机器人"
               checked={bot.enabled}
               disabled={bot.is_main || botMut.isPending}
-              onChange={(event) =>
+              onCheckedChange={(checked) =>
                 run(
                   botMut.mutateAsync({
                     bot_id: bot.bot_id,
-                    action: event.target.checked ? 'enable' : 'disable',
+                    action: checked ? 'enable' : 'disable',
                   }),
-                  event.target.checked ? '已启用' : '已停用',
+                  checked ? '已启用' : '已停用',
                 )
               }
             />
-          </Box>
+          </div>
         }
       >
-        <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.8 }}>
+        <span className="text-[13px] leading-relaxed text-muted-foreground">
           {bot.is_main
             ? '主 bot 的保护在服务端强制：不能停用、不能入群判定。'
             : '停用后该机器人不再接收与处理任何消息。'}
-        </Typography>
+        </span>
       </CardBlock>
 
       {main && !bot.is_main && (
@@ -120,9 +109,9 @@ export function BotDetailView({ botId }: { botId: number }) {
 
       {!bot.is_main && (
         <CardBlock title="移除机器人">
-          <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 1.5, lineHeight: 1.8 }}>
+          <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">
             移除后该机器人立即停止工作，其 webhook 与配置一并删除。此操作不可撤销。
-          </Typography>
+          </p>
           <ConfirmButton
             danger
             variant="outlined"
@@ -161,21 +150,26 @@ function OwnerCard({
   useEffect(() => setOwner(bot.owner_id), [bot.owner_id])
   return (
     <CardBlock title="归属管理员">
-      <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-        <FormControl size="small" sx={{ minWidth: 240 }}>
-          <InputLabel>归属</InputLabel>
-          <Select label="归属" value={owner} onChange={(event) => setOwner(Number(event.target.value))}>
-            {owners.map((o) => (
-              <MenuItem key={o.user_id} value={o.user_id}>
-                {o.label}
-              </MenuItem>
-            ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex min-w-[240px] flex-col gap-1">
+          <Label htmlFor="bot-owner">归属</Label>
+          <Select value={String(owner)} onValueChange={(v) => setOwner(Number(v))}>
+            <SelectTrigger id="bot-owner" aria-label="归属">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {owners.map((o) => (
+                <SelectItem key={o.user_id} value={String(o.user_id)}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
-        </FormControl>
-        <Button variant="contained" disabled={disabled || owner === bot.owner_id} onClick={() => onSave(owner)}>
+        </div>
+        <Button disabled={disabled || owner === bot.owner_id} onClick={() => onSave(owner)}>
           改派
         </Button>
-      </Box>
+      </div>
     </CardBlock>
   )
 }
@@ -197,39 +191,44 @@ function ModelsCard({
   useEffect(() => setLlm(bot.llm_models.join(', ')), [bot.llm_models])
   return (
     <CardBlock title="判定模型">
-      <Typography sx={{ fontSize: 12.5, color: 'text.secondary', mb: 1.5, lineHeight: 1.7 }}>
+      <p className="mb-3 text-[12.5px] leading-relaxed text-muted-foreground">
         逗号分隔的有序列表，格式 <code>上游名/模型ID</code>。留空表示跟随全局默认。
         {models.length > 0 &&
           ` 已启用模型：${models.slice(0, 6).join('、')}${models.length > 6 ? '…' : ''}`}
-      </Typography>
-      <Box sx={{ display: 'grid', gap: 1.5 }}>
-        <ModelRow label="初判（systemone）" value={so} onChange={setSo} disabled={disabled} onSave={() => onSave('so', so)} />
-        <ModelRow label="复判（llm）" value={llm} onChange={setLlm} disabled={disabled} onSave={() => onSave('llm', llm)} />
-      </Box>
+      </p>
+      <div className="grid gap-3">
+        <ModelRow label="初判（systemone）" id="bot-so" value={so} onChange={setSo} disabled={disabled} onSave={() => onSave('so', so)} />
+        <ModelRow label="复判（llm）" id="bot-llm" value={llm} onChange={setLlm} disabled={disabled} onSave={() => onSave('llm', llm)} />
+      </div>
     </CardBlock>
   )
 }
 
 function ModelRow({
   label,
+  id,
   value,
   onChange,
   onSave,
   disabled,
 }: {
   label: string
+  id: string
   value: string
   onChange: (v: string) => void
   onSave: () => void
   disabled: boolean
 }) {
   return (
-    <Box sx={{ display: 'flex', gap: 1 }}>
-      <TextField label={label} value={value} onChange={(event) => onChange(event.target.value)} fullWidth size="small" />
-      <Button variant="outlined" disabled={disabled} onClick={onSave}>
+    <div className="flex items-end gap-2">
+      <div className="flex flex-1 flex-col gap-1">
+        <Label htmlFor={id}>{label}</Label>
+        <Input id={id} value={value} onChange={(event) => onChange(event.target.value)} />
+      </div>
+      <Button variant="outline" disabled={disabled} onClick={onSave}>
         保存
       </Button>
-    </Box>
+    </div>
   )
 }
 
@@ -252,11 +251,11 @@ function OverridesCard({
   return (
     <CardBlock title={`参数覆盖（${overridden.length}）`}>
       {overridden.length === 0 ? (
-        <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+        <span className="text-[13px] text-muted-foreground">
           该机器人没有覆盖任何全局参数，全部跟随全局设置。
-        </Typography>
+        </span>
       ) : (
-        <Box sx={{ display: 'grid', gap: 1 }}>
+        <div className="grid gap-2">
           {overridden.map((spec) => (
             <OverrideRow
               key={spec.key}
@@ -271,7 +270,7 @@ function OverridesCard({
               }
             />
           ))}
-        </Box>
+        </div>
       )}
     </CardBlock>
   )
@@ -307,41 +306,48 @@ function OverrideRow({
     onCommit(next.trim())
   }
 
+  const unit = specUnit(spec)
+  const hint = error ?? (draft === '' ? '' : specValueText(draft, spec))
+
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-      <Box sx={{ minWidth: 220, flex: 1 }}>
-        <Typography sx={{ fontSize: 13.5 }}>{spec.label}</Typography>
-        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{specHint(spec)}</Typography>
-      </Box>
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="min-w-[220px] flex-1">
+        <div className="text-[13.5px]">{spec.label}</div>
+        <div className="text-[12px] text-muted-foreground">{specHint(spec)}</div>
+      </div>
       {kind === 'toggle' ? (
         <Switch
+          aria-label={spec.label}
           checked={draft === '1'}
           disabled={disabled}
-          onChange={(event) => commit(event.target.checked ? '1' : '0')}
+          onCheckedChange={(checked) => commit(checked ? '1' : '0')}
         />
       ) : (
-        <TextField
-          value={draft}
-          disabled={disabled}
-          error={error !== null}
-          helperText={error ?? (draft === '' ? '' : specValueText(draft, spec))}
-          sx={{ width: 240 }}
-          size="small"
-          slotProps={{
-            input: {
-              endAdornment: specUnit(spec) ? <Badge tone="neutral">{specUnit(spec)}</Badge> : undefined,
-            },
-          }}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={() => commit(draft)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') commit(draft)
-          }}
-        />
+        <div className="flex w-[240px] flex-col gap-1">
+          <div className="flex items-center gap-1.5">
+            <Input
+              aria-label={spec.label}
+              aria-invalid={error !== null || undefined}
+              value={draft}
+              disabled={disabled}
+              onChange={(event) => setDraft(event.target.value)}
+              onBlur={() => commit(draft)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') commit(draft)
+              }}
+            />
+            {unit && <Badge tone="neutral">{unit}</Badge>}
+          </div>
+          {hint && (
+            <span className={error !== null ? 'text-[12px] text-destructive' : 'text-[12px] text-muted-foreground'}>
+              {hint}
+            </span>
+          )}
+        </div>
       )}
-      <Button size="small" variant="text" disabled={disabled} onClick={() => onCommit('')}>
+      <Button size="sm" variant="ghost" disabled={disabled} onClick={() => onCommit('')}>
         恢复全局
       </Button>
-    </Box>
+    </div>
   )
 }

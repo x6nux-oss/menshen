@@ -1,24 +1,10 @@
 // AI 必封规则（主管理员）：规则列表、发现 Agent、新建/测试/启停/强制/删除。
 import { useState } from 'react'
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Switch,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Textarea } from '../../components/ui'
 import { useRuleAgent, useRules, useMiniState } from '../../api/hooks'
 import { useRulesMutation } from '../../api/mutations'
 import { fmtTS } from '../../lib/format'
-import { SearchField } from '../../ui'
+import { SearchField } from '../../components/mobile'
 import { CardBlock, ConfirmButton, DataTable, InfoList, MonoText, PageHeader, StatCard, StatusBadge, Toolbar } from '../components'
 import type { Column } from '../components'
 import { useRunFeedback } from '../feedback'
@@ -48,9 +34,7 @@ export function RulesView() {
   if (!main) {
     return (
       <CardBlock>
-        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>
-          AI 必封规则只对主管理员开放。
-        </Typography>
+        <span className="text-sm text-muted-foreground">AI 必封规则只对主管理员开放。</span>
       </CardBlock>
     )
   }
@@ -70,10 +54,10 @@ export function RulesView() {
       header: '状态',
       width: 140,
       render: (row) => (
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
+        <div className="flex gap-1">
           <StatusBadge info={row.enabled ? { label: '启用', tone: 'ok' } : { label: '候选', tone: 'neutral' }} />
           {row.enforce && <StatusBadge info={{ label: '强制', tone: 'warn' }} />}
-        </Box>
+        </div>
       ),
     },
     { key: 'hits', header: '命中', width: 80, align: 'right', render: (row) => row.hits },
@@ -92,24 +76,23 @@ export function RulesView() {
       header: '',
       width: 200,
       render: (row) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <Switch
-            size="small"
+            aria-label={`启用规则 ${row.name}`}
             checked={row.enabled}
             disabled={mut.isPending}
-            onChange={(e) => run(mut.mutateAsync({ action: 'toggle', id: row.id, enabled: e.target.checked }), '已更新')}
+            onCheckedChange={(checked) => run(mut.mutateAsync({ action: 'toggle', id: row.id, enabled: checked }), '已更新')}
           />
           <Switch
-            size="small"
-            color="warning"
+            aria-label={`强制规则 ${row.name}`}
             checked={row.enforce}
             disabled={mut.isPending || (!row.enforce && !canEnforce(row))}
-            onChange={(e) => run(mut.mutateAsync({ action: 'enforce', id: row.id, enforce: e.target.checked }), '已更新')}
+            onCheckedChange={(checked) => run(mut.mutateAsync({ action: 'enforce', id: row.id, enforce: checked }), '已更新')}
           />
           <ConfirmButton size="small" color="error" variant="text" title="删除规则" description={`确认删除「${row.name}」？`} confirmLabel="删除" danger onConfirm={() => run(mut.mutateAsync({ action: 'remove', id: row.id }), '已删除')}>
             删除
           </ConfirmButton>
-        </Box>
+        </div>
       ),
     },
   ]
@@ -123,12 +106,10 @@ export function RulesView() {
         subtitle="命中即处置或作为判定证据；强制开关需零误封才能打开"
         actions={
           <>
-            <Button variant="outlined" onClick={() => setTestOpen(true)}>
+            <Button variant="outline" onClick={() => setTestOpen(true)}>
               测试正则
             </Button>
-            <Button variant="contained" onClick={() => setSaveOpen(true)}>
-              ＋ 新建规则
-            </Button>
+            <Button onClick={() => setSaveOpen(true)}>＋ 新建规则</Button>
           </>
         }
       />
@@ -137,50 +118,60 @@ export function RulesView() {
         title="规则发现"
         actions={
           a?.running ? (
-            <Button size="small" variant="outlined" color="error" disabled={mut.isPending} onClick={() => run(mut.mutateAsync({ action: 'agent_stop' }), '已停止')}>
+            <Button size="sm" variant="outline" className="text-destructive" disabled={mut.isPending} onClick={() => run(mut.mutateAsync({ action: 'agent_stop' }), '已停止')}>
               停止
             </Button>
           ) : (
-            <Button size="small" variant="contained" disabled={mut.isPending} onClick={() => run(mut.mutateAsync({ action: 'agent_start' }), '已启动')}>
+            <Button size="sm" disabled={mut.isPending} onClick={() => run(mut.mutateAsync({ action: 'agent_start' }), '已启动')}>
               开始发现
             </Button>
           )
         }
       >
         {a?.running ? (
-          <Typography sx={{ fontSize: 13.5 }}>
+          <span className="text-[13.5px]">
             运行中（已 {a.steps_count} 步）
             {a.target_log_id > 0 ? ` · 针对记录 #${a.target_log_id}` : ' · 全库模式'}
             {a.started_at ? ` · 开始于 ${fmtTS(a.started_at)}` : ''}
-          </Typography>
+          </span>
         ) : (
-          <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.8 }}>
+          <span className="text-[13px] leading-relaxed text-muted-foreground">
             {a?.result || a?.error || '未在运行。启动后 Agent 会从历史封禁流水里探索规则，一轮可能持续几十分钟。'}
-          </Typography>
+          </span>
         )}
       </CardBlock>
 
       <Toolbar>
-        <SearchField value={q} onChange={setQ} placeholder="搜索名称 / 正则" sx={{ maxWidth: 300 }} />
-        <FormControl size="small" sx={{ minWidth: 140 }}>
-          <InputLabel>状态</InputLabel>
-          <Select label="状态" value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <MenuItem value="all">全部</MenuItem>
-            <MenuItem value="enabled">启用</MenuItem>
-            <MenuItem value="candidate">候选</MenuItem>
-            <MenuItem value="enforce">强制</MenuItem>
+        <SearchField value={q} onChange={setQ} placeholder="搜索名称 / 正则" className="max-w-[300px]" />
+        <div className="flex min-w-[140px] flex-col gap-1">
+          <Label htmlFor="rules-filter">状态</Label>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger id="rules-filter" aria-label="状态">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部</SelectItem>
+              <SelectItem value="enabled">启用</SelectItem>
+              <SelectItem value="candidate">候选</SelectItem>
+              <SelectItem value="enforce">强制</SelectItem>
+            </SelectContent>
           </Select>
-        </FormControl>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>排序</InputLabel>
-          <Select label="排序" value={sort} onChange={(e) => setSort(e.target.value)}>
-            <MenuItem value="default">默认</MenuItem>
-            <MenuItem value="coverage">覆盖率</MenuItem>
-            <MenuItem value="tp">命中广告</MenuItem>
-            <MenuItem value="hits">规则命中</MenuItem>
-            <MenuItem value="recent">最近创建</MenuItem>
+        </div>
+        <div className="flex min-w-[160px] flex-col gap-1">
+          <Label htmlFor="rules-sort">排序</Label>
+          <Select value={sort} onValueChange={setSort}>
+            <SelectTrigger id="rules-sort" aria-label="排序">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">默认</SelectItem>
+              <SelectItem value="coverage">覆盖率</SelectItem>
+              <SelectItem value="tp">命中广告</SelectItem>
+              <SelectItem value="hits">规则命中</SelectItem>
+              <SelectItem value="recent">最近创建</SelectItem>
+            </SelectContent>
           </Select>
-        </FormControl>
+        </div>
       </Toolbar>
 
       <DataTable
@@ -188,7 +179,7 @@ export function RulesView() {
         rows={rows}
         rowKey={(row) => row.id}
         onRowClick={(row) => nav.go({ k: 'rule', id: row.id })}
-        empty={<Typography sx={{ fontSize: 13, color: 'text.secondary' }}>没有匹配的规则。</Typography>}
+        empty={<span className="text-[13px] text-muted-foreground">没有匹配的规则。</span>}
         columns={columns}
       />
 
@@ -241,36 +232,50 @@ function SaveRuleDialog({
   const [note, setNote] = useState('')
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontSize: 17 }}>新建必封规则</DialogTitle>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent>
-        <Box sx={{ display: 'grid', gap: 2, pt: 0.5 }}>
-          <TextField label="名称" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
-          <TextField label="正则" value={pattern} onChange={(e) => setPattern(e.target.value)} helperText="保存时会自动跑一轮全库测试；出现误封样本将拒绝创建" multiline minRows={2} fullWidth />
-          <TextField label="类型（ad_kind）" value={category} onChange={(e) => setCategory(e.target.value)} fullWidth />
-          <TextField label="备注" value={note} onChange={(e) => setNote(e.target.value)} fullWidth />
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>取消</Button>
-        <Button
-          variant="contained"
-          disabled={pattern.trim() === '' || name.trim() === '' || mut.isPending}
-          onClick={() => {
-            mut.mutate(
-              { action: 'save', id: 0, name: name.trim(), pattern: pattern.trim(), category: category.trim(), note: note.trim() },
-              {
-                onSuccess: (resp) => {
-                  onSaved(resp)
-                  onClose()
+        <DialogHeader>
+          <DialogTitle>新建必封规则</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="rule-name">名称</Label>
+            <Input id="rule-name" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="rule-pattern">正则</Label>
+            <Textarea id="rule-pattern" rows={2} value={pattern} onChange={(e) => setPattern(e.target.value)} />
+            <span className="text-[12px] text-muted-foreground">保存时会自动跑一轮全库测试；出现误封样本将拒绝创建</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="rule-category">类型（ad_kind）</Label>
+            <Input id="rule-category" value={category} onChange={(e) => setCategory(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="rule-note">备注</Label>
+            <Input id="rule-note" value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>取消</Button>
+          <Button
+            disabled={pattern.trim() === '' || name.trim() === '' || mut.isPending}
+            onClick={() => {
+              mut.mutate(
+                { action: 'save', id: 0, name: name.trim(), pattern: pattern.trim(), category: category.trim(), note: note.trim() },
+                {
+                  onSuccess: (resp) => {
+                    onSaved(resp)
+                    onClose()
+                  },
                 },
-              },
-            )
-          }}
-        >
-          保存并测试
-        </Button>
-      </DialogActions>
+              )
+            }}
+          >
+            保存并测试
+          </Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   )
 }
@@ -279,22 +284,27 @@ function TestPatternDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const mut = useRulesMutation<{ test: RuleTest }>()
   const [pattern, setPattern] = useState('')
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle sx={{ fontSize: 17 }}>测试正则</DialogTitle>
-      <DialogContent>
-        <Box sx={{ display: 'grid', gap: 2, pt: 0.5 }}>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <TextField label="正则" value={pattern} onChange={(e) => setPattern(e.target.value)} fullWidth />
-            <Button variant="contained" disabled={pattern.trim() === '' || mut.isPending} onClick={() => mut.mutate({ action: 'test', pattern: pattern.trim() })}>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>测试正则</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <div className="flex items-end gap-2">
+            <div className="flex flex-1 flex-col gap-1">
+              <Label htmlFor="rule-test-pattern">正则</Label>
+              <Input id="rule-test-pattern" value={pattern} onChange={(e) => setPattern(e.target.value)} />
+            </div>
+            <Button disabled={pattern.trim() === '' || mut.isPending} onClick={() => mut.mutate({ action: 'test', pattern: pattern.trim() })}>
               测试
             </Button>
-          </Box>
+          </div>
           {mut.data && <TestSummary test={mut.data.test} />}
-        </Box>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>关闭</Button>
+        </DialogFooter>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>关闭</Button>
-      </DialogActions>
     </Dialog>
   )
 }
@@ -302,35 +312,35 @@ function TestPatternDialog({ open, onClose }: { open: boolean; onClose: () => vo
 /** TestSummary 全库测试结果：命中分类统计 + 覆盖率 + 按类型细分。 */
 export function TestSummary({ test }: { test: RuleTest }) {
   return (
-    <Box>
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 1.5, mb: 1.5 }}>
+    <div>
+      <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-3">
         <StatCard label="扫描" value={test.scanned} />
         <StatCard label="命中" value={test.matched} />
         <StatCard label="TP（广告）" value={test.tp} />
         <StatCard label="FP（误封）" value={test.fp} />
         <StatCard label="已撤销" value={test.undone} />
         <StatCard label="覆盖率" value={`${Math.round(test.coverage * 100)}%`} />
-      </Box>
+      </div>
       {test.kinds.length > 0 && (
-        <Box sx={{ mb: 1.5 }}>
+        <div className="mb-4">
           {test.kinds.map((k) => (
-            <Typography key={k.kind} sx={{ fontSize: 12.5, color: 'text.secondary' }}>
+            <div key={k.kind} className="text-[12.5px] text-muted-foreground">
               {k.kind}：{k.matched} / {k.total}
-            </Typography>
+            </div>
           ))}
-        </Box>
+        </div>
       )}
       {test.fp_samples.length > 0 && (
-        <Typography sx={{ fontSize: 13, color: 'error.main', mb: 1 }}>
+        <div className="mb-2 text-[13px] text-destructive">
           出现误封样本，规则不能创建/强制。
-        </Typography>
+        </div>
       )}
       {test.fp_samples.slice(0, 5).map((s) => (
-        <Typography key={s.id} sx={{ fontSize: 12.5, color: 'text.secondary', mb: 0.5 }}>
+        <div key={s.id} className="mb-1 text-[12.5px] text-muted-foreground">
           #{s.id} {s.text}
-        </Typography>
+        </div>
       ))}
-    </Box>
+    </div>
   )
 }
 
@@ -344,7 +354,7 @@ export function RuleDetailView({ id }: { id: number }) {
   if (!main) {
     return (
       <CardBlock>
-        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>AI 必封规则只对主管理员开放。</Typography>
+        <span className="text-sm text-muted-foreground">AI 必封规则只对主管理员开放。</span>
       </CardBlock>
     )
   }
@@ -352,7 +362,7 @@ export function RuleDetailView({ id }: { id: number }) {
   if (!rule) {
     return (
       <CardBlock>
-        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>规则不存在。</Typography>
+        <span className="text-sm text-muted-foreground">规则不存在。</span>
       </CardBlock>
     )
   }
@@ -363,10 +373,10 @@ export function RuleDetailView({ id }: { id: number }) {
         title={rule.name}
         subtitle={`规则 #${rule.id} · ${rule.source}`}
         actions={
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <div className="flex gap-1">
             <StatusBadge info={rule.enabled ? { label: '启用', tone: 'ok' } : { label: '候选', tone: 'neutral' }} />
             {rule.enforce && <StatusBadge info={{ label: '强制', tone: 'warn' }} />}
-          </Box>
+          </div>
         }
       />
 
@@ -377,27 +387,26 @@ export function RuleDetailView({ id }: { id: number }) {
       <CardBlock
         title="开关"
         actions={
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Typography sx={{ fontSize: 13 }}>启用</Typography>
-              <Switch size="small" checked={rule.enabled} disabled={mut.isPending} onChange={(e) => run(mut.mutateAsync({ action: 'toggle', id, enabled: e.target.checked }), '已更新')} />
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Typography sx={{ fontSize: 13 }}>强制</Typography>
+          <div className="flex gap-4">
+            <div className="flex items-center gap-1">
+              <span className="text-[13px]">启用</span>
+              <Switch aria-label="启用规则" checked={rule.enabled} disabled={mut.isPending} onCheckedChange={(checked) => run(mut.mutateAsync({ action: 'toggle', id, enabled: checked }), '已更新')} />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[13px]">强制</span>
               <Switch
-                size="small"
-                color="warning"
+                aria-label="强制规则"
                 checked={rule.enforce}
                 disabled={mut.isPending || (!rule.enforce && !canEnforce(rule))}
-                onChange={(e) => run(mut.mutateAsync({ action: 'enforce', id, enforce: e.target.checked }), '已更新')}
+                onCheckedChange={(checked) => run(mut.mutateAsync({ action: 'enforce', id, enforce: checked }), '已更新')}
               />
-            </Box>
-          </Box>
+            </div>
+          </div>
         }
       >
-        <Typography sx={{ fontSize: 12.5, color: 'text.secondary', lineHeight: 1.8 }}>
+        <span className="text-[12.5px] leading-relaxed text-muted-foreground">
           强制需启用、测试过且零误封；未强制时命中作为证据交复判定案。
-        </Typography>
+        </span>
       </CardBlock>
 
       <CardBlock title="最近测试">
@@ -410,15 +419,15 @@ export function RuleDetailView({ id }: { id: number }) {
             { label: '最近命中', value: rule.last_matched ? fmtTS(rule.last_matched) : '从未' },
           ]}
         />
-        <Box sx={{ mt: 2 }}>
-          <Button variant="outlined" disabled={mut.isPending} onClick={() => mut.mutate({ action: 'test', id })}>
+        <div className="mt-4">
+          <Button variant="outline" disabled={mut.isPending} onClick={() => mut.mutate({ action: 'test', id })}>
             重新跑全库测试
           </Button>
-        </Box>
+        </div>
         {mut.data && (
-          <Box sx={{ mt: 2 }}>
+          <div className="mt-4">
             <TestSummary test={mut.data.test} />
-          </Box>
+          </div>
         )}
       </CardBlock>
 
@@ -430,11 +439,11 @@ export function RuleDetailView({ id }: { id: number }) {
             { label: '创建时间', value: fmtTS(rule.created_at) },
           ]}
         />
-        <Box sx={{ mt: 2 }}>
+        <div className="mt-4">
           <ConfirmButton variant="outlined" color="error" danger title="删除规则" description={`确认删除「${rule.name}」？`} confirmLabel="删除" onConfirm={() => run(mut.mutateAsync({ action: 'remove', id }), '已删除')}>
             删除规则
           </ConfirmButton>
-        </Box>
+        </div>
       </CardBlock>
     </>
   )
