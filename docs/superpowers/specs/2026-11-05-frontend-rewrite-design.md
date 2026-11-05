@@ -295,6 +295,123 @@ Dockerfile 的两条 `test -f`（index.html + admin.html）、CI 的 `npm run bu
 - **`onAfterBuild` 钩子在 v2.3.1 存在**（`dist/hooks.d.ts:7`），Task 2/3 的
   `.gitkeep` 回写插件逐字可用。
 
+### 8.3 Phase 0 验收结论（2026-11-05，rsbuild v2.3.1，Node v26.13.0）
+
+完整验证记录见 `.superpowers/sdd/2026-11-05-frontend-rewrite-phase0-build/task-5-report.md`。
+
+**五条前提的最终结果**
+
+| # | 前提 | 结果 |
+|---|---|---|
+| a | `distPath.root` 跨目录 | ✅ 成立，无退路 |
+| b | 共享产物目录两次构建 | ✅ 成立（**前置构建 `true` / 后置 `false`**），无退路 |
+| c | `html.template` 按 entryName 分派 | ✅ 成立（`rsbuild.config.ts` 用函数形式，`index`→`index.html`、`public`→`public.html`） |
+| d | Tailwind 4 在 rsbuild 下 `@theme inline` | ✅ 成立，**未走 `@tailwindcss/postcss` 退路**（实测产出 8168 字节 CSS） |
+| e | MSW worker 由 `public/` 复制替代 dev 中间件 | ✅ 生产构建成立（worker 进产物根、Go 侧可达）；**dev 下另有缺陷，见下** |
+
+**⚠️ 未满足的完成标准：dev server 在 `VITE_MOCK=1` 下白屏**
+
+验收时发现一个 **Phase 0 完成标准第 4 条未真正满足**的问题（生产构建与托管全部正常，
+仅开发模式受影响）：
+
+- **现象**：`VITE_MOCK=1 npm run dev` 后打开 `http://localhost:3000/miniapp/` ——
+  `#root` 永远空白，页面什么都不渲染。
+- **根因**：dev 模式下 rsbuild 把应用挂在**根路径 `/`**，而运行时代码硬编码了 `/miniapp/`
+  前缀，导致 `/miniapp/*` 全部落到 SPA 回退返回 `text/html`：
+
+  ```
+  /                             200  text/html        ← 应用其实在这里
+  /mockServiceWorker.js         200  text/javascript  ← 真实文件在根
+  /miniapp/telegram-web-app.js  200  text/html        ← 期望真文件，实得 HTML
+  /miniapp/mockServiceWorker.js 200  text/html        ← 期望真文件，实得 HTML
+  ```
+
+  于是 MSW 注册抛错（`unsupported MIME type ('text/html')`），`bootstrap()` 的
+  `await startMocks()` 拒绝，后面的 `createRoot(...).render(...)` 永不执行：
+
+  ```
+  error   [browser] Uncaught (in promise) Error: [MSW] Failed to register the
+  Service Worker: ... The script has an unsupported MIME type ('text/html').
+  ```
+
+- **迁移根因**：Vite 的 `base` 一个选项**同时**管 dev 与 build；rsbuild 拆成
+  **`server.base`（dev 的 URL 基路径）** 与 **`output.assetPrefix`（产物里的资源前缀）**
+  两个选项。Task 4 只迁了 `output.assetPrefix: '/miniapp/'`，漏了 `server.base`。
+- **修法**（Phase 1 开头补）：在两个 rsbuild 配置里加
+  `server: { base: '/miniapp/' }` / `{ base: '/admin/' }`。加完之后
+  `/miniapp/telegram-web-app.js` 与 `/miniapp/mockServiceWorker.js` 在 dev 下才会返回
+  真实文件，MSW 才能注册成功。
+  **修法已实测验证**（临时改配置起 dev、验证后还原）：
+  - dev URL 从 `http://localhost:3000/` 变为 `http://localhost:3000/miniapp/`（符合预期）；
+  - `/miniapp/telegram-web-app.js` 与 `/miniapp/mockServiceWorker.js` 的 Content-Type
+    从 `text/html` 变为 `text/javascript`；
+  - 浏览器 console 的消息数从 1（MSW MIME 报错）变为 **0**；
+  - 页面正常渲染（显示 `unavailable-guide` 引导页，这是普通浏览器无 Telegram SDK 时的预期）。
+- **不受影响的部分**：生产构建产物的路径**完全正确**（`assets/` 扁平、引用带
+  `/miniapp/` 前缀、SDK 排在入口脚本之前），Go 侧托管与全部 339 个前端测试、
+  `internal/panel` 的 handler 测试都通过。这个缺陷**只在 dev**。
+- **验收时的旁证**：不设 `VITE_MOCK` 起 dev —— 页面正常渲染出
+  `data-testid="unavailable-guide"`（「请通过 Telegram 里打开本页」引导页），
+  控制台无任何消息。这条反证了「应用能挂载、只是 MSW 那条路断了」。
+
+**构建耗时**（`npm run build`，含 `tsc -b` + 两次 rsbuild 构建）
+
+```
+real 4.96s   user 7.39s   sys 0.73s
+产物 Total: 650.1 kB / gzip 195.7 kB
+```
+
+Vite 基线无法对比（Vite 配置与依赖已在 Task 4 删除，为对比去重装不值得）。
+
+**Phase 0 完成标准逐条核验**
+
+| # | 标准 | 结果 |
+|---|---|---|
+| 1 | `npm run build` 一条命令产三个 html | ✅ `index.html` + `public.html` + `admin.html` |
+| 2 | typecheck / test / lint 全绿（测试文件一个不改） | ✅ `tsc -b` exit 0；51 files / 339 tests 通过；lint exit 0（2 个既有 warning，非本次引入） |
+| 3 | 有产物与无产物两种状态下 `go build` 都成功 | ✅ 两者均通过；无产物时 `go test ./internal/panel/` 也通过（回到 503 占位页路径） |
+| 4 | 三个面在浏览器里打开正常 | ⚠️ **部分**：生产构建的托管已由 handler 测试覆盖并通过；但 **dev 模式白屏**（见上，待 Phase 1 修） |
+| 5 | vite 配置已删、依赖已移除 | ✅ 两个配置删除；`package.json` 无 `vite` / `@vitejs/*` |
+| 6 | `.gitkeep` 在 git 索引、`.gitignore` 未排掉 | ✅ `git ls-files` 列出它；规则为 `webdist/*` + `!webdist/.gitkeep` |
+| 7 | 设计文档已写入实测结论 | ✅ 本节 |
+
+**Go 侧托管验证方式**（按裁决 1，未启动完整服务）
+
+用既有的 in-process handler 测试覆盖，比起服务更贴近要验的东西：
+
+- `TestMiniAppServesEmbeddedApp`（`miniapp_test.go:1149`）—— 入口页 200 且含 `id="root"`、
+  入口页 `no-store`、引用 `/miniapp/telegram-web-app.js`、`fs.Glob(dist,"assets/*")` 非空、
+  真实 asset 200 且 `immutable`、SDK 返回 JS Content-Type 且 `max-age=3600`、
+  目录与缺失资源 404（禁止列举）、未匹配路由 SPA 回退 200。
+- `TestMiniAppRouteBoundaries`（`miniapp_test.go:1238`）—— 页面路由只收 GET/HEAD 且 405 带
+  `Allow`、API 只收 POST、HEAD 不写 body。
+- `TestAdminPanelRoutes`（`admin_panel_test.go:128`）—— 桌面端 405 / 404 / 路径穿越边界。
+
+**未覆盖的路径**（如实记录，非阻塞）：`_w` 公开页的托管没有被上述用例直接覆盖 ——
+公开页与 Mini App 共用 `MiniAppHandler` 的 SPA 回退分支，但 `_w` 路径本身由 `main.webRouter`
+组装，不在 `internal/panel` 的测试面内。补一条 `_w` 托管的端到端测试是可选改进，Phase 1 可一并做。
+
+**Phase 0 遇到的坑（全部已修，供后续参考）**
+
+1. **入口名决定 HTML 文件名**：`entry: { main: ... }` 产出 `main.html`，而 Go 硬编码找
+   `index.html` —— 入口名必须是 `index`。
+2. **模板注释里的 `</head>` 字面量**：rsbuild 的 HTML 插件按字面量查找并替换，会命中注释
+   里那一处，把入口脚本**注进注释内部**使它们全部失效 —— 构建成功、无告警、页面全废。
+   注释里绝不能出现闭合标签字面量。
+3. **SDK 必须留在 `<head>`**：`html.inject` 默认注入到 head 末尾，SDK 放进 `<body>` 就会
+   排在入口脚本之后，App 静默落引导页。
+4. **资源必须扁平落在 `assets/`**：Go 只对该前缀走 immutable 强缓存，且
+   `miniapp_test.go` 断言 `assets/*` 非空、`assets[0]` 不能命中目录。
+5. **`rsbuild dev` 会清空 `distPath.root`**：Task 4 引入的回归 —— `npm run dev` 后
+   `webdist` 整个变空（含 `.gitkeep`），全新克隆上会导致 `go build` 直接失败。
+   修法：dev 的 `distPath.root` 指向 `node_modules/.rsbuild-dev`（dev 产物本就在内存）。
+6. **`import.meta.env.VITE_MOCK` 会静默失效**：rsbuild 默认只暴露 `PUBLIC_` 前缀，
+   必须在 `loadEnv({ prefixes: ['VITE_'] })` 里显式声明，否则开发 mock 恒为关闭。
+7. **`tsconfig` 的 `"types": ["vite/client"]` 是 `import.meta.env` 的类型来源** ——
+   删 vite 后不改成 `["@rsbuild/core/types"]`，`tsc -b` 会挂。
+8. **`server.base` ≠ `output.assetPrefix`**：Vite 的 `base` 是一个选项管两端，rsbuild
+   拆成两个。只迁后者会导致 dev 下路径全错（即上面第 4 条完成标准的问题）。
+
 ## 9. 测试策略
 
 **保留 12 个纯逻辑测试**（与组件库无关）：
