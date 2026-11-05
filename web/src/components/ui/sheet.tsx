@@ -49,6 +49,8 @@ export function SheetBackdrop({ className, ...props }: ComponentProps<typeof Bas
 
 export interface SheetContentProps extends ComponentProps<typeof BaseDialog.Popup> {
   side?: SheetSide
+  /** 不渲染右上角自带的关闭按钮（调用方自备、且需要按状态禁用它时用）。 */
+  hideClose?: boolean
 }
 
 /**
@@ -59,6 +61,7 @@ export function SheetContent({
   className,
   children,
   side = 'right',
+  hideClose = false,
   ...props
 }: SheetContentProps) {
   return (
@@ -74,15 +77,17 @@ export function SheetContent({
         {...props}
       >
         {children}
-        <BaseDialog.Close
-          aria-label="关闭"
-          className={cn(
-            'absolute top-3 right-3 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none',
-            'hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/50',
-          )}
-        >
-          <X className="size-4" />
-        </BaseDialog.Close>
+        {!hideClose && (
+          <BaseDialog.Close
+            aria-label="关闭"
+            className={cn(
+              'absolute top-3 right-3 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none',
+              'hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/50',
+            )}
+          >
+            <X className="size-4" />
+          </BaseDialog.Close>
+        )}
       </BaseDialog.Popup>
     </BaseDialog.Portal>
   )

@@ -21,3 +21,5 @@ export type { TopBarProps } from './TopBar'
 
 export { ChatRef } from './ChatRef'
 export type { ChatRefProps } from './ChatRef'
+export { FormDrawer } from './FormDrawer'
+export type { FormDrawerProps } from './FormDrawer'
