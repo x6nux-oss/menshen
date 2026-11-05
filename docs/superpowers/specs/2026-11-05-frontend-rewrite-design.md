@@ -256,19 +256,44 @@ Dockerfile 的两条 `test -f`（index.html + admin.html）、CI 的 `npm run bu
 
 ### 8.2 待验证的 5 个前提（Phase 0 第一步，不通过则按退路改）
 
-| # | 前提 | 退路 |
-|---|---|---|
-| a | `output.distPath.root: '../internal/panel/webdist'` 可跨目录 | 构建到 `web/dist` 再脚本拷贝 |
-| b | **两次构建共用一产物目录，第二次不误删第一次** | 第二次 `cleanDistPath: false` + 手动清自己的文件 |
-| c | `html.template` 用函数按 `entryName` 分派模板 | 每入口独立配置目录 |
-| d | Tailwind 4 在 rsbuild 下 `@theme inline` 生效 | 回退 `@tailwindcss/postcss` |
-| e | MSW worker 可由 `public/` 复制替代 dev 中间件 | 保留自定义 rsbuild 插件 |
+**a、b 已实测（2026-11-05，rsbuild v2.3.1）**，c、d、e 由 Task 2/3/4 在与生产配置
+合流时覆盖。
+
+| # | 前提 | 退路 | 实测结果 |
+|---|---|---|---|
+| a | `output.distPath.root: '../internal/panel/webdist'` 可跨目录 | 构建到 `web/dist` 再脚本拷贝 | ✅ **可行**。产物落到 `../internal/panel/webdist/probe.html`，无任何路径告警 |
+| b | **两次构建共用一产物目录，第二次不误删第一次** | 第二次 `cleanDistPath: false` + 手动清自己的文件 | ✅ **可行，但前提是后置构建必须 `cleanDistPath: false`**（见下） |
+| c | `html.template` 用函数按 `entryName` 分派模板 | 每入口独立配置目录 | 待 Task 2 实测 |
+| d | Tailwind 4 在 rsbuild 下 `@theme inline` 生效 | 回退 `@tailwindcss/postcss` | 待 Task 2 实测 |
+| e | MSW worker 可由 `public/` 复制替代 dev 中间件 | 保留自定义 rsbuild 插件 | 待 Task 4 实测 |
 
 **b 是最危险的一条**：现状 Vite 靠「第二个配置 `emptyOutDir` 只清自己的文件」+
 第一次构建结束回写 `.gitkeep` 实现共享产物目录（见现有 `vite.config.ts` 的
 `keepWebdistPlaceholder`）。若 rsbuild 的 `cleanDistPath` 清空整个目录，第二次构建
 会删掉 Mini App 产物，而 Dockerfile 的 `test -f index.html` 会因此失败 —— 这是
 一个「构建成功但产物缺一半」的失效模式，必须显式验证。
+
+#### b 的实测细节（决定 Task 2/3 的配置写法）
+
+1. `cleanDistPath: true` **清空整个目录**：先用 `touch` 造一个 `index.html`
+   （模拟 Mini App 的产物），再以 `true` 跑第二次构建 —— `index.html` 被删除。
+   同时 **`.gitkeep` 也被删除**，所以「构建结束回写 `.gitkeep`」的插件是必需的，
+   不是可选优化。
+2. `cleanDistPath: false` **保留他人产物**：再造一个 `index.html`，以 `false`
+   跑构建 —— `index.html` 存活，与本次构建的 `probe.html` 并存。
+3. 结论：**先构建者用 `true`（顺带清掉上次构建的陈旧文件），后构建者用 `false`**。
+   这正是计划的 `build:miniapp`（true）→ `build:admin`（false）顺序。
+
+#### 实测发现的额外事实（Task 2/3 可直接利用）
+
+- **rsbuild 默认自动复制 `public/` 到产物根**：未配置任何 `copy` 时，
+  `web/public/telegram-web-app.js` 就出现在了产物目录。所以 Task 2 配置里的
+  `copy: [{ from: 'public', to: '' }]` 是冗余的（不会报错，但非必需）。
+- **`@rsbuild/core/types` 子路径存在**（`package.json` 的 `exports["./types"]`），
+  所以 Task 4 把 `tsconfig.app.json` 的 `"types": ["vite/client"]` 改成
+  `["@rsbuild/core/types"]` 是有效写法。
+- **`onAfterBuild` 钩子在 v2.3.1 存在**（`dist/hooks.d.ts:7`），Task 2/3 的
+  `.gitkeep` 回写插件逐字可用。
 
 ## 9. 测试策略
 
