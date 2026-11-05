@@ -54,7 +54,7 @@ export function UserPage({ id }: { id: number }) {
         )}
       </SectionCard>
 
-      <div className="mb-1">
+      <div className="mb-2">
         <Segmented
           value={filter}
           onChange={(next) => setFilter(next === 'all' ? 'all' : 'act')}
@@ -117,7 +117,7 @@ function UserLogListRow({
   return (
     <ListRow
       primary={
-        <span className="flex flex-wrap items-center gap-0.5">
+        <span className="flex flex-wrap items-center gap-1">
           <span className="font-mono text-sm">
             #{log.id} · {fmtTS(log.created_at, tz)}
           </span>

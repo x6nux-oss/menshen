@@ -116,7 +116,7 @@ export function SysLogPage() {
       </div>
 
       {counts !== undefined && !countLoading && (
-        <div data-testid="syslog-counts" className="mb-1 px-0.5 text-[12.5px] text-muted-foreground">
+        <div data-testid="syslog-counts" className="mb-1 px-1 text-[12.5px] text-muted-foreground">
           {`各级：调试 ${counts.debug} · 信息 ${counts.info} · 警告 ${counts.warn} · 错误 ${counts.error}`}
         </div>
       )}
@@ -168,7 +168,7 @@ function SysLogListRow({ log, tz }: { log: SysLogRow; tz?: string }) {
   return (
     <div
       data-testid={`syslog-row-${log.seq}`}
-      className="border-b border-border px-0.5 py-1.5"
+      className="border-b border-border px-1 py-1.5"
     >
       <div className="flex flex-wrap items-baseline gap-2">
         <span className="font-mono text-[12.5px] text-muted-foreground">
@@ -180,7 +180,7 @@ function SysLogListRow({ log, tz }: { log: SysLogRow; tz?: string }) {
         </span>
       </div>
       {log.attrs.length > 0 && (
-        <div className="mt-0.5 font-mono text-[12px] leading-[1.6] break-words text-muted-foreground">
+        <div className="mt-1 font-mono text-[12px] leading-[1.6] break-words text-muted-foreground">
           {log.attrs.map((attr, i) => (
             <span key={`${attr.k}-${i}`} className="mr-2">
               {attr.k}={attr.v}

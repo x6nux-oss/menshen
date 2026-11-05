@@ -177,9 +177,9 @@ export function AppealDetailPage({ id }: { id: number }) {
         <div
           ref={barRef}
           data-testid="appeal-action-bar"
-          className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-1.25 pt-0.75 pb-[calc(6px+env(safe-area-inset-bottom))]"
+          className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-2.5 pt-1.5 pb-[calc(6px+env(safe-area-inset-bottom))]"
         >
-          <div className="flex flex-wrap gap-0.75">
+          <div className="flex flex-wrap gap-1.5">
             <Button
               variant="outline"
               size="sm"
@@ -221,7 +221,7 @@ export function AppealDetailPage({ id }: { id: number }) {
               </Button>
             )}
           </div>
-          <p className="mt-0.5 text-[11px] leading-[1.5] text-muted-foreground">
+          <p className="mt-1 text-[11px] leading-[1.5] text-muted-foreground">
             人工解除与 AI 撤销同效：解除禁言与冷判定限制；联合封禁只有主管理员能在此一并解除。
           </p>
         </div>

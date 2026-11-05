@@ -55,7 +55,7 @@ function botLabelOf(bots: Bot[], botID: number): string {
 const BATCH_BAR_MIN_RESERVE = 140
 
 /** 批量操作条的紧凑按钮：全局 Button 默认 h-9，这里压回 32 让五个按钮一屏放下。 */
-const BULK_BUTTON = 'h-8 min-w-0 px-1.25 text-[13px]'
+const BULK_BUTTON = 'h-8 min-w-0 px-2.5 text-[13px]'
 
 export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number } = {}) {
   const nav = useNav()

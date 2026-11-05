@@ -102,7 +102,7 @@ export function AILogPage() {
         </Button>
       </div>
 
-      <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
+      <div className="mb-1 flex flex-wrap items-center gap-1.5">
         <Segmented
           value={status}
           onChange={setStatus}
@@ -129,7 +129,7 @@ export function AILogPage() {
             )
           ) : (
             <>
-              <div className="mt-0.5">
+              <div className="mt-1">
                 {rows.map((row) => (
                   <AILogListRow
                     key={row.id}
@@ -177,13 +177,13 @@ function AILogListRow({ row, tz, onOpen }: { row: AILogRow; tz?: string; onOpen:
         </span>
         <span className="shrink-0 text-[12px] text-muted-foreground">{row.latency_ms}ms</span>
       </span>
-      <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
+      <span className="mt-1 block truncate text-[12px] text-muted-foreground">
         {fmtTSFull(row.ts, tz)} · {row.endpoint} · {row.upstream || '—'} ·{' '}
         {row.prompt_tokens}+{row.completion_tokens} tok · {row.cost_text}
         {!ok && row.status ? ` · ${row.status}` : ''}
       </span>
       {!ok && row.error && (
-        <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">{row.error}</span>
+        <span className="mt-1 block truncate text-[12px] text-muted-foreground">{row.error}</span>
       )}
     </button>
   )

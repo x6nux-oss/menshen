@@ -20,7 +20,9 @@ export interface SegmentedProps {
 
 export function Segmented({ value, onChange, options, ariaLabel, className }: SegmentedProps) {
   return (
-    <div role="group" aria-label={ariaLabel} className={cn('flex gap-1.5', className)}>
+    // flex-wrap：320px 屏 + iOS 动态字体下，5 项胶囊（RecordsPage 的判定筛选）
+    // 总宽会超过可用宽度，不换行会被裁掉。旧实现是 MUI Chip 的 flexWrap: 'wrap'。
+    <div role="group" aria-label={ariaLabel} className={cn('flex flex-wrap gap-1.5', className)}>
       {options.map((option) => {
         const selected = option.value === value
         return (

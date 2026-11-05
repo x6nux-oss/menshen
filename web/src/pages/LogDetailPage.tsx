@@ -183,9 +183,9 @@ export function LogDetailPage({ id }: { id: number }) {
       <div
         ref={barRef}
         data-testid="log-action-bar"
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-1.25 pt-0.75 pb-[calc(6px+env(safe-area-inset-bottom))]"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-2.5 pt-1.5 pb-[calc(6px+env(safe-area-inset-bottom))]"
       >
-        <div className="flex flex-wrap gap-0.75">
+        <div className="flex flex-wrap gap-1.5">
           {PRIMARY_ACTIONS.map((spec) => (
             <Button
               key={spec.action}
@@ -223,7 +223,7 @@ export function LogDetailPage({ id }: { id: number }) {
               </Button>
             ))}
         </div>
-        <p className="mt-0.5 text-[11px] leading-[1.5] text-muted-foreground">
+        <p className="mt-1 text-[11px] leading-[1.5] text-muted-foreground">
           复查结果发到群里（受群内静默开关约束）；人工标记与群内 /ban 命令同效；
           AI 写规则围绕本条原文生成候选。
         </p>

@@ -25,8 +25,8 @@ export function AILogItemPage({ id }: { id: number }) {
   const ok = item.data.status === 'ok'
 
   return (
-    <div data-testid="ailogitem-page" className="px-0.5">
-      <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
+    <div data-testid="ailogitem-page" className="px-1">
+      <div className="mb-1 flex flex-wrap items-center gap-1.5">
         <Badge tone={ok ? 'ok' : 'no'}>{ok ? '成功' : '失败'}</Badge>
         <span className="text-[13px] font-semibold break-all">{item.data.model || '（未记录）'}</span>
       </div>

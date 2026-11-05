@@ -162,7 +162,7 @@ export function RecordsPage() {
                 )
               ) : (
                 <>
-                  <div className="mt-0.5">
+                  <div className="mt-1">
                     {logRows.map((log) => (
                       <LogListRow
                         key={log.id}
@@ -211,7 +211,7 @@ export function RecordsPage() {
                 )
               ) : (
                 <>
-                  <div className="mt-0.5">
+                  <div className="mt-1">
                     {appealRows.map((appeal) => (
                       <AppealListRow
                         key={appeal.id}
