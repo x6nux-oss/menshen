@@ -27,6 +27,7 @@ export type Section =
   | 'rules'
   | 'settings'
   | 'syslog'
+  | 'ailog'
 
 export type AdminRoute =
   | { k: 'overview' }
@@ -47,6 +48,7 @@ export type AdminRoute =
   | { k: 'rule'; id: number }
   | { k: 'settings' }
   | { k: 'syslog' }
+  | { k: 'ailog' }
 
 /** sectionOf 把路由归到侧栏的哪一项（详情页归属它的列表所在分区）。 */
 export function sectionOf(route: AdminRoute): Section {
@@ -132,6 +134,8 @@ export function parseAdminRoute(pathname: string): AdminRoute {
       return { k: 'settings' }
     case 'syslog':
       return { k: 'syslog' }
+    case 'ailog':
+      return { k: 'ailog' }
     default:
       return { k: 'overview' }
   }

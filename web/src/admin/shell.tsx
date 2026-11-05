@@ -29,6 +29,7 @@ import { RecordsView } from './views/RecordsView'
 import { RuleDetailView, RulesView } from './views/RulesView'
 import { SettingsView } from './views/SettingsView'
 import { SysLogView } from './views/SysLogView'
+import { AILogView } from './views/AILogView'
 import { UpstreamDetailView } from './views/UpstreamDetailView'
 import { UpstreamsView } from './views/UpstreamsView'
 import { UserView } from './views/UserView'
@@ -50,6 +51,7 @@ const MANAGE: { section: Section; label: string; mainOnly: boolean }[] = [
   { section: 'models', label: '模型定价', mainOnly: true },
   { section: 'rules', label: 'AI 必封规则', mainOnly: true },
   { section: 'syslog', label: '运行日志', mainOnly: true },
+  { section: 'ailog', label: 'AI 调用流水', mainOnly: true },
   { section: 'settings', label: '全局设置', mainOnly: true },
 ]
 
@@ -64,6 +66,7 @@ const SECTION_TITLES: Record<Section, string> = {
   rules: 'AI 必封规则',
   settings: '全局设置',
   syslog: '运行日志',
+  ailog: 'AI 调用流水',
 }
 
 /** MAIN_ONLY_ROUTES 是主管理员专属路由集合；DETAIL_TITLES 是二级页标题（具体名称由各详情视图补全）。 */
@@ -76,6 +79,7 @@ const MAIN_ONLY_ROUTES = new Set<AdminRoute['k']>([
   'rule',
   'settings',
   'syslog',
+  'ailog',
 ])
 const DETAIL_TITLES: Partial<Record<AdminRoute['k'], string>> = {
   bot: '机器人详情',
@@ -258,6 +262,8 @@ function renderRoute(route: AdminRoute, main: boolean) {
       return <SettingsView />
     case 'syslog':
       return <SysLogView />
+    case 'ailog':
+      return <AILogView />
   }
 }
 
