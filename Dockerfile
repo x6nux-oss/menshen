@@ -1,4 +1,4 @@
-# 前端构建阶段：Vite 产物输出到 ../internal/panel/webdist（相对 web/），
+# 前端构建阶段：rsbuild 产物输出到 ../internal/panel/webdist（相对 web/），
 # 也就是镜像里的 /internal/panel/webdist，供下面的 Go 阶段 go:embed。
 # 前端产物与目标架构无关，固定跑构建机的原生架构，避免 QEMU 模拟。
 # 依赖一律在容器里 npm ci（宿主机的 web/node_modules 已由 .dockerignore 排除）。
