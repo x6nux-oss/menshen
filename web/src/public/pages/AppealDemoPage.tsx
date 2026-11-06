@@ -6,8 +6,12 @@
 // 全部照查，所以这里通过即代表申诉那条路也通。申诉页只回一句
 // `验证未通过`，密钥、域名白名单或 cdata 绑定出了问题，具体原因
 // 全靠这页显示。
-import { Box, Button, CircularProgress, Typography } from '@mui/material'
+//
+// Phase 4：展示层换到新设计系统（Tailwind + components/ui）。
+// **验证链路一字未动** —— collectSignals / postJSON 的调用、回调签名、
+// TurnstileWidget 的 props 全部保持原样（CSP 与安全边界）。
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Button, Spinner } from '../../components/ui'
 import { getJSON, postJSON } from '../api'
 import type { AppealDemoData, WebRoute } from '../api'
 import { collectSignals } from '../fingerprint'
@@ -40,19 +44,17 @@ export function AppealDemoPage({ route }: { route: WebRoute }) {
     )
 
   return (
-    <Box data-testid="appeal-demo">
-      <Typography sx={{ fontSize: 20, fontWeight: 700, mb: 0.5 }}>
-        申诉验证测试台
-      </Typography>
-      <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 2 }}>
+    <div data-testid="appeal-demo">
+      <h1 className="mb-1 text-xl font-bold">申诉验证测试台</h1>
+      <p className="mb-4 text-[13px] text-muted-foreground">
         与用户申诉页同一条校验路径（action=appeal、cdata 绑定、hostname 核对），
         通过即代表申诉验证也通；失败原因会显示在下方。
-      </Typography>
-      <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2 }}>
-        <Typography sx={{ fontSize: 15, fontWeight: 700 }}>Cloudflare Turnstile</Typography>
+      </p>
+      <div className="rounded-lg bg-card p-4 text-card-foreground">
+        <p className="text-[15px] font-bold">Cloudflare Turnstile</p>
         <DemoCard route={route} sitekey={data.sitekey} cdata={data.cdata} />
-      </Box>
-    </Box>
+      </div>
+    </div>
   )
 }
 
@@ -110,29 +112,27 @@ function DemoCard({
         onToken={onToken}
         onError={onError}
       />
-      <Typography sx={{ fontSize: 12, color: 'text.secondary', wordBreak: 'break-all' }}>
+      <p className="text-[12px] break-all text-muted-foreground">
         site key：{sitekey} · cdata：{cdata}
-      </Typography>
+      </p>
       {submitting && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-          <CircularProgress size={14} />
-          <Typography sx={{ fontSize: 13 }}>正在校验…</Typography>
-        </Box>
+        <div className="mt-2 flex items-center gap-2">
+          <Spinner size={14} />
+          <span className="text-[13px]">正在校验…</span>
+        </div>
       )}
       {result && (
-        <Box sx={{ mt: 1 }}>
-          <Typography
-            sx={{ fontSize: 13.5, color: result.ok ? 'success.main' : 'error.main' }}
-          >
+        <div className="mt-2">
+          <p className={result.ok ? 'text-[13.5px] text-success' : 'text-[13.5px] text-destructive'}>
             {result.ok ? '✅ ' : '❌ '}
             {result.msg}
-          </Typography>
+          </p>
           {!result.ok && (
-            <Button size="small" variant="outlined" sx={{ mt: 1 }} onClick={retry}>
+            <Button size="sm" variant="outline" className="mt-2" onClick={retry}>
               重试验证
             </Button>
           )}
-        </Box>
+        </div>
       )}
     </>
   )
@@ -140,8 +140,8 @@ function DemoCard({
 
 function Placeholder() {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-      <CircularProgress size={22} />
-    </Box>
+    <div className="flex justify-center py-16">
+      <Spinner size={22} />
+    </div>
   )
 }
