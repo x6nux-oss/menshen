@@ -697,6 +697,73 @@ Mini App 真实页面需要 Telegram 环境（SDK 的 `initData` 由 Telegram �
 - `RulesPage`(1026) 与 `SettingsPage`(894) 未拆分（计划 Task 8 的可选项）。
 - 公开页（`src/public/`，2019 行）仍在用 MUI，Phase 4 迁移。
 
+### 10.4 Phase 4 验收结论（2026-11-06 实测）
+
+**结论：前端重写完成。全仓零 MUI，四个阶段的目标全部达成。**
+
+#### 产出
+
+| 内容 | 说明 |
+|---|---|
+| 公开页 6 个迁移 | `PublicApp` / `AppealVerifyPage` / `AppealViewPage` / `AppealDemoPage` / `JoinVerifyPage` / `CaptchaDemoPage` / `LogViewPage` / `TurnstileWidget` / `InvalidState` |
+| `ThemeToggle` 新建 | 三态循环（跟随系统 → 亮 → 暗），公开页与桌面端顶栏接入 |
+| `subscribeThemeChoice` 新增 | 修一个真实缺陷（见下） |
+| 触控热区 `.tap-44` | 视觉尺寸不变、热区撑到 44×44（只在 `pointer: coarse` 下） |
+| 全局 reduced-motion | base 层兜底，覆盖所有 `transition-colors` / `animate-spin` |
+| 删除预览页与 `theme.ts` | Phase 1 的验收载体完成使命 |
+| **卸载 MUI** | `@mui/material`、`@mui/icons-material`、`@emotion/react`、`@emotion/styled` |
+
+#### 门禁结果
+
+```
+npm run typecheck  → exit 0
+npm run test       → 49 files / 484 tests 全绿
+npm run lint       → exit 0（0 warning —— 从 2 个降到 0）
+npm run build      → 成功（三个 html 齐全）
+go build / go vet / go test ./...  → 全绿（13 个包）
+grep -rn "@mui|@emotion" web/src/ web/package.json  → 空
+```
+
+**产物体积**：Mini App 1153.5 kB → 1062.5 kB（gzip 354.1 → 329.1，省 25 kB）；
+桌面端 726.4 → 731.5 kB（略增，主题切换器与热区工具类）。
+
+#### Phase 4 修的一个真实缺陷
+
+**主题选择会被系统主题覆盖**：`ThemeToggle` 直接改 `localStorage` 与 DOM，
+而外壳组件（`AdminApp` / `PublicApp`）各自持有 `dark` state 并订阅系统偏好 ——
+用户刚选完暗色，下一次系统主题变化就把它覆盖回去。
+`localStorage` 的 `storage` 事件只在**别的标签页**触发，本页改不了自己的监听，
+所以新增 `subscribeThemeChoice`（同页内的发布订阅）让外壳同步。
+
+#### 触控尺寸的裁定（Phase 3 遗留）
+
+Phase 3 的 brief 要求「按钮 ≥44px」，与既有取值冲突：`COMPACT_BTN`(32px)、
+`Segmented` 胶囊(26px)。移动端详情页的底部操作条要在一行放下 6 个按钮，
+做不到每个 44px —— 这是真实的约束，不是疏忽。
+
+**裁定：视觉不变、热区撑开。** `.tap-44` 用伪元素把可点区域扩到 44×44，
+布局与视觉尺寸不变。WCAG 2.5.8 明确允许「目标虽小，但有效点击区域足够大」。
+只在 `pointer: coarse` 下生效 —— 桌面鼠标不需要，且扩大的热区在密集列表里
+会互相遮挡。`Button` 的全部尺寸统一挂上这个类。
+
+#### 浏览器实测（生产构建 + Go 服务）
+
+- 320 / 768 / 1280 三个断点：三个面均**无横向溢出**。
+- 公开页主题切换：跟随系统 → 亮 → 暗，`--background` 从 `lab(98.26%)` 切到
+  `lab(5.69%)`，`localStorage` 与 `aria-label` 同步。
+- 景深光晕（`body::before` 的 `radial-gradient`）、reduced-motion 规则、
+  `.tap-44` 都确认进了产物 —— 这几条都是「不生效也不报错」的静默失效点。
+- 无 console 错误、无未捕获异常。
+
+#### 遗留
+
+- `RulesPage`(1026) 与 `SettingsPage`(894) 未拆分（Phase 3 计划 Task 8 的可选项）。
+  两者都已迁到新设计系统，只是文件仍偏大。
+- Mini App 的完整数据链路（开关、处置、申诉、兑换）未在浏览器里走通 ——
+  需要真实 Telegram 环境（SDK 的 `initData` 由 Telegram 注入，本地伪造要绕过
+  只读 getter）。这部分由 484 个测试覆盖，**建议在真机上过一遍**。
+- 视图内部的细节样式（间距/字号）未逐一人工验收 —— 建议在真实数据下过一遍。
+
 ## 11. 风险
 
 | 风险 | 影响 | 缓解 |
