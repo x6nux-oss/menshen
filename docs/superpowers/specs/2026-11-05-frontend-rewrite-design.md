@@ -623,6 +623,80 @@ go build / go test ./internal/panel/  → 通过
 - 视图内部的细节样式（间距/字号）未逐一人工验收 —— 建议后续在真实数据下过一遍。
 - `theme-mode` 的用户手动切换 UI 尚未接入（当前跟随系统）；设计文档 §6 要求三面共用，Phase 4 补。
 
+### 10.3 Phase 3 验收结论（2026-11-06 实测）
+
+**结论：Mini App 迁移完成，`src/ui/`（MUI 组件层）已删除。**
+主题按 §6 改为只跟随 Telegram `colorScheme`（亮/暗），`themeParams` 的主题色一律忽略。
+
+#### 产出
+
+| 内容 | 说明 |
+|---|---|
+| 19 个页面全部迁移 | Bots / Mine / Overview / SysLog / User / ChatDetail / AppealDetail / LogDetail / AILog / AILogItem / Records / Chats / Models / Upstreams / BotDetail / Lists / Settings / Rules |
+| 外壳换新层 | `App.tsx` 的 `TopBar`/`TabBar`/`Skeletons`/`ErrorState`/`ErrorBoundary`；去 MUI `ThemeProvider`/`CssBaseline` |
+| 主题策略 | `telegram.getTheme()` 只返回 `{ colorScheme }`；`applyThemeMode` 写 `<html class="dark">` |
+| `shared.tsx` 8 个展示件 | props 与导出名**全部不变**（19 个页面都在用） |
+| 补 3 个新层组件 | `FormDrawer`（7 个页面在用）、`SettingRow`（BotDetail/Settings）、`Chip`+`ChipStatic`（多选胶囊） |
+| `src/ui/` 删除 | 34 个文件（17 组件 + 17 测试），全仓零引用 |
+
+#### 门禁结果
+
+```
+npm run typecheck  → exit 0
+npm run test       → 49 files / 488 tests 全绿
+npm run lint       → exit 0（1 个既有 warning，src/public/InvalidState.tsx）
+npm run build      → 成功（729.4 kB / gzip 213.6 kB，三个 html 齐全）
+go build / go test ./internal/panel/  → 通过
+git diff src/admin/  → 零改动
+```
+
+测试数 524 → 488：少的 46 个是 `src/ui/*.test.tsx`（16 个 MUI 组件的测试），
+它们测的实现已删除，对应能力由 `components/` 下的测试覆盖。
+
+#### 三个必须记下来的实现教训
+
+1. **MUI `spacing(n) = n×8px`，Tailwind 单位是 4px —— 换算是 ×2，不是 ×1。**
+   批次 3-5 有 20 处照抄了原值（`sx={{ mb: 0.5 }}`=4px → `mb-0.5`=2px），
+   间距整体紧一档。审查在第 5 批发现后统一修正（`7d0593e`），并在第 6 批起
+   把规则写进 dispatch prompt —— 之后 76 处换算零错误。
+2. **`Segmented` 是单选控件，不能拿来替代多选的 `Chip`。**
+   `Segmented` 是 `role="group"` + 一次只有一个 `aria-pressed`；SettingsPage 的
+   模型多选是「一组胶囊、若干同时选中」。用 Segmented 会告诉屏幕阅读器
+   「这是单选框」。为此新增 `Chip`（每个胶囊独立 `aria-pressed`）。
+3. **`UserLink` 必须是 `<span role="link">`，不能是 `<button>`。**
+   它常嵌在 `ListRow` 的 `<button>` 根节点里，button 套 button 是非法 HTML，
+   浏览器会拆掉内层节点；且 jsdom 里原生 button 的 keyDown 不会自动转成 click。
+
+#### Phase 3 的两处缺陷修复
+
+1. **dev 下预览页与 MSW 白屏**（既有缺陷，Phase 1 起就存在）：rsbuild 默认开启
+   `lazyCompilation`，它给动态 `import()` 生成的 proxy chunk 会 POST
+   `?/rspack/lazy/trigger` 触发编译，而 `server.base: '/miniapp/'` 下那个端点挂在
+   根路径 —— 请求 `/miniapp/rspack/lazy/trigger` 一律 404，动态 import 永不 resolve。
+   **控制台一行报错都没有，只有 root 是空的。** 修法：`dev.lazyCompilation: false`
+   （`300c7fb`）。生产构建不受影响。
+2. **`Segmented` 在 320px 屏溢出**：5 项胶囊 + iOS 动态字体下总宽超可用宽度 21px，
+   容器无 `flex-wrap` 会被裁掉（旧 MUI Chip 是 `flexWrap: 'wrap'`）。已加 `flex-wrap`。
+
+#### 浏览器实测
+
+生产构建 + Go 服务实测：token（`--background` = `lab(98.26% …)`）、景深光晕
+（`body::before` 的 `radial-gradient`）、玻璃（预览页 5 个 `.glass` 元素）全部生效；
+暗色切换后 `--background` 从 98.26% 降到 5.69%、`--foreground` 升到 94.78%。
+Mini App 真实页面需要 Telegram 环境（SDK 的 `initData` 由 Telegram 注入，
+本地伪造要绕过 SDK 的只读 getter），未在浏览器里走通完整数据链路 ——
+这部分由 488 个测试（含 19 个页面的渲染测试）覆盖。
+
+#### 遗留
+
+- **触控尺寸的既有约定与 brief 的 44px 规则冲突**：`COMPACT_BTN`(32px)、
+  `Segmented` 胶囊(26px)、`SwitchRow` 的次级按钮都低于 44px。这些是 Phase 1
+  定下的既有取值（旧 MUI 实现同样如此），不是 Phase 3 引入的。
+  应在 Phase 4 做一次设计系统级裁定（统一放宽到 26/32，或把关键控件提到 44），
+  **不要逐页私改** —— 那会让同一个 App 里出现两种高度。
+- `RulesPage`(1026) 与 `SettingsPage`(894) 未拆分（计划 Task 8 的可选项）。
+- 公开页（`src/public/`，2019 行）仍在用 MUI，Phase 4 迁移。
+
 ## 11. 风险
 
 | 风险 | 影响 | 缓解 |
