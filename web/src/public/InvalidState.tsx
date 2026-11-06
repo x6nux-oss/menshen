@@ -1,11 +1,9 @@
 // InvalidState 是链接无效 / 已失效 / 读取失败的统一占位。
-import { Box, Typography } from '@mui/material'
-
 export function InvalidState({ message }: { message: string }) {
   return (
-    <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2.5, textAlign: 'center' }}>
-      <Typography sx={{ fontSize: 16, lineHeight: 1.7 }}>{message}</Typography>
-    </Box>
+    <div className="rounded-lg bg-card p-5 text-center text-card-foreground">
+      <p className="text-[16px] leading-[1.7]">{message}</p>
+    </div>
   )
 }
 

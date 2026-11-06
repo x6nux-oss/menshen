@@ -1,13 +1,17 @@
 // 原文查看页（_w/v/<id>/<sig>）：门槛凭据 → 判定记录详情。
-import { Box, Button, CircularProgress, Typography } from '@mui/material'
+//
+// Phase 4：展示层换到新设计系统。`useGate` 的调用与 reveal 流程一字未动。
+import type { ReactNode } from 'react'
+import { Button, Spinner } from '../../components/ui'
+import { ChatRef } from '../../components/mobile'
 import type { LogRecordView, WebRoute } from '../api'
 import { InvalidState } from '../InvalidState'
 import { useGate } from '../useGate'
-import { ChatRef } from '../../components/mobile'
 
-const cardSx = { bgcolor: 'background.paper', borderRadius: 2, p: 2, mb: 2 }
-const titleSx = { fontSize: 15, fontWeight: 700, mb: 1 }
-const tdSx = { borderBottom: '1px solid', borderColor: 'divider', py: 0.75, pr: 1.5, fontSize: 13.5 }
+const CARD = 'mb-4 rounded-lg bg-card p-4 text-card-foreground'
+const TITLE = 'mb-2 text-[15px] font-bold'
+// 表格单元格：py: 0.75(6px) → py-1.5；pr: 1.5(12px) → pr-3；13.5px 字号。
+const TD = 'border-b border-border py-1.5 pr-3 text-[13.5px]'
 
 export function LogViewPage({ route }: { route: WebRoute }) {
   const { gate, view, error, loading, reveal } = useGate<LogRecordView>(route)
@@ -16,21 +20,21 @@ export function LogViewPage({ route }: { route: WebRoute }) {
   if (view) return <LogContent view={view} />
   if (!gate)
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress size={22} />
-      </Box>
+      <div className="flex justify-center py-16">
+        <Spinner size={22} />
+      </div>
     )
   return (
     <>
       <WarnCard text={gate.warn} />
-      <Box sx={cardSx}>
-        <Button variant="contained" disabled={loading} onClick={() => void reveal()}>
+      <div className={CARD}>
+        <Button disabled={loading} onClick={() => void reveal()}>
           {loading ? '正在读取…' : '查看内容'}
         </Button>
-        <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 1 }}>
+        <p className="mt-2 text-[13px] text-muted-foreground">
           链接只对持有者有效；查看凭据 {Math.round((gate.ttl_seconds || 300) / 60)} 分钟内有效。
-        </Typography>
-      </Box>
+        </p>
+      </div>
     </>
   )
 }
@@ -38,10 +42,10 @@ export function LogViewPage({ route }: { route: WebRoute }) {
 function LogContent({ view }: { view: LogRecordView }) {
   const r = view.record
   return (
-    <Box data-testid="log-view">
+    <div data-testid="log-view">
       <WarnCard text="敏感内容，请勿转发。页面仅供管理员核对判定依据。" />
-      <Box sx={cardSx}>
-        <Typography sx={{ fontSize: 13.5, lineHeight: 1.9 }}>
+      <div className={CARD}>
+        <p className="text-[13.5px] leading-[1.9]">
           记录：<Mono>#{r.id}</Mono> ｜ 时间：{r.created}
           <br />
           用户：<Mono>{r.user_id}</Mono>
@@ -51,12 +55,12 @@ function LogContent({ view }: { view: LogRecordView }) {
           <br />
           入群时间：{view.member.joined || '未知'} ｜ 群内发言：{view.member.msgs} ｜ 历史命中：
           {view.member.hits}
-        </Typography>
-      </Box>
+        </p>
+      </div>
 
-      <Box sx={cardSx}>
-        <Typography sx={titleSx}>判定</Typography>
-        <Typography sx={{ fontSize: 13.5, lineHeight: 1.9 }}>
+      <div className={CARD}>
+        <p className={TITLE}>判定</p>
+        <p className="text-[13.5px] leading-[1.9]">
           结论：{r.verdict} ｜ 类型：{r.kind || '—'} ｜ 置信度：
           {Math.round(r.confidence * 100)}%
           <br />
@@ -64,93 +68,66 @@ function LogContent({ view }: { view: LogRecordView }) {
           {r.reason && ` ｜ 理由：${r.reason}`}
           <br />
           处置：{r.action_label || r.action}
-        </Typography>
-        <Typography sx={{ ...titleSx, mt: 1.5 }}>被拦原文</Typography>
-        <Box
-          component="pre"
-          sx={{
-            m: 0,
-            p: 1.25,
-            bgcolor: 'action.hover',
-            borderRadius: 1,
-            fontSize: 13,
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            fontFamily: 'ui-monospace, Menlo, monospace',
-          }}
-        >
+        </p>
+        <p className={`${TITLE} mt-3`}>被拦原文</p>
+        {/* 旧实现是 Box component="pre" + m:0 p:1.25(10px) → p-2.5，圆角 1(4px) → rounded */}
+        <pre className="m-0 rounded bg-muted p-2.5 font-mono text-[13px] break-words whitespace-pre-wrap">
           {r.text}
-        </Box>
-      </Box>
+        </pre>
+      </div>
 
       {view.history.length > 0 && (
-        <Box sx={cardSx}>
-          <Typography sx={titleSx}>该群最近留底（{view.history.length} 条）</Typography>
-          <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className={CARD}>
+          <p className={TITLE}>该群最近留底（{view.history.length} 条）</p>
+          <table className="w-full border-collapse">
             <tbody>
               {view.history.map((h) => (
-                <Box component="tr" key={h.message_id} sx={h.blocked ? { bgcolor: 'error.light' } : undefined}>
-                  <Box component="td" sx={{ ...tdSx, color: 'text.secondary', whiteSpace: 'nowrap' }}>
-                    {h.time}
-                  </Box>
-                  <Box component="td" sx={tdSx}>
+                <tr key={h.message_id} className={h.blocked ? 'bg-destructive/10' : undefined}>
+                  <td className={`${TD} whitespace-nowrap text-muted-foreground`}>{h.time}</td>
+                  <td className={TD}>
                     {h.text}
                     {h.blocked && <b> ← 被拦</b>}
-                  </Box>
-                </Box>
+                  </td>
+                </tr>
               ))}
             </tbody>
-          </Box>
-        </Box>
+          </table>
+        </div>
       )}
 
       {view.logs.length > 0 && (
-        <Box sx={cardSx}>
-          <Typography sx={titleSx}>该群最近判定记录（{view.logs.length} 条）</Typography>
-          <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className={CARD}>
+          <p className={TITLE}>该群最近判定记录（{view.logs.length} 条）</p>
+          <table className="w-full border-collapse">
             <tbody>
               {view.logs.map((l) => (
-                <Box component="tr" key={l.id}>
-                  <Box component="td" sx={tdSx}>
+                <tr key={l.id}>
+                  <td className={TD}>
                     <Mono>#{l.id}</Mono>
-                  </Box>
-                  <Box component="td" sx={{ ...tdSx, color: 'text.secondary', whiteSpace: 'nowrap' }}>
-                    {l.time}
-                  </Box>
-                  <Box component="td" sx={tdSx}>
+                  </td>
+                  <td className={`${TD} whitespace-nowrap text-muted-foreground`}>{l.time}</td>
+                  <td className={TD}>
                     {l.verdict} {Math.round(l.confidence * 100)}%
-                  </Box>
-                  <Box component="td" sx={tdSx}>
-                    {l.action_label || l.action}
-                  </Box>
-                </Box>
+                  </td>
+                  <td className={TD}>{l.action_label || l.action}</td>
+                </tr>
               ))}
             </tbody>
-          </Box>
-        </Box>
+          </table>
+        </div>
       )}
-    </Box>
+    </div>
   )
 }
 
 function WarnCard({ text }: { text: string }) {
   return (
-    <Box
-      sx={{
-        bgcolor: 'warning.main',
-        color: '#000',
-        borderRadius: 2,
-        p: 1.5,
-        mb: 2,
-        fontSize: 13,
-        lineHeight: 1.7,
-      }}
-    >
+    <div className="mb-4 rounded-lg bg-warning p-3 text-[13px] leading-[1.7] text-warning-foreground">
       {text}
-    </Box>
+    </div>
   )
 }
 
-function Mono({ children }: { children: React.ReactNode }) {
-  return <Box component="span" sx={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{children}</Box>
+function Mono({ children }: { children: ReactNode }) {
+  return <span className="font-mono">{children}</span>
 }

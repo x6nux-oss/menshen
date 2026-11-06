@@ -2,14 +2,18 @@
 //
 // 页面加载时取回提供方与 sitekey，渲染对应的验证码组件；拿到 token 后
 // 连同浏览器特征提交，服务端向提供方核对通过即解除禁言。
-import { Box, CircularProgress, Typography } from '@mui/material'
+//
+// Phase 4：展示层换到新设计系统（Tailwind + components/ui）。
+// **验证链路一字未动** —— mountCaptcha / collectSignals / postJSON 的调用、
+// 回调签名、验证码容器的 ref 与 data-testid 全部保持原样（CSP 与安全边界）。
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Spinner } from '../../components/ui'
+import { ChatRef } from '../../components/mobile'
 import { getJSON, postJSON } from '../api'
 import type { JoinVerifyData, WebRoute } from '../api'
 import { mountCaptcha } from '../captcha'
 import { collectSignals } from '../fingerprint'
 import { errorText, InvalidState } from '../InvalidState'
-import { ChatRef } from '../../components/mobile'
 
 const PROVIDER_LABEL: Record<string, string> = {
   turnstile: 'Cloudflare Turnstile',
@@ -68,9 +72,9 @@ export function JoinVerifyPage({ route }: { route: WebRoute }) {
     return <InvalidState message="本群未配置人机验证，请联系群管理员。" />
 
   return (
-    <Box data-testid="join-verify">
-      <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2, mb: 2 }}>
-        <Typography sx={{ fontSize: 18, fontWeight: 700, mb: 1 }}>
+    <div data-testid="join-verify">
+      <div className="mb-4 rounded-lg bg-card p-4 text-card-foreground">
+        <p className="mb-2 text-[18px] font-bold">
           {data.chat ? (
             <>
               加入「
@@ -80,30 +84,30 @@ export function JoinVerifyPage({ route }: { route: WebRoute }) {
           ) : (
             '入群验证'
           )}
-        </Typography>
-        <Typography sx={{ fontSize: 14, lineHeight: 1.8 }}>
+        </p>
+        <p className="text-sm leading-[1.8]">
           为防广告机器人，请先完成人机验证。通过后即可在群里发言；
           {data.minutes > 0
             ? `请在 ${data.minutes} 分钟内完成，否则会被移出群聊（可重新加入）。`
             : '未通过验证前无法发言。'}
-        </Typography>
-      </Box>
+        </p>
+      </div>
 
-      <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2 }}>
-        <Typography sx={{ fontSize: 15, fontWeight: 700, mb: 1.5 }}>
+      <div className="rounded-lg bg-card p-4 text-card-foreground">
+        <p className="mb-3 text-[15px] font-bold">
           人机验证 · {PROVIDER_LABEL[data.provider] ?? data.provider}
-        </Typography>
+        </p>
         <CaptchaWidget data={data} onToken={submit} />
-        <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 1 }}>
+        <p className="mt-2 text-[13px] text-muted-foreground">
           验证组件加载不出来时，请用系统浏览器打开本页。
-        </Typography>
+        </p>
         <ResultArea submitting={submitting} result={result} />
-      </Box>
+      </div>
 
-      <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 2, lineHeight: 1.7 }}>
+      <p className="mt-4 text-[12px] leading-[1.7] text-muted-foreground">
         本页会记录你的 IP 与浏览器特征，仅用于反垃圾审核。
-      </Typography>
-    </Box>
+      </p>
+    </div>
   )
 }
 
@@ -125,7 +129,7 @@ function CaptchaWidget({
       onToken,
     })
   }, [data.provider, data.sitekey, data.endpoint, onToken])
-  return <Box ref={ref} data-testid="captcha" sx={{ my: 1 }} />
+  return <div ref={ref} data-testid="captcha" className="my-2" />
 }
 
 function ResultArea({
@@ -137,25 +141,23 @@ function ResultArea({
 }) {
   if (submitting)
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5 }}>
-        <CircularProgress size={16} />
-        <Typography sx={{ fontSize: 14 }}>正在验证…</Typography>
-      </Box>
+      <div className="mt-3 flex items-center gap-2">
+        <Spinner size={16} />
+        <p className="text-sm">正在验证…</p>
+      </div>
     )
   if (!result) return null
   return (
-    <Typography
-      sx={{ fontSize: 14, mt: 1.5, color: result.ok ? 'success.main' : 'error.main' }}
-    >
+    <p className={`mt-3 text-sm ${result.ok ? 'text-success' : 'text-destructive'}`}>
       {result.msg}
-    </Typography>
+    </p>
   )
 }
 
 function Placeholder() {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-      <CircularProgress size={22} />
-    </Box>
+    <div className="flex justify-center py-16">
+      <Spinner size={22} />
+    </div>
   )
 }
