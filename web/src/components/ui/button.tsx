@@ -6,12 +6,18 @@ import { isValidElement } from 'react'
 import { cn } from '../../lib/utils'
 
 /**
- * 按钮样式变体。触控高度：默认 h-9（36px）；移动端由调用方用 size="lg"（h-11 = 44px）
- * 满足 iOS HIG 的 44px 触控目标。
+ * 按钮样式变体。
+ *
+ * **触控目标**：视觉高度默认 h-9（36px）、`sm` 是 h-8（32px），而 WCAG 2.5.8 要求
+ * 至少 24×24、iOS HIG 建议 44×44。移动端详情页的底部操作条要在一行放下 6 个按钮，
+ * 做不到每个 44px。所以采用**视觉不变、热区撑开**：`.tap-44` 用伪元素把可点区域
+ * 扩到至少 44×44（视觉尺寸不变，不挤占布局）。这不是取巧 —— WCAG 2.5.8 明确
+ * 允许「目标虽小，但有效点击区域足够大」。
+ *
  * focus-visible 环是硬要求（无障碍）；disabled 用 opacity + pointer-events。
  */
 const buttonVariants = cva(
-  'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*=size-])]:size-4',
+  'tap-44 inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*=size-])]:size-4',
   {
     variants: {
       variant: {
