@@ -6,8 +6,8 @@
 // 展示层已换到新设计系统：`<html class="dark">` + oklch token + Tailwind，
 // 不再需要 MUI 的 ThemeProvider / CssBaseline。
 import { useEffect, useMemo, useState } from 'react'
-import { ErrorBoundary } from '../components/feedback'
-import { applyThemeMode, resolveThemeMode, subscribeSystemTheme } from '../lib/theme-mode'
+import { ErrorBoundary, ThemeToggle } from '../components/feedback'
+import { applyThemeMode, resolveThemeMode, subscribeSystemTheme, subscribeThemeChoice } from '../lib/theme-mode'
 import { parseRoute } from './api'
 import { InvalidState } from './InvalidState'
 import { AppealDemoPage } from './pages/AppealDemoPage'
@@ -35,6 +35,16 @@ export function PublicApp() {
   // 订阅系统偏好只建一次；重复订阅会在每次主题变化时重建监听。
   useEffect(() => subscribeSystemTheme((mode) => setDark(mode === 'dark')), [])
 
+  // 标题栏的 ThemeToggle 直接改 localStorage 与 DOM，不经过这里的 state。
+  // 不同步的话，下一次系统主题变化会把用户的选择覆盖掉。
+  useEffect(
+    () =>
+      subscribeThemeChoice((mode) => {
+        if (mode !== null) setDark(mode === 'dark')
+      }),
+    [],
+  )
+
   const width = (route !== null && CONTAINER_WIDTH[route.kind]) || 'max-w-[640px]'
 
   // 不要给这个容器铺 bg-background：会盖住 body::before 的景深光晕，
@@ -44,6 +54,8 @@ export function PublicApp() {
       <div className="mb-4 flex items-baseline gap-2">
         <h1 className="text-[22px] leading-tight font-bold">门神</h1>
         <span className="text-[13px] text-muted-foreground">反广告申诉与记录查看</span>
+        {/* 主题切换推到最右：标题保持左对齐，按钮不参与基线对齐。 */}
+        <ThemeToggle className="ml-auto self-center" />
       </div>
       {route === null ? (
         <InvalidState message="链接无效或已被替换。" />

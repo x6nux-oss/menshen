@@ -29,7 +29,28 @@ export function setStoredTheme(mode: ThemeMode | null): void {
   if (typeof localStorage === 'undefined') return
   if (mode === null) localStorage.removeItem(STORAGE_KEY)
   else localStorage.setItem(STORAGE_KEY, mode)
+  // 同页内的订阅者（如桌面面板的外壳）也要知道 —— storage 事件只在**别的**
+  // 标签页触发，本页改不了自己的监听。
+  choiceListeners.forEach((cb) => cb(mode))
 }
+
+/**
+ * subscribeThemeChoice 订阅**用户显式选择**的变化（同页内）。
+ *
+ * 与 subscribeSystemTheme 的区别：后者跟的是操作系统的偏好，前者跟的是
+ * 用户在 ThemeToggle 上点的那个。外壳组件用它同步自己持有的 dark 状态 ——
+ * 不同步的话，用户刚选完暗色，下一次系统主题变化就把它覆盖回去。
+ *
+ * 回调收到 null 表示「已恢复跟随系统」。
+ */
+export function subscribeThemeChoice(cb: (mode: ThemeMode | null) => void): () => void {
+  choiceListeners.add(cb)
+  return () => {
+    choiceListeners.delete(cb)
+  }
+}
+
+const choiceListeners = new Set<(mode: ThemeMode | null) => void>()
 
 /**
  * subscribeSystemTheme 订阅系统偏好变化。返回值变化时回调；

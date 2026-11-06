@@ -7,7 +7,7 @@
 // 背后有东西可透的面板）；表格与长列表不用玻璃。
 import { useMiniState } from '../api/hooks'
 import { ApiError } from '../api/client'
-import { ErrorState } from '../components/feedback'
+import { ErrorState, ThemeToggle } from '../components/feedback'
 import { GlassPanel, GlassToolbar } from '../components/glass'
 import { Button, Skeleton } from '../components/ui'
 import { cn } from '../lib/utils'
@@ -199,6 +199,8 @@ function Layout({ main, identityLabel }: { main: boolean; identityLabel: string 
             <span className="ml-auto text-[13px] text-muted-foreground">
               {SECTION_TITLES[section]}
             </span>
+            {/* 主题切换：三态循环（跟随系统 → 亮 → 暗）。与公开页共用同一个组件。 */}
+            <ThemeToggle />
           </GlassToolbar>
         </div>
         <div className="flex-1 px-6 py-6">
