@@ -9,7 +9,6 @@
 // 触发提交，用户无操作也会消耗失败次数（满 5 次申诉自动结案）。
 // 失败后的重试由页面驱动：resetKey 变化时 reset 重新挑战，重试节奏由
 // 用户主动点击控制，而非组件自动循环。
-import { Box } from '@mui/material'
 import { useEffect, useRef } from 'react'
 import { loadTurnstile } from './turnstile'
 
@@ -57,5 +56,5 @@ export function TurnstileWidget({
     if (resetKey > 0 && idRef.current) window.turnstile?.reset(idRef.current)
   }, [resetKey])
 
-  return <Box ref={ref} data-testid="turnstile" sx={{ my: 1 }} />
+  return <div ref={ref} data-testid="turnstile" className="my-2" />
 }

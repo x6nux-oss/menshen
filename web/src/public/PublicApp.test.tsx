@@ -2,7 +2,7 @@
 // 门槛凭据 → 内容；申诉详情页资料渲染。
 import { fireEvent, render, screen } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { server, startTestServer } from '../test/server'
 import type { AppealData, AppealDossierView, JoinVerifyData, LogRecordView } from './api'
 import { PublicApp } from './PublicApp'
@@ -364,20 +364,6 @@ describe('PublicApp · 申诉验证测试台', () => {
   })
 })
 
-// stubMatchMedia 让 jsdom 里的 useMediaQuery 按查询返回指定匹配。
-function stubMatchMedia(matches: (q: string) => boolean) {
-  window.matchMedia = ((q: string) => ({
-    matches: matches(q),
-    media: q,
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  })) as unknown as typeof window.matchMedia
-}
-
 /** mockAPV 挂上申诉详情的门槛与内容接口。 */
 function mockAPV(view: unknown) {
   server.use(
@@ -391,29 +377,19 @@ function mockAPV(view: unknown) {
 }
 
 describe('PublicApp · 申诉详情响应式列数', () => {
-  const realMatchMedia = window.matchMedia
-  afterEach(() => {
-    window.matchMedia = realMatchMedia
-  })
-
-  it('≥1400px 三列并排', async () => {
-    stubMatchMedia((q) => q.includes('1400') || q.includes('900'))
+  it('栅格用 CSS 断点控制列数（≥900px 两列、≥1400px 三列）', async () => {
     at('/_w/apv/7/sig')
     mockAPV(appealView)
     render(<PublicApp />)
     fireEvent.click(await screen.findByRole('button', { name: '查看内容' }))
-    expect(await screen.findByTestId('appeal-grid-3')).toBeInTheDocument()
-    expect(screen.queryByTestId('appeal-grid-2')).not.toBeInTheDocument()
-  })
 
-  it('900–1400px 两列（资料与活动同栏）', async () => {
-    stubMatchMedia((q) => q.includes('900') && !q.includes('1400'))
-    at('/_w/apv/7/sig')
-    mockAPV(appealView)
-    render(<PublicApp />)
-    fireEvent.click(await screen.findByRole('button', { name: '查看内容' }))
-    expect(await screen.findByTestId('appeal-grid-2')).toBeInTheDocument()
-    expect(screen.getByTestId('appeal-two-wrap')).toBeInTheDocument()
-    expect(screen.queryByTestId('appeal-grid-3')).not.toBeInTheDocument()
+    // 列数由纯 CSS 断点决定（不再读视口）：断言栅格上挂着两个断点类，
+    // 且三栏都作为网格项存在。
+    const grid = await screen.findByTestId('appeal-grid')
+    expect(grid).toHaveClass('min-[900px]:grid-cols-2')
+    expect(grid).toHaveClass('min-[1400px]:grid-cols-3')
+    expect(screen.getByTestId('appeal-main')).toBeInTheDocument()
+    expect(screen.getByTestId('appeal-profile')).toBeInTheDocument()
+    expect(screen.getByTestId('appeal-activity')).toBeInTheDocument()
   })
 })
