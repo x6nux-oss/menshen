@@ -104,5 +104,14 @@ export default defineConfig(({ command, envMode }) => {
       // 本地开发把 API 代理到 Go 服务（默认监听 127.0.0.1:8081）。
       proxy: { '/miniapp/api': 'http://127.0.0.1:8081' },
     },
+    dev: {
+      // 关掉懒编译。rsbuild 默认开启，它给动态 import() 生成的 proxy chunk 会用
+      // `?/rspack/lazy/trigger` 的 resourceQuery 去 POST 触发编译，而 `server.base`
+      // 下那个端点实际挂在根路径，浏览器请求 `/miniapp/rspack/lazy/trigger` 一律 404
+      // —— 于是动态 import 永远不 resolve：dev 下 `/miniapp/_preview`（组件预览页）
+      // 与 MSW 懒加载全部白屏，而控制台无报错。
+      // 代价是 dev 首屏多编译几个 chunk；生产构建不受这个开关影响。
+      lazyCompilation: false,
+    },
   }
 })
