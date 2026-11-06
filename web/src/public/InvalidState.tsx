@@ -8,6 +8,7 @@ export function InvalidState({ message }: { message: string }) {
 }
 
 /** errorText 把 unknown 错误收敛成带文案的错误（保留服务端中文提示）。 */
+// oxlint-disable-next-line react/only-export-components -- 与 InvalidState 同属「公开页的错误呈现」，拆文件反而绕。
 export function errorText(err: unknown): string {
   if (err instanceof Error && err.message) return err.message
   return '请求失败，请刷新重试。'

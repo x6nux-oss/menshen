@@ -20,10 +20,6 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.1",
-    "@mui/icons-material": "^7.3.11",
-    "@mui/material": "^7.3.11",
     "@tanstack/react-query": "^5.104.0",
     "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
