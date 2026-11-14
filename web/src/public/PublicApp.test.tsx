@@ -1,6 +1,7 @@
 // 公开网页（_w）行为测试：申诉验证页渲染处罚依据与失效态；原文查看页
 // 门槛凭据 → 内容；申诉详情页资料渲染。
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { server, startTestServer } from '../test/server'
@@ -200,21 +201,34 @@ const appealView: AppealDossierView = {
 }
 
 describe('PublicApp', () => {
-  it('申诉验证页渲染处罚依据与账号信息', async () => {
+  it('申诉页默认显示摘要与验证，完整记录可展开且不重建验证码', async () => {
     at('/_w/ap/7/sig')
     server.use(http.get('*/_w/ap/7/sig', () => HttpResponse.json(appealData)))
     render(<PublicApp />)
 
-    expect(await screen.findByText('为什么被限制')).toBeInTheDocument()
-    expect(screen.getByText(/消息判定处置/)).toBeInTheDocument()
-    expect(screen.getByText(/昵称里写着日入5000/)).toBeInTheDocument()
-    expect(screen.getByText(/张三 \(@zs\)/)).toBeInTheDocument()
-    expect(screen.getByText('AI 复核后维持原判', { exact: false })).toBeInTheDocument()
-    expect(screen.getByText(/资料仍写着推广/)).toBeInTheDocument()
-    // 人机验证区块挂共享 Turnstile 组件容器。
-    expect(screen.getByTestId('turnstile')).toBeInTheDocument()
-    // 留底里的 HTML 按文本渲染，不注入 DOM。
-    expect(screen.getByText(/<b>bold<\/b>/)).toBeInTheDocument()
+    const summary = within((await screen.findByRole('heading', { name: '限制摘要' })).closest('section')!)
+    expect(summary.getByText(/消息判定处置/)).toBeVisible()
+    expect(summary.getByText(/昵称里写着日入5000/)).toBeVisible()
+    expect(summary.getByText('AI 复核后维持原判', { exact: false })).toBeVisible()
+    expect(screen.getByText(/IP.*浏览器特征.*保留 30 天/)).toBeVisible()
+
+    const toggle = screen.getByText('查看完整记录').closest('summary')!
+    const records = toggle.closest('details')!
+    const widget = screen.getByTestId('turnstile')
+    expect(records).not.toHaveAttribute('open')
+    expect(within(records).getByText(/<b>bold<\/b>/)).not.toBeVisible()
+    expect(widget.compareDocumentPosition(records) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await userEvent.click(toggle)
+    expect(records).toHaveAttribute('open')
+    expect(within(records).getByText(/张三 \(@zs\)/)).toBeVisible()
+    expect(within(records).getByText(/资料仍写着推广/)).toBeVisible()
+    expect(within(records).getByText(/<b>bold<\/b>/)).toBeVisible()
+    expect(screen.getByTestId('turnstile')).toBe(widget)
+
+    await userEvent.click(toggle)
+    expect(records).not.toHaveAttribute('open')
+    expect(screen.getByTestId('turnstile')).toBe(widget)
   })
 
   it('过期的申诉链接显示失效文案', async () => {

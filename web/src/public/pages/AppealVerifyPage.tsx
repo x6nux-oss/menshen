@@ -3,11 +3,10 @@
 //
 // **验证链路保持不变** —— collectSignals / postJSON 的调用、回调签名、
 // TurnstileWidget 的 props、resetKey 语义全部保持原样（CSP 与安全边界）。
-// 页面只重排信息顺序：先说明为什么被拦，再给证据与 AI 结论，最后验证。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Bot,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   MessageSquareText,
   ShieldAlert,
@@ -30,7 +29,6 @@ import {
   Mono,
   PageHeader,
   SectionCard,
-  Steps,
 } from '../ui'
 
 const LIMIT_LABEL: Record<string, string> = {
@@ -106,109 +104,61 @@ export function AppealVerifyPage({ route }: { route: WebRoute }) {
   if (error) return <InvalidState message={error} />
   if (!data) return <Placeholder />
   const done = result?.ok === true
+  const primaryLimit = data.limits[0]
   return (
-    <div data-testid="appeal-verify" className="space-y-4">
+    <div data-testid="appeal-verify" className="space-y-3 [overflow-wrap:anywhere]">
       <PageHeader
         title="申诉验证"
-        description="核对限制原因，完成一次人机验证，获取交给群管理员的解禁码。"
+        description={
+          <span className="text-[14px]">
+            {data.account.name || '用户'} · UID <Mono>{data.account.uid}</Mono>
+          </span>
+        }
+        badge={<span className="text-[12px] text-muted-foreground">申诉单 <Mono>#{data.appeal_id}</Mono></span>}
+        className="mb-0"
       />
 
-      <Steps
-        current={done ? 3 : result || submitting ? 1 : 0}
-        steps={[
-          { title: '核对记录', description: '查看限制依据与留底' },
-          { title: '完成验证', description: '人机验证通过后签发' },
-          { title: '提交解禁码', description: '交给群管理员处理' },
-        ]}
-      />
-
-      <Callout tone="info" icon={<ShieldAlert />} title="隐私说明">
-        为防止滥用，本页会记录你的 IP 与浏览器特征，仅用于反垃圾审核，保留 {data.days} 天。
-      </Callout>
-
-      <SectionCard icon={<ShieldAlert />} title="为什么被限制">
-        {data.limits.length > 0 ? (
-          <ul className="space-y-4">
-            {data.limits.map((limit, index) => (
-              <li key={index} className="text-[16px] leading-7">
-                <p className="font-medium">{LIMIT_LABEL[limit.type] ?? limit.type}</p>
-                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
-                  {limit.chat_id ? (
-                    <span>
-                      群{' '}
-                      <ChatRef name={limit.chat} url={limit.chat_url} fallback={limit.chat_id} />
-                    </span>
-                  ) : null}
-                  {limit.time && (
-                    <span className="inline-flex items-center gap-1">
-                      <Clock3 aria-hidden className="size-3.5" />
-                      {limit.time}
-                    </span>
-                  )}
-                </p>
-                {limit.reason && <Detail label="理由">{limit.reason}</Detail>}
-                {limit.text && <Detail label="原消息">{limit.text}</Detail>}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyLine>本 bot 名下已查不到仍在生效的限制，可能已经解除。</EmptyLine>
-        )}
-      </SectionCard>
-
-      <SectionCard icon={<UserRound />} title="账号信息">
-        <MetaGrid>
-          <Meta label="用户 ID">
-            <Mono>{data.account.uid}</Mono>
-          </Meta>
-          {data.account.name && <Meta label="判定时的昵称">{data.account.name}</Meta>}
-        </MetaGrid>
-        <Tip>
-          这些是 bot 判定时记下的资料。广告号的昵称、用户名或简介里常写着推广、收益承诺或引流话术，
-          即使某条消息看起来无害也会被整体判为广告号。把资料改干净再申诉，通过率会高很多。
-        </Tip>
-      </SectionCard>
-
-      <SectionCard icon={<MessageSquareText />} title="你在群里的发言（留底）">
-        {data.messages.length > 0 ? (
-          <Messages messages={data.messages} />
-        ) : (
-          <EmptyLine>
-            没有查到你的发言留底（可能已过保留期，或你还没在本 bot 的群里发过言）。
-          </EmptyLine>
-        )}
-        <Tip>
-          以上是 bot 留底的你的发言，最多显示最近 100 条、每条 300 字；留底保留 {data.days} 天。
-        </Tip>
-      </SectionCard>
-
-      <SectionCard icon={<Sparkles />} title="AI 复核结论">
-        <p className="text-[16px] leading-7">
-          <span className="font-medium">{data.ai.label}</span>
-          {data.ai.conf > 0 && (
-            <span className="text-muted-foreground">
-              {' '}
-              · 置信度 {Math.round(data.ai.conf * 100)}%
-            </span>
+      <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_340px]">
+        <SectionCard contentClassName="space-y-3 p-4 sm:p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-[14px] font-semibold">限制摘要</h2>
+            <span className="text-[12px] text-muted-foreground">{data.limits.length} 项限制</span>
+          </div>
+          {primaryLimit ? (
+            <div className="space-y-1">
+              <p className="line-clamp-2 text-[14px] font-medium">
+                {LIMIT_LABEL[primaryLimit.type] ?? primaryLimit.type}
+                {primaryLimit.chat_id ? (
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    <ChatRef name={primaryLimit.chat} url={primaryLimit.chat_url} fallback={primaryLimit.chat_id} />
+                  </span>
+                ) : null}
+              </p>
+              <p className="line-clamp-2 text-[14px] leading-6 text-muted-foreground">
+                {primaryLimit.reason || '展开完整记录，查看限制依据。'}
+              </p>
+            </div>
+          ) : (
+            <EmptyLine>当前未查到生效限制，可能已经解除。</EmptyLine>
           )}
-          {data.ai.model && (
-            <span className="mt-1 block text-[12.5px] text-muted-foreground">
-              模型 <Mono>{data.ai.model}</Mono>
-            </span>
-          )}
-        </p>
-        {data.ai.reason && <Detail label="复核理由">{data.ai.reason}</Detail>}
-        {data.ai.statement && <Detail label="你的申诉理由">{data.ai.statement}</Detail>}
-      </SectionCard>
+          <p className="border-t border-border pt-3 text-[13px] leading-5">
+            <span className="text-muted-foreground">AI 复核：</span>
+            <span className="font-medium">{data.ai.label || '暂无复核结论'}</span>
+          </p>
+        </SectionCard>
 
-      <SectionCard icon={<CheckCircle2 />} title="人机验证">
-        <p className="text-[15px] leading-7">
-          完成下方验证后，会给你一个<strong className="font-semibold">解禁码</strong>。
-          把它交给群管理员即可解除限制。
-        </p>
-        {data.sitekey ? (
-          !done && (
-            <div className="mt-4 rounded-md border border-border bg-muted/50 p-3">
+        <SectionCard
+          icon={<CheckCircle2 />}
+          title="人机验证"
+          className="max-[368px]:-mx-4 max-[368px]:rounded-none md:sticky md:top-4 md:col-start-2 md:row-start-1 md:row-span-2"
+          contentClassName="p-4 sm:p-4 max-[368px]:p-2"
+        >
+          <p className="text-[14px] leading-6">完成验证后，将解禁码交给群管理员处理。</p>
+          <p className="mt-2 text-[12px] leading-5 text-muted-foreground">
+            本页记录你的 IP 与浏览器特征，仅用于反垃圾审核，保留 {data.days} 天。
+          </p>
+          {data.sitekey ? (
+            !done && (
               <TurnstileWidget
                 sitekey={data.sitekey}
                 cdata={data.cdata}
@@ -216,29 +166,93 @@ export function AppealVerifyPage({ route }: { route: WebRoute }) {
                 onToken={onToken}
                 onError={onError}
               />
-            </div>
-          )
-        ) : (
-          <Callout tone="danger" icon={<TriangleAlert />} title="未配置验证">
-            本页未配置人机验证，请联系群管理员处理。
-          </Callout>
-        )}
-        {!done && (
-          <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
-            验证组件加载不出来时，请用系统浏览器打开本页。
-          </p>
-        )}
-        <ResultArea
-          submitting={submitting}
-          result={result}
-          onRetry={result && !result.ok && data.sitekey ? retry : undefined}
-        />
-      </SectionCard>
+            )
+          ) : (
+            <Callout tone="danger" icon={<TriangleAlert />} title="未配置验证">
+              本页未配置人机验证，请联系群管理员处理。
+            </Callout>
+          )}
+          {!done && (
+            <p className="text-[12px] leading-5 text-muted-foreground">
+              无法加载时，请用系统浏览器打开。
+            </p>
+          )}
+          <ResultArea
+            submitting={submitting}
+            result={result}
+            onRetry={result && !result.ok && data.sitekey ? retry : undefined}
+          />
+        </SectionCard>
 
-      <p className="flex items-center justify-center gap-2 pt-1 text-[12px] text-muted-foreground">
-        <Bot aria-hidden className="size-3.5" />
-        门神自动审核 · 申诉单 <Mono>#{data.appeal_id}</Mono>
-      </p>
+        <details className="group min-w-0 rounded-lg border border-border bg-card md:col-start-1">
+          <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-3 py-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            <span className="font-medium">查看完整记录</span>
+            <span className="ml-auto text-[12px] text-muted-foreground">
+              {data.limits.length} 项限制 · {data.messages.length} 条发言
+            </span>
+            <ChevronDown aria-hidden className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="space-y-3 border-t border-border p-3">
+            <SectionCard icon={<ShieldAlert />} title="为什么被限制">
+              {data.limits.length > 0 ? (
+                <ul className="space-y-4">
+                  {data.limits.map((limit, index) => (
+                    <li key={index} className="text-[15px] leading-6">
+                      <p className="font-medium">{LIMIT_LABEL[limit.type] ?? limit.type}</p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
+                        {limit.chat_id ? (
+                          <span>群 <ChatRef name={limit.chat} url={limit.chat_url} fallback={limit.chat_id} /></span>
+                        ) : null}
+                        {limit.time && (
+                          <span className="inline-flex items-center gap-1">
+                            <Clock3 aria-hidden className="size-3.5" />
+                            {limit.time}
+                          </span>
+                        )}
+                      </p>
+                      {limit.reason && <Detail label="理由">{limit.reason}</Detail>}
+                      {limit.text && <Detail label="原消息">{limit.text}</Detail>}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyLine>本 bot 名下已查不到仍在生效的限制，可能已经解除。</EmptyLine>
+              )}
+            </SectionCard>
+
+            <SectionCard icon={<UserRound />} title="账号信息">
+              <MetaGrid>
+                <Meta label="用户 ID"><Mono>{data.account.uid}</Mono></Meta>
+                {data.account.name && <Meta label="判定时的昵称">{data.account.name}</Meta>}
+              </MetaGrid>
+              <Tip>资料以判定时的记录为准；昵称、用户名或简介中含推广内容时，也可能触发限制。</Tip>
+            </SectionCard>
+
+            <SectionCard icon={<MessageSquareText />} title="你在群里的发言（留底）">
+              {data.messages.length > 0 ? (
+                <Messages messages={data.messages} />
+              ) : (
+                <EmptyLine>暂无留底，可能已过保留期或尚未在相关群发言。</EmptyLine>
+              )}
+              <Tip>最近 100 条、每条最多 300 字；保留 {data.days} 天。</Tip>
+            </SectionCard>
+
+            <SectionCard icon={<Sparkles />} title="AI 复核结论">
+              <p className="text-[15px] leading-6">
+                <span className="font-medium">{data.ai.label}</span>
+                {data.ai.conf > 0 && (
+                  <span className="text-muted-foreground"> · 置信度 {Math.round(data.ai.conf * 100)}%</span>
+                )}
+                {data.ai.model && (
+                  <span className="mt-1 block text-[12px] text-muted-foreground">模型 <Mono>{data.ai.model}</Mono></span>
+                )}
+              </p>
+              {data.ai.reason && <Detail label="复核理由">{data.ai.reason}</Detail>}
+              {data.ai.statement && <Detail label="你的申诉理由">{data.ai.statement}</Detail>}
+            </SectionCard>
+          </div>
+        </details>
+      </div>
     </div>
   )
 }
