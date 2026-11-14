@@ -6,6 +6,7 @@
 > 前端分支已合入 main；main 后续并行加入 localvision（`f37495e`），该功能保留。
 > 本轮进一步修复 menshen-994/995 的长模型名挤压与空模型详情崩溃，最新门禁为
 > 52 个文件 / 506 个测试通过，浏览器 7 尺寸复验通过，见末尾。
+> 修复提交 `c604921` 已推送 main，并于 18:19 更新到 dev，源站与公网验证通过。
 > 用户已明确 Mini App 只需多尺寸正常显示；Telegram 真机与逐页 op 矩阵不作为
 > 本轮 Mini App 的验收前置条件。
 
@@ -300,3 +301,20 @@ value 容器 `shrink-0` 且没有宽度上限，真实长模型名会把中间�
 
 未执行或声称 Telegram 真机、真实验证码、处罚/申诉/兑换业务 E2E；
 该部分仍由 menshen-wuu / menshen-3dn 独立跟踪。
+
+## dev 修复部署（2026-11-14 18:19，UTC+8）
+
+修复提交 `c604921` 已推送 main；使用干净工作区构建 linux/amd64 静态程序，
+构建信息为 `vcs.revision=c604921d238de3ae6491f650959d858a43bdb1ac`、
+`vcs.modified=false`，运行版本为 `2.5.0+c604921`。
+本地上传文件、已安装程序与运行进程的 SHA-256 一致：
+`350f7ce574a3388cc9b47507362c354f445c5bf26982043bd4ec01a9fd62847b`。
+
+`menshen-dev` 服务 active；源站与公开域名 `/healthz` 均为 `200 ok`。
+Mini App、管理端和公开页分别引用 `index.5cb31b6450.js`、
+`admin.fdf3b65a1f.js`、`public.09c68da18f.js`，HTML 为 no-store；
+所有引用的 JS/CSS 与 Telegram SDK 均返回 200，资源类型检查通过。
+两份 CSS 均核对长名称换行、右值半宽限制及原有下拉可用高度规则。
+
+部署及验证仅通过本地 sshctl 的提交专用规则执行，未备份数据库，
+仅保留旧程序供回滚。menshen-994/995 已关闭；凭据和 sshctl 本地配置未入库。
