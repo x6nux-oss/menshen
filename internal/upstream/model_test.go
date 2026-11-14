@@ -243,8 +243,13 @@ func TestBuildBodyPerKind(t *testing.T) {
 	body = a.BuildBody(EPChat, "a/claude", payload)
 	// system 现组装为带 cache_control 的 blocks（原生渠道必须显式打标才缓存），
 	// 形状详见 cache_test.go 的 TestBuildBodyAnthropicSystemCacheBlocks。
-	if _, ok := body["system"].([]map[string]any); !ok || body["max_tokens"] != anthropicDefaultMaxTokens {
+	if _, ok := body["system"].([]map[string]any); !ok || body["max_tokens"] != DefaultMaxTokens {
 		t.Errorf("Anthropic 应把 system 提为带标记的 blocks 并带 max_tokens: %v", body)
+	}
+	// 思考也计入 max_tokens：线上推理模型（deepseek-flash）在 2048 里没想完，
+	// 正文为空，复判一律「未返回 JSON」。默认值要给思考留足余量。
+	if mt, _ := body["max_tokens"].(int); mt < 32768 {
+		t.Errorf("Anthropic 默认 max_tokens = %d，推理模型会把它全用在思考上", mt)
 	}
 	if body["stream"] != true {
 		t.Errorf("Anthropic 应走流式: %v", body)

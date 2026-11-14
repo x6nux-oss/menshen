@@ -1,6 +1,7 @@
 // 模型定价：搜索、列表摘要、添加（上游仅启用中 + 四个价格）、详情价格编辑、
 // 启停与删除参数、无启用上游时的入口收敛。
 import { fireEvent, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { describe, expect, it } from 'vitest'
 import type { State } from '../api/types'
@@ -111,6 +112,49 @@ describe('ModelDetailPage', () => {
     fireEvent.click(sw)
     await waitFor(() => expect(bodies).toHaveLength(1))
     expect(bodies[0]).toEqual({ action: 'update', name: 'demo/gpt-5-mini', enabled: false })
+  })
+
+  it('思考强度：选择 high 提交 high', async () => {
+    const bodies: Record<string, unknown>[] = []
+    capturePost('model', bodies)
+    renderPage(<ModelDetailPage name="demo/gpt-5-mini" />)
+    await screen.findByText('上游 demo ｜ 模型 ID gpt-5-mini')
+
+    const effortSelect = screen.getByRole('combobox', { name: '思考强度' })
+    expect(effortSelect).toHaveTextContent('不填')
+    await userEvent.click(effortSelect)
+    await userEvent.click(await screen.findByRole('option', { name: 'high' }))
+
+    await waitFor(() => expect(bodies).toHaveLength(1))
+    expect(bodies[0]).toEqual({
+      action: 'update',
+      name: 'demo/gpt-5-mini',
+      reasoning_effort: 'high',
+    })
+  })
+
+  it('思考强度：选择不填提交空串', async () => {
+    const bodies: Record<string, unknown>[] = []
+    capturePost('model', bodies)
+    const stateWithHighEffort = structuredClone(mockState)
+    stateWithHighEffort.models = (stateWithHighEffort.models ?? []).map((model) =>
+      model.name === 'demo/gpt-5-mini' ? { ...model, reasoning_effort: 'high' } : model,
+    )
+    useState(stateWithHighEffort)
+    renderPage(<ModelDetailPage name="demo/gpt-5-mini" />)
+    await screen.findByText('上游 demo ｜ 模型 ID gpt-5-mini')
+
+    const effortSelect = screen.getByRole('combobox', { name: '思考强度' })
+    expect(effortSelect).toHaveTextContent('high')
+    await userEvent.click(effortSelect)
+    await userEvent.click(await screen.findByRole('option', { name: '不填' }))
+
+    await waitFor(() => expect(bodies).toHaveLength(1))
+    expect(bodies[0]).toEqual({
+      action: 'update',
+      name: 'demo/gpt-5-mini',
+      reasoning_effort: '',
+    })
   })
 
   it('删除模型：确认文案含模型名，确认后提交 remove', async () => {

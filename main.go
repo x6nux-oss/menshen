@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	version   = "2.4.2"
+	version   = "2.5.0"
 	buildTime = "unknown" // 由构建脚本通过 ldflags 注入
 )
 
@@ -65,6 +65,7 @@ func main() {
 	}
 
 	sh := core.NewShared(cfg, db, cache)
+	sh.Version = version
 
 	// 日志三路输出：标准输出、日志文件与进程内环形缓冲。上限从设置现读，
 	// 面板上改小立刻生效；文件写不进去只丢这一行并退避重试，绝不打断业务。

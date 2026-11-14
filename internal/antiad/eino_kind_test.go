@@ -117,8 +117,10 @@ func TestAnthropicRequestTranslation(t *testing.T) {
 	if body["stream"] != false {
 		t.Errorf("翻译渠道固定非流式：%v", body["stream"])
 	}
-	if body["max_tokens"] != ruleAgentAnthropicMaxTokens {
-		t.Errorf("未传 max_tokens 时应给默认值：%v", body["max_tokens"])
+	// 与判定链路同一个默认值（32k）：思考计入 max_tokens，给小了推理模型
+	// 想不完就被截断、正文为空。两边各写一份时曾经一边改了一边没改。
+	if body["max_tokens"] != upstream.DefaultMaxTokens {
+		t.Errorf("未传 max_tokens 时应给判定链路同一个默认值：%v", body["max_tokens"])
 	}
 	msgs, _ := body["messages"].([]map[string]any)
 	// system 被抽出后剩 3 条：user / assistant(tool_use) / user(tool_result)。
@@ -359,7 +361,7 @@ func TestEinoKindRTAnthropic(t *testing.T) {
 	if err := json.Unmarshal(cap.body, &sent); err != nil {
 		t.Fatalf("出站请求不是 JSON：%v", err)
 	}
-	if sent["max_tokens"] != float64(ruleAgentAnthropicMaxTokens) {
+	if sent["max_tokens"] != float64(upstream.DefaultMaxTokens) {
 		t.Errorf("出站请求应带默认 max_tokens：%v", sent["max_tokens"])
 	}
 	choice := out["choices"].([]any)[0].(map[string]any)

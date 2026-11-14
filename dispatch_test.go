@@ -285,6 +285,32 @@ func TestMainBotStillServesPanel(t *testing.T) {
 	}
 }
 
+// TestStatusCommandRouting：私聊 /status 只对服务管理员生效，/status@botname
+// 与带参数形态都要认；陌生人的同样文字落到申诉通道，不暴露命令。
+func TestStatusCommandRouting(t *testing.T) {
+	dm := func(uid int64, text string) *tg.Update {
+		return &tg.Update{Message: &tg.Message{MessageID: 1, Date: 1700000000, Text: text,
+			From: &tg.TGUser{ID: uid}, Chat: &tg.Chat{ID: uid, Type: "private"}}}
+	}
+	b, fake := testutil.NewTestBot(t, 777)
+
+	for _, text := range []string{"/status", "/status@testbot", "/status all"} {
+		fake.Reset()
+		dispatch(b, dm(777, text))
+		p := fake.LastCall("sendMessage")
+		if p == nil || !strings.Contains(p["text"].(string), "运行状态") {
+			t.Errorf("%q 应得到运行状态，得到 %v", text, p)
+		}
+	}
+
+	fake.Reset()
+	dispatch(b, dm(12345, "/status"))
+	if p := fake.LastCall("sendMessage"); p != nil &&
+		strings.Contains(p["text"].(string), "运行状态") {
+		t.Errorf("陌生人不该能看运行状态：%v", p)
+	}
+}
+
 // TestUbanCommandRouting：私聊 /uban 只对服务管理员生效（主/次都行），
 // 陌生人发同样的文字不会触发全解 —— 它落到申诉通道，不暴露命令。
 func TestUbanCommandRouting(t *testing.T) {

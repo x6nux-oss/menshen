@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { errorStatus } from '../api/client'
 import { useMiniState } from '../api/hooks'
 import { useModelMutation, useOptimisticMiniMutation } from '../api/mutations'
+import { REASONING_EFFORTS } from '../api/types'
 import type { Model, State } from '../api/types'
 import { EmptyState, ErrorState, Skeletons, useToast } from '../components/feedback'
 import { FormDrawer, ListRow, SearchField, SectionCard, SwitchRow, useConfirm } from '../components/mobile'
@@ -16,6 +17,8 @@ import { Label } from '../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { filterRows } from '../lib/filters'
 import { useNav, usePageParam } from '../nav'
+
+const REASONING_EFFORT_UNSET = '__unset__'
 
 function priceText(m: Pick<Model, 'prompt_price' | 'completion_price'>): string {
   return `输入 $${m.prompt_price}/M · 补全 $${m.completion_price}/M`
@@ -340,6 +343,25 @@ export function ModelDetailPage({ name }: { name: string }) {
     )
   }
 
+  function setEffort(next: string) {
+    enableMut.mutate(
+      {
+        body: { action: 'update', name, reasoning_effort: next },
+        apply: (state: State) => ({
+          ...state,
+          models: (state.models ?? []).map((entry) =>
+            entry.name === name ? { ...entry, reasoning_effort: next } : entry,
+          ),
+        }),
+      },
+      {
+        onSuccess: (resp) =>
+          toast(resp.note ?? (next ? `思考强度 ${next}` : '不传思考强度')),
+        onError: (err) => toast(err.message),
+      },
+    )
+  }
+
   async function removeModel() {
     const ok = await confirm({
       title: '删除该模型？',
@@ -388,6 +410,37 @@ export function ModelDetailPage({ name }: { name: string }) {
           disabled={enableMut.isPending}
           onChange={toggleSimple}
         />
+        <div className="px-4 py-3">
+          <Label htmlFor="model-reasoning-effort" className="mb-1 block">
+            思考强度
+          </Label>
+          <Select
+            value={
+              model.reasoning_effort === ''
+                ? REASONING_EFFORT_UNSET
+                : model.reasoning_effort
+            }
+            disabled={enableMut.isPending}
+            onValueChange={(next) =>
+              setEffort(next === REASONING_EFFORT_UNSET ? '' : next)
+            }
+          >
+            <SelectTrigger id="model-reasoning-effort" aria-label="思考强度">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={REASONING_EFFORT_UNSET}>不填</SelectItem>
+              {REASONING_EFFORTS.map((effort) => (
+                <SelectItem key={effort} value={effort}>
+                  {effort}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="mt-1 text-[12px] leading-[1.7] text-muted-foreground">
+            不填不发，模型按自己的默认思考；模型不认时自动去掉
+          </p>
+        </div>
       </SectionCard>
 
       <PriceCard key={model.name} model={model} />

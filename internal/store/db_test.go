@@ -55,6 +55,11 @@ func TestMigrateOldDB(t *testing.T) {
 			supports_chat INTEGER NOT NULL DEFAULT 1,
 			supports_systemone INTEGER NOT NULL DEFAULT 0)`,
 		`INSERT INTO upstreams (name,base_url,api_key) VALUES ('old','http://x','k')`,
+		// 老形状的 models：没有 simple_instructions / reasoning_effort（migrate 才补）。
+		`CREATE TABLE models (name TEXT PRIMARY KEY,
+			prompt_price REAL NOT NULL, completion_price REAL NOT NULL,
+			cache_read_price REAL NOT NULL DEFAULT 0, cache_write_price REAL NOT NULL DEFAULT 0,
+			enabled INTEGER NOT NULL DEFAULT 1)`,
 		// 老形状的 ad_rules：没有 last_ads_total / last_kinds（migrate 才补）。
 		`CREATE TABLE ad_rules (id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL, pattern TEXT NOT NULL,
@@ -96,7 +101,8 @@ func TestMigrateOldDB(t *testing.T) {
 		{"group_members", "profile_hash"}, {"group_members", "prewarm_next_at"},
 		{"group_members", "prewarm_watch"},
 		{"join_mutes", "shape"},
-		{"antiad_log", "so_verdict"}, {"antiad_log", "llm_verdict"}} {
+		{"antiad_log", "so_verdict"}, {"antiad_log", "llm_verdict"},
+		{"models", "simple_instructions"}, {"models", "reasoning_effort"}} {
 		if has, err := hasColumn(s.Write, c[0], c[1]); err != nil || !has {
 			t.Errorf("%s.%s 没有补上（err=%v）", c[0], c[1], err)
 		}

@@ -3,6 +3,7 @@ package upstream
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 )
@@ -40,13 +41,24 @@ func (u *Upstream) SetAuth(req *http.Request) {
 // OpenAI Completions 渠道原样透传（只补 model）；其余类型只挑自己认识的
 // 字段重新组装，避免把 stream_options 这类参数发给不认它的上游。
 //
-// 已被上游拒绝过 temperature 的模型（见 TemperatureUnsupported）在这里
-// 统一去掉该参数：它是各渠道请求体组装唯一的出入口，判定链路的每条请求
-// 都经过这里。
+// 已被上游拒绝过 temperature / 思考强度的模型（见 TemperatureUnsupported、
+// EffortUnsupported）在这里统一去掉该参数：它是各渠道请求体组装唯一的
+// 出入口，判定链路的每条请求都经过这里。
 func (u *Upstream) BuildBody(ep Endpoint, model string, payload map[string]any) map[string]any {
 	_, id := SplitModelName(model)
 	if TemperatureUnsupported(id) {
-		payload = dropTemperature(payload)
+		payload = dropKey(payload, "temperature")
+	}
+	if EffortUnsupported(id) {
+		payload = dropKey(payload, "reasoning_effort")
+	}
+	// 没写上限的 chat 请求补默认上限（见 maxtokens.go）；各渠道再按自己的
+	// 字段名翻译（max_tokens / max_output_tokens / maxOutputTokens）。
+	if ep == EPChat && maxTokensOf(payload) == 0 {
+		if n := DefaultMaxTokensFor(id, u.EffectiveKind() == KindAnthropic); n > 0 {
+			payload = maps.Clone(payload)
+			payload["max_tokens"] = n
+		}
 	}
 	switch u.EffectiveKind() {
 	case KindOpenAIResp:
@@ -164,20 +176,21 @@ func (u *Upstream) NormalizeResponse(ep Endpoint, raw []byte) ([]byte, error) {
 
 // ---- 请求体组装 ----
 
-// dropTemperature 返回去掉 temperature 的载荷副本。不改调用方的 map：
-// 同一份载荷会在重试时反复经过 BuildBody（含并发多路）。
-func dropTemperature(payload map[string]any) map[string]any {
-	if _, ok := payload["temperature"]; !ok {
+// dropKey 返回去掉 key 的载荷副本。不改调用方的 map：同一份载荷会在
+// 重试时反复经过 BuildBody（含并发多路）。
+func dropKey(payload map[string]any, key string) map[string]any {
+	if _, ok := payload[key]; !ok {
 		return payload
 	}
-	out := make(map[string]any, len(payload))
-	for k, v := range payload {
-		if k == "temperature" {
-			continue
-		}
-		out[k] = v
-	}
+	out := maps.Clone(payload)
+	delete(out, key)
 	return out
+}
+
+// effortOf 读载荷里的思考强度（见 effort.go），没写为空。
+func effortOf(payload map[string]any) string {
+	e, _ := payload["reasoning_effort"].(string)
+	return e
 }
 
 func clonePayload(in map[string]any) map[string]any {
@@ -286,10 +299,6 @@ func maxTokensOf(payload map[string]any) int {
 	return 0
 }
 
-// anthropicDefaultMaxTokens：Messages API 的 max_tokens 是必填项；判定
-// 链路没传时给一个足够放完整 JSON 判决的值。
-const anthropicDefaultMaxTokens = 2048
-
 func bodyOpenAIResponses(model string, payload map[string]any) map[string]any {
 	msgs := messagesOf(payload)
 	input := make([]map[string]any, 0, len(msgs))
@@ -317,6 +326,9 @@ func bodyOpenAIResponses(model string, payload map[string]any) map[string]any {
 	if mt := maxTokensOf(payload); mt > 0 {
 		body["max_output_tokens"] = mt
 	}
+	if e := effortOf(payload); e != "" {
+		body["reasoning"] = map[string]any{"effort": e}
+	}
 	return body
 }
 
@@ -334,9 +346,11 @@ func bodyAnthropic(model string, payload map[string]any) map[string]any {
 			out = append(out, map[string]any{"role": "user", "content": anthropicContent(m)})
 		}
 	}
-	maxTokens := anthropicDefaultMaxTokens
-	if mt := maxTokensOf(payload); mt > 0 {
-		maxTokens = mt
+	// Messages API 的 max_tokens 必填；BuildBody 已为 chat 请求补过默认值，
+	// 这里只兜直接调用的情况。
+	maxTokens := maxTokensOf(payload)
+	if maxTokens <= 0 {
+		maxTokens = DefaultMaxTokensFor(model, true)
 	}
 	body := map[string]any{"model": model, "max_tokens": maxTokens, "stream": true}
 	if len(out) > 0 {
@@ -350,6 +364,9 @@ func bodyAnthropic(model string, payload map[string]any) map[string]any {
 	}
 	if t, ok := payload["temperature"]; ok {
 		body["temperature"] = t
+	}
+	if e := effortOf(payload); e != "" {
+		body["output_config"] = map[string]any{"effort": e}
 	}
 	return body
 }

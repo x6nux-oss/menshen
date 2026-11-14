@@ -313,7 +313,19 @@ func TestMiniMutations(t *testing.T) {
 		t.Fatalf("新增模型应 200，得到 %d：%s", w.Code, w.Body.String())
 	}
 	if sh.Cache.Snap().Models["up1/m1"] == nil {
-		t.Error("模型没落库")
+		t.Fatal("模型没落库")
+	}
+	// 思考强度：填了就存；不认识的值是参数错误（400），不是内部故障。
+	if w := call("model", map[string]any{"action": "update", "name": "up1/m1",
+		"reasoning_effort": "low"}); w.Code != http.StatusOK {
+		t.Fatalf("设置思考强度应 200，得到 %d：%s", w.Code, w.Body.String())
+	}
+	if got := sh.Cache.Snap().Models["up1/m1"].ReasoningEffort; got != "low" {
+		t.Errorf("思考强度应存为 low，得到 %q", got)
+	}
+	if w := call("model", map[string]any{"action": "update", "name": "up1/m1",
+		"reasoning_effort": "turbo"}); w.Code != http.StatusBadRequest {
+		t.Errorf("不认识的思考强度应 400，得到 %d：%s", w.Code, w.Body.String())
 	}
 	// 负价会让开销核算变成负数；超长模型名会撑爆 callback_data（64 字节）。
 	if w := call("model", map[string]any{"action": "add", "upstream": "up1",

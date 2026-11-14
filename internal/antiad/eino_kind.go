@@ -113,6 +113,10 @@ func (t *einoKindRT) RoundTrip(req *http.Request) (*http.Response, error) {
 	if upstream.TemperatureUnsupported(in.Model) {
 		in.Temperature = nil
 	}
+	// 没写上限时补默认上限（Anthropic 必填，被拒过的退回 8192；其余被拒过的不传）。
+	if in.MaxTokens <= 0 {
+		in.MaxTokens = upstream.DefaultMaxTokensFor(in.Model, t.kind == upstream.KindAnthropic)
+	}
 	// Eino 发的 model 字段已是不带上游前缀的模型 ID，翻译时原样透传。
 	body, err := json.Marshal(t.translateRequest(&in))
 	if err != nil {
@@ -340,11 +344,6 @@ func responsesRequest(in *einoWireReq) map[string]any {
 	return body
 }
 
-// ruleAgentAnthropicMaxTokens 是 Anthropic 渠道未显式传 max_tokens 时的
-// 默认值：Messages API 必填；一轮的输出是一条消息（文本 + 工具调用），
-// 8192 给推理型模型留足空间。
-const ruleAgentAnthropicMaxTokens = 8192
-
 // anthropicRequest 把 chat/completions 请求翻译成 Messages API 请求。
 // Anthropic 要求 tool_result 挂在 tool_use 之后紧邻的 user 消息里，Eino 的
 // 连续 role:"tool" 消息在这里合并成一条 user 消息的多个 tool_result 块。
@@ -394,7 +393,8 @@ func anthropicRequest(in *einoWireReq) map[string]any {
 
 	maxTokens := in.MaxTokens
 	if maxTokens <= 0 {
-		maxTokens = ruleAgentAnthropicMaxTokens
+		// Messages API 必填；与判定链路共用默认值，给推理型模型的思考留足空间。
+		maxTokens = upstream.DefaultMaxTokensFor(in.Model, true)
 	}
 	body := map[string]any{"model": in.Model, "max_tokens": maxTokens, "stream": false}
 	if len(msgs) > 0 {
@@ -468,8 +468,15 @@ func geminiRequest(in *einoWireReq) map[string]any {
 		body["systemInstruction"] = map[string]any{
 			"parts": []map[string]any{{"text": strings.Join(system, "\n\n")}}}
 	}
+	gen := map[string]any{}
 	if in.Temperature != nil {
-		body["generationConfig"] = map[string]any{"temperature": *in.Temperature}
+		gen["temperature"] = *in.Temperature
+	}
+	if in.MaxTokens > 0 {
+		gen["maxOutputTokens"] = in.MaxTokens
+	}
+	if len(gen) > 0 {
+		body["generationConfig"] = gen
 	}
 	if len(in.Tools) > 0 {
 		decls := make([]map[string]any, 0, len(in.Tools))

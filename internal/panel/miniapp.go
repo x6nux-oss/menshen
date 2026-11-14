@@ -517,6 +517,7 @@ func miniState(sh *core.Shared, w http.ResponseWriter, uid int64, username strin
 				"prompt_price": m.PromptPrice, "completion_price": m.CompletionPrice,
 				"cache_read_price": m.CacheReadPrice, "cache_write_price": m.CacheWritePrice,
 				"simple_instructions": m.SimpleInstructions,
+				"reasoning_effort":    m.ReasoningEffort,
 				"upstream":            m.UpstreamName(), "model_id": m.ModelID(),
 			})
 		}
@@ -1068,6 +1069,10 @@ func miniModel(sh *core.Shared, w http.ResponseWriter, uid int64, body map[strin
 		// 初判提示词简化：按模型标记（微调初判模型专用），详情页开关。
 		if _, ok := body["simple_instructions"]; ok {
 			p.SimpleInstructions = ptr(miniBool(body, "simple_instructions"))
+		}
+		// 思考强度：空串 = 不传（取值校验在 core.UpdateModel）。
+		if _, ok := body["reasoning_effort"]; ok {
+			p.ReasoningEffort = ptr(miniStr(body, "reasoning_effort"))
 		}
 		err = sh.UpdateModel(name, p)
 	default:

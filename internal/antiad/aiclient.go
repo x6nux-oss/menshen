@@ -423,6 +423,11 @@ func aiAttempt(parent context.Context, sh *core.Shared, snap *store.Snapshot,
 	if ep == upstream.EPChat {
 		p["user"] = sid
 		p["session_id"] = sid
+		// 思考强度按模型设置：填了才带，没填由模型按自己的默认思考。
+		// BuildBody 按渠道翻成各家字段、去掉已被拒过的（见 upstream/effort.go）。
+		if m := snap.Models[model]; m != nil && m.ReasoningEffort != "" {
+			p["reasoning_effort"] = m.ReasoningEffort
+		}
 	}
 	built := up.BuildBody(ep, model, p)
 	// 微调初判模型不吃长口径：models 表里标了 simple_instructions 的模型，
@@ -561,6 +566,32 @@ func aiAttemptDo(parent context.Context, sh *core.Shared, snap *store.Snapshot,
 				"模型", model, "上游", upName(up), "状态", resp.StatusCode)
 			return aiResult{
 				err: fmt.Errorf("上游 %s 返回 %d：模型不接受 temperature 参数，已去掉该参数重试",
+					upName(up), resp.StatusCode),
+				stage: st, elapsed: time.Since(start),
+				retryable: true, noBackoff: true}
+		}
+		// 模型不接受思考强度：与 temperature 同款，记下、立即重发不带它。
+		// 模型设置里填了它不认的档位也走这里 —— 这个模型此后按自己的默认思考。
+		if upstream.EffortRejected(resp.StatusCode, detail) {
+			_, id := upstream.SplitModelName(model)
+			upstream.MarkEffortUnsupported(id)
+			slog.Warn("反广告：模型不接受思考强度参数，去掉后重试",
+				"模型", model, "上游", upName(up), "状态", resp.StatusCode, "原因", detail)
+			return aiResult{
+				err: fmt.Errorf("上游 %s 返回 %d：模型不接受思考强度参数，已去掉该参数重试",
+					upName(up), resp.StatusCode),
+				stage: st, elapsed: time.Since(start),
+				retryable: true, noBackoff: true}
+		}
+		// 模型不接受默认的 32k 输出上限（多半是超了它自己的上限）：记下，
+		// 退回加上限之前的行为立即重发（见 upstream/maxtokens.go）。
+		if upstream.MaxTokensRejected(resp.StatusCode, detail) {
+			_, id := upstream.SplitModelName(model)
+			upstream.MarkMaxTokensRejected(id)
+			slog.Warn("反广告：模型不接受默认输出上限，退回后重试",
+				"模型", model, "上游", upName(up), "状态", resp.StatusCode, "原因", detail)
+			return aiResult{
+				err: fmt.Errorf("上游 %s 返回 %d：模型不接受默认输出上限，已退回后重试",
 					upName(up), resp.StatusCode),
 				stage: st, elapsed: time.Since(start),
 				retryable: true, noBackoff: true}

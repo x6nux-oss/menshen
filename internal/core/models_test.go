@@ -57,6 +57,24 @@ func TestModelOps(t *testing.T) {
 		t.Fatalf("不存在的模型应被拒，得到 %v", err)
 	}
 
+	// 思考强度：填了就存（去空白、转小写），填空清掉，不认识的值拒绝 ——
+	// 拼错的值发出去只会换来上游 400。
+	if err := sh.UpdateModel(name, core.ModelPatch{ReasoningEffort: ptr(" Low ")}); err != nil {
+		t.Fatal(err)
+	}
+	if got := sh.Cache.Snap().Models[name].ReasoningEffort; got != "low" {
+		t.Fatalf("思考强度应存为 low，得到 %q", got)
+	}
+	if err := sh.UpdateModel(name, core.ModelPatch{ReasoningEffort: ptr("turbo")}); !isOpErr(err) {
+		t.Fatalf("不认识的思考强度应被拒，得到 %v", err)
+	}
+	if err := sh.UpdateModel(name, core.ModelPatch{ReasoningEffort: ptr("")}); err != nil {
+		t.Fatal(err)
+	}
+	if got := sh.Cache.Snap().Models[name].ReasoningEffort; got != "" {
+		t.Fatalf("填空应清掉思考强度，得到 %q", got)
+	}
+
 	if err := sh.DeleteModel(name); err != nil {
 		t.Fatal(err)
 	}

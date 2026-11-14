@@ -650,7 +650,8 @@ func (c *Cache) Reload() error {
 
 func (c *Cache) loadModels(snap *Snapshot, q rowQueryer) error {
 	rows, err := q.Query(`SELECT name,prompt_price,completion_price,
-		cache_read_price,cache_write_price,enabled,simple_instructions FROM models`)
+		cache_read_price,cache_write_price,enabled,simple_instructions,
+		reasoning_effort FROM models`)
 	if err != nil {
 		return err
 	}
@@ -659,7 +660,7 @@ func (c *Cache) loadModels(snap *Snapshot, q rowQueryer) error {
 		m := &upstream.Model{}
 		var en, si int64
 		if err := rows.Scan(&m.Name, &m.PromptPrice, &m.CompletionPrice,
-			&m.CacheReadPrice, &m.CacheWritePrice, &en, &si); err != nil {
+			&m.CacheReadPrice, &m.CacheWritePrice, &en, &si, &m.ReasoningEffort); err != nil {
 			return err
 		}
 		m.Enabled = en == 1

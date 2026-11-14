@@ -37,3 +37,7 @@ cloudflare/clef-gateway/.wrangler/
 # 本地工具缓存
 /node_modules/
 .zcode/
+.claude/
+
+# sshctl 配置（含服务器密码）
+**/.sshctl.toml
