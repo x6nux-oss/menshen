@@ -1,0 +1,138 @@
+# 新前端完成度与合并审查
+
+审查日期：2026-11-14。
+
+审查范围：`main@f86b130` → `worktree-feat-frontend-rewrite@68209b3`，
+共 61 个提交、188 个变更文件。审查结合三路独立代码复核、重新执行质量门禁、
+生产构建的浏览器检查。本文提交只记录结果，没有修改应用代码。
+
+**结论：主要页面和构建迁移完成，但尚不满足合并验收标准，暂不合并 main。**
+发现四处可复现的交互回归；原设计要求的真机链路和逐页 op 覆盖验收也未完成。
+不能把“484 个测试通过”等同于“所有设计验收通过”。
+
+## 完成度
+
+| 范围 | 已完成 | 剩余问题 |
+| --- | --- | --- |
+| Phase 0：构建迁移 | rsbuild 两次构建生成 index/public/admin；Go embed、静态资源路径和构建顺序保持兼容 | 未实际重建 Docker 镜像；部署配置已检查，未发现本分支引入的构建阻塞 |
+| Phase 1：设计系统 | Tailwind/token、Base UI 基础件、移动组件、反馈层、玻璃与主题模块已接入 | Select 显示标签与 ActionSheet 模态行为回归 |
+| Phase 2：桌面端 | 原 16 个视图已迁移，新增 AI 调用流水；主要 CRUD、权限分支和 op 调用保留 | 耗时排序无效、主题覆盖、根容器遮挡景深；缺逐页 op 覆盖回归 |
+| Phase 3：Mini App | 原页面、tab/stack 导航和 API 层保留，旧 MUI 组件层已删除 | 共用 Select/ActionSheet 问题；真实 Telegram iOS/Android 核心链路待验 |
+| Phase 4：公开页与收尾 | 6 类公开页面、主题开关及减少动效样式已迁移；源代码和直接依赖已移除 MUI/Emotion | 显式主题选择会被系统覆盖；真实验证码、申诉/兑换和弱网链路待验 |
+
+`motion`、`react-virtual`、`features/apps` 目录重组和两个大页面拆分没有按原设计全部落地。
+这些不能算已完成，但本次没有测得必须靠它们解决的性能问题，宜修订范围说明，
+不应仅为对齐旧计划添加依赖或重构。
+
+## 合并前应修复
+
+### 1. Select 显示内部值，当前选项不可读（P2，menshen-981）
+
+位置：`web/src/components/ui/select.tsx:57`。
+
+`SelectValue` 直接使用 Base UI 的默认显示行为，而调用方没有提供选项的
+`items` 映射或显示格式化。首次渲染会显示原始 value。
+
+浏览器复现：打开群组详情，处罚下拉显示 `-1`，本应为“跟随全局”；
+AI 流水结果筛选显示 `__all__`。同一模式也影响 bot ID、管理员 UID、
+白名单时长、记录筛选和协议类型等桌面端与 Mini App 控件。
+请求值仍可正常提交，但用户无法可靠辨认当前配置，处罚选项尤其需要修复。
+
+修复方向：补完整的 value/label 映射或显式显示格式化，保留原请求值。
+仅添加 `ItemText` 不能修复首次显示，已对安装版 Base UI 做 SSR 对照。
+回归检查需断言“触发器显示的文本”，不能只检查 `onValueChange`。
+
+### 2. 确认弹窗允许焦点进入背景页面（P2，menshen-984）
+
+位置：`web/src/components/mobile/ActionSheet.tsx:105`。
+
+旧 MUI Drawer 被普通 `div role="dialog" aria-modal="true"` 替换，
+只实现初始 focus 与 Escape，没有焦点约束、背景交互隔离和滚动锁。
+
+浏览器复现：Mini App 模型详情 → 删除该模型 → 确认弹窗；按 Tab 两次，
+焦点离开弹窗到 BODY；再按一次，焦点到背景“返回”按钮，弹窗仍打开。
+键盘用户可继续访问背景表单和导航。
+
+修复方向：复用已有 Base UI Dialog/Sheet 的模态行为，保留取消与焦点恢复。
+补 Tab/Shift+Tab 焦点约束的行为检查，不只断言 `aria-modal` 属性。
+
+### 3. 手选主题仍被系统事件覆盖（P2，menshen-983）
+
+位置：`web/src/admin/AdminApp.tsx:25`、`web/src/public/PublicApp.tsx:36`。
+
+两个入口无条件采纳 `subscribeSystemTheme` 回调。新增的
+`subscribeThemeChoice` 只同步用户点击瞬间，无法防止之后的系统事件覆盖。
+
+浏览器复现：手选暗色，存储值为 `dark`；模拟系统先暗后亮并等待事件处理，
+`html.dark` 变为 false，按钮却仍显示“主题：暗色”，存储值也仍为 `dark`。
+设计文档 §10.4 把此问题记为已修复，与实测不符。
+
+修复方向：只有跟随系统模式才采纳系统事件；恢复跟随系统时同步外壳状态。
+补外壳与 ThemeToggle 的集成测试，覆盖手选之后再次收到系统事件。
+
+### 4. AI 调用流水耗时排序无效（P2，menshen-982）
+
+位置：`web/src/admin/views/AILogView.tsx:84`、`:138`；
+取值逻辑在 `web/src/admin/data-table.tsx:73`。
+
+列 key 和 sortable 使用 `latency`，接口实际字段为 `latency_ms`；
+表格按 `row[col.key]` 排序，所以每行排序值都是 undefined。
+
+浏览器复现：两行耗时为 812 ms、15003 ms；点击耗时后表头
+`aria-sort="descending"`，行顺序仍是 812 ms、15003 ms。
+
+最小修复：列 key 与 sortable 都改用真实字段 `latency_ms`。
+补使用真实 AILogRow 结构的页面级排序检查，无需新增抽象。
+
+## 其他验收差异
+
+- **景深画布被遮挡（P3，menshen-985）**：`web/src/admin/shell.tsx:145`
+  根容器仍有不透明 `bg-background`，覆盖 `body::before` 光晕，违反设计 §4.6。
+  这是视觉目标差异，不是 API 或数据安全故障。
+- **验收记录与覆盖缺口（P2，menshen-986）**：设计 §7/§9 要求的逐页 op
+  集合覆盖回归未实现。现有组件测试未检查上述标签、模态、主题事件和实际字段排序。
+  op 覆盖测试也不能替代这些交互检查，两者需要分别补齐。
+- **真实链路待验**：复用 `menshen-wuu`（Telegram iOS/Android）和
+  `menshen-3dn`（真实处罚 → 申诉 → 验证 → 兑换 → 白名单）。原设计将这些列为
+  Phase 3/4 验收条件，§10.4 却在仍未验证时宣称全部完成，应更正表述。
+- **非阻塞文档/构建收尾**：`docs/development.md:43` 仍描述 Vite；Dockerfile
+  只断言 index/admin 存在，宜补 public.html 断言。当前构建三个文件均已生成。
+
+## 本次验证证据与边界
+
+| 命令/检查 | 结果 |
+| --- | --- |
+| `npm test` | 49 个文件、484 个测试全部通过 |
+| `npm run lint` | 通过，退出码 0 |
+| `npm run build` | tsc 与两次 rsbuild 均通过，生成三个 HTML 入口 |
+| `go test ./...` | 全部通过 |
+| `go vet ./...` | 通过 |
+| `go build -o /tmp/menshen-frontend-review-20261114 .` | 通过 |
+| `git diff --check main..HEAD` | 通过 |
+| Go 生产构建 + 浏览器 | 桌面和 Mini App 数据页可渲染；复现上述四处交互问题 |
+
+浏览器使用本地 Go 服务、独立临时数据库和仓库 fixture 响应；Mini App 通过
+测试 URL hash 让官方 SDK 进入模拟客户端状态。真实 HMAC、会话与路由有 Go
+自动测试覆盖，但本次浏览器数据检查不等同于真实 Telegram 授权或真实业务端到端验收。
+没有使用线上账号、真实 bot 或外部写操作，也没有验证真实验证码提供方。
+
+Mini App 模型详情在 320px 检查未见横向溢出；此结果只覆盖抽查页面，
+不代表全部页面、弹层或真机键盘场景均通过。Docker 路径、锁文件和资源托管由
+代码检查与本地构建支持，未宣称执行了完整 Docker 镜像构建。
+
+## 合并与交接
+
+提交图上 feature 是 main 的后继，可以快进；实际 main 工作区含已有未提交改动：
+
+- `web/src/admin/views/ModelsView.tsx` 和 `web/src/pages/ModelsPage.tsx`
+  有新增思考强度功能，与本分支重写的文件重叠。合并后需要保留功能并迁到新组件，
+  直接回放旧补丁可能重新引入 MUI。
+- main 下两份未跟踪的前端设计/Phase 0 文档与本分支新增路径重名。
+- 其他后端、API 类型和 fixture 改动属于已有工作，本次未改动、提交或清理。
+
+建议顺序：修复 menshen-981～984 → 补回归检查与真机验收 → 保存并妥善迁移
+main 的已有工作 → 以最终集成结果重跑质量门禁 → 合并 main。
+
+本次未合并 main。跟进问题已登记到 beads；本机 beads 的 SQLite repo ID
+存在不匹配，故使用 `bd --no-db` 直接读写 JSONL，未修改数据库身份或执行强制导入。
+`.beads/issues.jsonl` 被本地忽略规则排除，远端交接以本报告中的问题描述为准。
