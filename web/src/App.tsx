@@ -155,20 +155,15 @@ function Shell() {
 
   return (
     <>
-      {/* 顶栏 sticky：旧实现用 MUI AppBar position="sticky"，内容从下方滚过时
-          玻璃才有东西可模糊（设计文档 §4.4）。z 低于 TabBar 的 30。 */}
       <TopBar
         className="sticky top-0 z-20"
         title={top ? currentName : '门神'}
         subtitle={top ? undefined : `${role} · ${meLabel(me)}`}
         onBack={top ? nav.pop : undefined}
       />
-      {/* 不要给这个 main 铺不透明底色：会盖住 body::before 的景深光晕，
-          玻璃（顶栏/底栏/弹层）立刻退化成白板（设计文档 §4.6）。
-          根页给固定 Tab 栏留位；二级页 Tab 栏隐藏，留常规底部间距。 */}
       <main
         className="px-4 pt-1"
-        style={{ paddingBottom: top ? '1rem' : 'calc(72px + env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: top ? '1rem' : 'calc(var(--mini-nav-clearance) + 24px)' }}
       >
         {/* Tab 根页常驻：push 二级页时只隐藏不卸载，返回后搜索词/批量选择等内存状态不丢。
             页面级筛选/搜索由 PageScope 写进 URL；被盖住时 active=false，只留内存不写 URL。 */}

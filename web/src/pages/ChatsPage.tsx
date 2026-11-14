@@ -199,9 +199,8 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
     <div
       data-testid="chats-page"
       data-reserved={reserved}
-      // Shell 已为 TabBar 留了 72px；这里补批量操作条实测高度（未测到时用兜底值）。
       style={{
-        paddingBottom: batch ? `calc(${reserved}px + env(safe-area-inset-bottom))` : undefined,
+        paddingBottom: batch ? reserved : undefined,
       }}
     >
       <div className="mb-2 flex items-center gap-1.5">
@@ -292,8 +291,7 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
           ref={barRef}
           data-testid="batch-bar"
           className="fixed inset-x-0 z-20 border-t border-border bg-card px-2 py-2"
-          // TabBar 是 z-30、高 56px（含安全区），这里贴在它上面。
-          style={{ bottom: 'calc(56px + env(safe-area-inset-bottom))' }}
+          style={{ bottom: 'calc(var(--mini-nav-clearance) + 8px)' }}
         >
           <p className="mb-1.5 text-center text-[12px] text-muted-foreground">
             已选 {selected.length} 个群

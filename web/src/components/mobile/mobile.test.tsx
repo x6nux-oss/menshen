@@ -3,7 +3,7 @@
 //
 // 注意 SwitchRow 用 `primary`（不是 label）、ConfirmOptions 用 `danger`
 // （不是 destructive）—— 与旧 src/ui/ 的实现对齐，是 Phase 2/3 迁移的契约。
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -190,6 +190,36 @@ describe('TabBar', () => {
     render(<TabBar tabs={tabs} active="overview" onChange={() => {}} />)
     expect(screen.getByRole('button', { name: '概览' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: '机器人' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('拖动到另一项仅在松手时导航，随后 click 不重复导航', () => {
+    const onChange = vi.fn()
+    render(<TabBar tabs={tabs} active="overview" onChange={onChange} />)
+    const track = screen.getByRole('button', { name: '概览' }).parentElement!
+    vi.spyOn(track, 'getBoundingClientRect').mockReturnValue({
+      left: 0, width: 300, right: 300, top: 0, bottom: 56, height: 56, x: 0, y: 0,
+      toJSON: () => ({}),
+    })
+    fireEvent.pointerDown(screen.getByRole('button', { name: '概览' }), { pointerId: 1, clientX: 75, button: 0 })
+    fireEvent.pointerMove(track, { pointerId: 1, clientX: 225 })
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.pointerUp(track, { pointerId: 1, clientX: 225 })
+    fireEvent.click(screen.getByRole('button', { name: '概览' }), { detail: 1 })
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('bots')
+  })
+
+  it('拖动取消后不导航，键盘仍可选择', async () => {
+    const onChange = vi.fn()
+    render(<TabBar tabs={tabs} active="overview" onChange={onChange} />)
+    const first = screen.getByRole('button', { name: '概览' })
+    fireEvent.pointerDown(first, { pointerId: 2, clientX: 40, button: 0 })
+    fireEvent.pointerMove(first, { pointerId: 2, clientX: 200 })
+    fireEvent.pointerCancel(first, { pointerId: 2 })
+    expect(onChange).not.toHaveBeenCalled()
+    first.focus()
+    await userEvent.keyboard('{ArrowRight}')
+    expect(screen.getByRole('button', { name: '机器人' })).toHaveFocus()
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('bots')
   })
 
   it('渲染图标与无障碍名', () => {

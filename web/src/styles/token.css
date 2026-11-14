@@ -12,9 +12,7 @@
   --radius-xl: 1.25rem;
 
   /* ---- 基础色 ---- */
-  /* 背景不是纯色：带一点冷蓝的浅灰，让白卡片与玻璃有分离感。
-     纯白底上的白卡片 = 没有层次，这是「AI 塑料感」的头号来源。 */
-  --background: oklch(0.985 0.003 250);
+  --background: oklch(0.975 0.002 260);
   --foreground: oklch(0.205 0.015 255);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.205 0.015 255);
@@ -25,16 +23,12 @@
   --accent: oklch(0.955 0.012 250);
   --accent-foreground: oklch(0.205 0.015 255);
 
-  /* ---- 景深画布（§4.7）----
-   * 应用底色不是单一颜色，而是几团品牌色光晕叠在底色上。
-   * 玻璃的 backdrop-filter 模糊的是「它背后的东西」—— 背后是纯色时，
-   * 模糊结果与不模糊完全一样，玻璃就退化成一块半透明白板。
-   * 这些光晕给了玻璃可模糊的内容，也让页面有了视觉焦点。
-   *
-   * 浓度取 22%/18%：再低在这个尺度下几乎看不出（实测 14% 时整页仍像纯白）。 */
-  --canvas-glow-1: oklch(0.62 0.19 258 / 22%);
-  --canvas-glow-2: oklch(0.64 0.18 320 / 18%);
-  --canvas-glow-3: oklch(0.68 0.14 200 / 14%);
+  --dock-surface: oklch(0.99 0.002 260 / 76%);
+  --mini-nav-clearance: calc(80px + env(safe-area-inset-bottom));
+  --dock-lens-fill: oklch(0.94 0.008 260);
+  --dock-active: oklch(0.51 0.185 258);
+  --dock-edge: oklch(1 0 0 / 85%);
+  --dock-shadow: oklch(0.2 0.01 260 / 12%);
 
   /* ---- 品牌与语义色 ---- */
   --primary: oklch(0.55 0.185 258);
@@ -72,7 +66,7 @@
 .dark {
   color-scheme: dark;
 
-  --background: oklch(0.185 0.012 255);
+  --background: oklch(0.17 0.003 260);
   --foreground: oklch(0.955 0.005 250);
   --card: oklch(0.235 0.014 255);
   --card-foreground: oklch(0.955 0.005 250);
@@ -83,9 +77,11 @@
   --accent: oklch(0.3 0.018 255);
   --accent-foreground: oklch(0.955 0.005 250);
 
-  /* 暗色画布：光晕更浓（暗底上低透明度会被吃掉，需比亮色高一档） */
-  --canvas-glow-1: oklch(0.6 0.18 258 / 26%);
-  --canvas-glow-2: oklch(0.6 0.17 320 / 20%);
+  --dock-surface: oklch(0.24 0.005 260 / 80%);
+  --dock-lens-fill: oklch(0.34 0.008 260);
+  --dock-active: oklch(0.74 0.14 258);
+  --dock-edge: oklch(1 0 0 / 18%);
+  --dock-shadow: oklch(0 0 0 / 36%);
 
   --primary: oklch(0.68 0.16 258);
   --primary-foreground: oklch(0.16 0.015 255);

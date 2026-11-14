@@ -34,7 +34,8 @@ export function ToastProvider({ children }: ToastProviderProps) {
       <Toaster
         position="bottom-center"
         // 移动端在底部 TabBar 之上，避免被遮住。
-        offset={{ bottom: '18%' }}
+        offset={{ bottom: 'calc(var(--mini-nav-clearance) + 12px)' }}
+        mobileOffset={{ bottom: 'calc(var(--mini-nav-clearance) + 12px)' }}
         duration={2200}
       />
     </ToastContext.Provider>

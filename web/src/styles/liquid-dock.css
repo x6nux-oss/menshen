@@ -1,0 +1,121 @@
+@layer components {
+  .mini-topbar {
+    background: color-mix(in srgb, var(--background) 92%, transparent);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+
+  .liquid-dock {
+    position: fixed;
+    z-index: 30;
+    inset-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+    bottom: calc(var(--mini-nav-clearance) - 68px);
+    max-width: 540px;
+    margin-inline: auto;
+  }
+
+  .liquid-dock-surface {
+    width: 100%;
+    padding: 6px;
+    border-radius: 34px;
+    background: var(--dock-surface);
+    box-shadow:
+      inset 0 1px 1px var(--dock-edge),
+      inset 0 -1px 1px color-mix(in srgb, var(--dock-edge) 45%, transparent),
+      0 8px 28px var(--dock-shadow),
+      0 2px 6px var(--dock-shadow);
+  }
+
+  .liquid-dock-track,
+  .liquid-dock-copy {
+    display: flex;
+    height: 56px;
+  }
+
+  .liquid-dock-track {
+    position: relative;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .liquid-dock-item {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 56px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border-radius: 28px;
+    color: var(--muted-foreground);
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+  }
+
+  button.liquid-dock-item {
+    position: relative;
+    z-index: 2;
+    cursor: pointer;
+    transition: color 150ms;
+  }
+
+  .liquid-dock-item[aria-current='page'] {
+    color: var(--dock-active);
+  }
+
+  .liquid-dock-item:focus-visible {
+    position: relative;
+    z-index: 2;
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+  }
+
+  .liquid-dock-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke-width: 1.8;
+  }
+
+  .liquid-dock-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .liquid-dock-copy {
+    background: var(--dock-lens-fill);
+  }
+
+  .liquid-dock-lens {
+    z-index: 1;
+  }
+
+  @media (hover: hover) {
+    button.liquid-dock-item:hover {
+      color: var(--foreground);
+    }
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .mini-topbar,
+  .liquid-dock-surface {
+    background: var(--background);
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .liquid-dock-lens {
+    display: none;
+  }
+
+  .liquid-dock-item[aria-current='page'] {
+    background: var(--dock-lens-fill);
+  }
+}
