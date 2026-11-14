@@ -98,7 +98,7 @@ export function SelectContent({ className, children, ...props }: ComponentProps<
       <BaseSelect.Positioner sideOffset={4} className="z-50">
         <BaseSelect.Popup
           className={cn(
-            'glass max-h-72 min-w-[var(--anchor-width)] overflow-y-auto rounded-lg p-1',
+            'glass max-h-[min(18rem,var(--available-height))] min-w-[var(--anchor-width)] overflow-y-auto rounded-lg p-1',
             className,
           )}
           {...props}

@@ -497,10 +497,15 @@ telegram.test（Telegram 桥）
 沿用现有测试装配思路（`src/test/renderPage.tsx` 的 Provider 栈、MSW handlers、
 `fixtures.ts`），但把 MUI 相关的部分换掉。
 
-**人工验收**（自动化覆盖不到，进 bd 工单）：
-Telegram 真机 iOS + Android（玻璃在 Safari 的实际观感、滚动不掉帧）、
+**Mini App 验收口径（2026-11-14 用户确认）**：只要求不同屏幕尺寸下正常显示，
+覆盖窄屏手机、横屏、平板、宽屏，以及主要页面、表单和弹层；检查白屏、横向溢出、
+内容遮挡和滚动可达性。Telegram 真机业务链路与逐页 op 矩阵不作为本轮
+Mini App 合并验收的前置条件，已有自动化测试继续保留。
+
+**其他人工验收与后续走查**（自动化覆盖不到，进 bd 工单）：
 桌面 Chrome/Firefox/Safari（折射在 Chromium 上是否真的生效）、
-弱网（公开页申诉流程）。
+弱网（公开页申诉流程）。Telegram iOS/Android 的真实业务与设备体验另由
+`menshen-wuu` 跟踪，不阻塞本次 Mini App 响应式验收。
 
 ## 10. 分期与验收
 
@@ -509,7 +514,7 @@ Telegram 真机 iOS + Android（玻璃在 Safari 的实际观感、滚动不掉�
 | **0** | rsbuild 迁移 + 5 个前提实测。产物仍被 Go 正常托管，组件暂不动 | `npm run build` 后 `./menshen` 打开三个面都不白屏；Dockerfile 两条 `test -f` 通过 |
 | **1** | 设计 token + 玻璃层 + shadcn 基础组件 + 测试装配重建 | 组件预览页在三个面都能开；玻璃三层与三条回退可见 |
 | **2** | `/admin` 外壳（drill-in 侧栏）+ 16 视图 + **补 AI 流水页** | 桌面端全功能，op 覆盖测试全绿 |
-| **3** | `/miniapp` 外壳（TabBar + 导航栈）+ 18 页面 | TG 真机走完核心链路（开关、处置、申诉、兑换） |
+| **3** | `/miniapp` 外壳（TabBar + 导航栈）+ 18 页面 | 多尺寸页面和主要弹层正常显示，无白屏、横向溢出或不可达操作；覆盖范围见合并审查报告 |
 | **4** | 公开页 token 对齐 + 无障碍/响应式/reduced-motion 收尾 | 申诉与入群验证全链路真机通过；三个面视觉统一 |
 
 Phase 之间不留新旧组件共存态（主人选的是「全部页面一次重写」），
@@ -762,9 +767,9 @@ Phase 3 的 brief 要求「按钮 ≥44px」，与既有取值冲突：`COMPACT_
 
 - `RulesPage`(1026) 与 `SettingsPage`(894) 未拆分（Phase 3 计划 Task 8 的可选项）。
   两者都已迁到新设计系统，只是文件仍偏大。
-- Mini App 的完整数据链路（开关、处置、申诉、兑换）未在浏览器里走通 ——
-  需要真实 Telegram 环境（SDK 的 `initData` 由 Telegram 注入，本地伪造要绕过
-  只读 getter）。这部分由 484 个测试覆盖，**建议在真机上过一遍**。
+- Mini App 的真实 Telegram 业务链路（开关、处置、申诉、兑换）未验证。
+  按 2026-11-14 用户确认，本轮 Mini App 仅验收多尺寸显示，真实业务链路由
+  `menshen-wuu` 独立跟踪；组件与接口测试通过不代表真实业务 E2E 已通过。
 - 视图内部的细节样式（间距/字号）未逐一人工验收 —— 建议在真实数据下过一遍。
 
 ## 11. 风险
