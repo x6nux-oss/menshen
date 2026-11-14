@@ -342,7 +342,7 @@ func handleSettingsCallback(b *core.Bot, q *tg.CallbackQuery) {
 		b.AnswerCallback(q.ID, "已切换")
 		showSettings(b, chatID, msgID)
 
-	case "m": // a:st:m:so|llm|ocr|vision —— 全局默认模型（列表或单值）
+	case "m":
 		if !b.IsMain(q.From.ID) {
 			b.AnswerCallback(q.ID, "")
 			return
@@ -352,39 +352,27 @@ func handleSettingsCallback(b *core.Bot, q *tg.CallbackQuery) {
 			return
 		}
 		key, label := "antiad_so_models", "默认判定模型（systemone）"
-		single := false
 		switch parts[3] {
+		case "so":
 		case "llm":
 			key, label = "antiad_llm_models", "默认复判/总结模型（大模型）"
-		case "ocr":
-			key, label = "antiad_ocr_model", "OCR 模型（优先逐字识别图中的文字；留空则跳过 OCR）"
-			single = true
-		case "vision":
-			key, label = "antiad_vision_model", "识图模型（须支持图片输入；留空则图片与贴纸不判）"
-			single = true
+		default:
+			b.AnswerCallback(q.ID, "该模型配置已不支持，请刷新设置页")
+			return
 		}
 		snap := b.Cache.Snap()
 		cur := "（未配置）"
-		if single {
-			if v := snap.Setting(key); v != "" {
-				cur = v
-			}
-		} else {
-			so, llm := snap.ModelsFor(0)
-			list := so
-			if key == "antiad_llm_models" {
-				list = llm
-			}
-			if len(list) > 0 {
-				cur = strings.Join(list, ", ")
-			}
+		so, llm := snap.ModelsFor(0)
+		list := so
+		if key == "antiad_llm_models" {
+			list = llm
 		}
-		hint := "请输入<b>" + label + "</b>的模型名（必须已存在于「模型定价」且为启用状态）："
-		if !single {
-			hint = "请输入<b>" + label + "</b>列表，按<b>重试顺序</b>用逗号分隔：\n" +
-				"<code>a/gpt-5-mini, b/gpt-5-mini, a/deepseek-v3</code>\n\n" +
-				"每项形如 <code>上游名/模型ID</code>，必须已存在于「模型定价」且为启用状态。"
+		if len(list) > 0 {
+			cur = strings.Join(list, ", ")
 		}
+		hint := "请输入<b>" + label + "</b>列表，按<b>重试顺序</b>用逗号分隔：\n" +
+			"<code>a/gpt-5-mini, b/gpt-5-mini, a/deepseek-v3</code>\n\n" +
+			"每项形如 <code>上游名/模型ID</code>，必须已存在于「模型定价」且为启用状态。"
 		b.AnswerCallback(q.ID, "")
 		b.AskInput(chatID, q.From.ID, "st_model", key,
 			hint+"\n\n填 <code>-</code> 可清空。\n\n当前值：<code>"+
@@ -491,10 +479,7 @@ func showSettings(b *core.Bot, chatID, msgID int64) {
 
 	sb.WriteString("\n<b>默认模型</b>（按重试顺序，可在每个 bot 上单独覆盖）\n")
 	so, llm := snap.ModelsFor(0)
-	fmt.Fprintf(&sb, "判定: %s\n复判: %s\nOCR: %s\n识图: %s\n",
-		modelListLabel(so), modelListLabel(llm),
-		modelLabel(snap.Setting("antiad_ocr_model")),
-		modelLabel(snap.Setting("antiad_vision_model")))
+	fmt.Fprintf(&sb, "判定: %s\n复判: %s\n", modelListLabel(so), modelListLabel(llm))
 
 	sb.WriteString("\n<i>保留天数同时作用于判定流水、群消息留底与群成员画像" +
 		"（有命中史的画像行保留，那是风控证据）。</i>\n")
@@ -520,8 +505,6 @@ func showSettings(b *core.Bot, chatID, msgID int64) {
 			{"🤖 默认判定模型", "a:st:m:so"},
 			{"🤖 默认复判模型", "a:st:m:llm"},
 		},
-		{{"🔎 OCR 模型", "a:st:m:ocr"}},
-		{{"👁 识图模型", "a:st:m:vision"}},
 		{{"📝 形态摘要", "a:ad:dg"}},
 	}
 	// 一行一个：按钮上带当前值，两列在手机端会被截断，而截断的恰好是值。

@@ -25,8 +25,6 @@ const MASTER_TOGGLES: { key: string; label: string; hint: string }[] = [
 const MODEL_KEYS: { key: string; label: string; hint: string }[] = [
   { key: 'antiad_so_models', label: '初判模型（systemone）', hint: '逗号分隔的有序列表，重试按顺序轮换。' },
   { key: 'antiad_llm_models', label: '复判模型（llm）', hint: '逗号分隔的有序列表。' },
-  { key: 'antiad_ocr_model', label: '远程 OCR 模型（可选）', hint: '填写 上游名/模型ID；本地 OCR 未启用或失败时使用，留空关闭远程 OCR。' },
-  { key: 'antiad_vision_model', label: '远程识图模型（可选）', hint: '填写 上游名/模型ID；用于补充画面描述或本地识别失败时回退，留空关闭远程识图。' },
   { key: 'antiad_rule_model', label: '规则发现模型', hint: '留空用回退模型。' },
 ]
 

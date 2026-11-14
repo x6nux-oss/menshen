@@ -416,7 +416,7 @@ func anthropicImage(v any) map[string]any {
 		return nil
 	}
 	// data:<mime>;base64,<payload> —— 判定链路的图片全走这个形状
-	//（见 antiad.imagePart）。远程 URL 原样给 url source。
+	// 远程 URL 原样给 url source。
 	if rest, ok := strings.CutPrefix(u, "data:"); ok {
 		i := strings.IndexByte(rest, ',')
 		if i < 0 {

@@ -41,12 +41,6 @@ type caches struct {
 	// 刷屏式引流会反复贴同一个链接，缓存后只取一次；空结果也缓存，
 	// 已删/私密的帖子不必每条消息重试。
 	linkPreview core.TTLMap[string, adLinkPreview]
-	// vision 是识图结果，键为 file_unique_id：刷屏号反复发同一张图、
-	// 群友反复用同一个贴纸，不必每次都花钱。
-	vision core.TTLMap[string, string]
-	// ocr 是 OCR 结果，键为 "模型file_unique_id"：OCR 优先于识图，空串
-	// 表示「这张图没有文字」（已确认过，下次直接回落识图，不再重复烧 OCR）。
-	ocr         core.TTLMap[string, string]
 	localVision core.TTLMap[string, localvision.Result]
 	localMedia  chan struct{}
 	// doomedAlbums 记下已判成广告的相册，判定之后才到的那几张照删。
@@ -114,8 +108,6 @@ func GCCaches(sh *core.Shared) {
 	c.photo.GC(now)
 	c.link.GC(now)
 	c.linkPreview.GC(now)
-	c.vision.GC(now)
-	c.ocr.GC(now)
 	c.localVision.GC(now)
 	c.doomedAlbums.GC(now)
 	c.unbanGate.GC(now)

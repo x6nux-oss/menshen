@@ -37,15 +37,15 @@ describe.each([
   ['Mini App', SettingsPage],
   ['桌面', SettingsView],
 ] as const)('%s 设置页的本地视觉模型', (_surface, Settings) => {
-  it('直接提供本地 OCR/NSFW 配置，并标清可选远程模型', async () => {
+  it('只提供本地 OCR/NSFW，不再提供远程视觉模型配置', async () => {
     renderPage(<Settings />)
 
     expect(await screen.findByText('PP-OCRv6 small')).toBeInTheDocument()
     expect(screen.getByText('Marqo NSFW')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '一键下载并启用' })).toBeInTheDocument()
     expect(screen.getByLabelText('NSFW 阈值（%）')).toHaveValue('85')
-    expect(screen.getByText('远程 OCR 模型（可选）')).toBeInTheDocument()
-    expect(screen.getByText('远程识图模型（可选）')).toBeInTheDocument()
+    expect(screen.queryByText(/远程 OCR 模型/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/远程识图模型/)).not.toBeInTheDocument()
   })
 })
 

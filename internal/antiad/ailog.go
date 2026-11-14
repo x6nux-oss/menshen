@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"time"
 
-	"menshen/internal/archive"
 	"menshen/internal/core"
 	"menshen/internal/upstream"
 )
@@ -144,7 +143,7 @@ func promptPlaceholder(n int) string {
 // logAICall 把一次尝试落进 ai_log。判定热路径上的写入：任何失败只记运行
 // 日志，绝不影响判定本身；表缺列等结构问题靠 Cleanup/迁移兜住。
 func logAICall(sh *core.Shared, ep upstream.Endpoint, model, up string,
-	payload map[string]any, mediaRefs []string, r aiResult) {
+	payload map[string]any, r aiResult) {
 
 	if sh == nil || sh.Store == nil {
 		return
@@ -154,9 +153,6 @@ func logAICall(sh *core.Shared, ep upstream.Endpoint, model, up string,
 		// 载荷都是本服务组装的 map，到这里还序列化失败只能整体放弃输入列。
 		input = []byte(`{"_error":"序列化失败"}`)
 	}
-	// 图片已经由消息存档落盘；流水里只留指向它的占位符，不再把 base64
-	// 存第二份。mediaRefs 为空（贴纸/视频帧/未开启存档）时原样保留。
-	input = archive.RedactImageDataURLs(input, mediaRefs)
 	output := capBytes(r.reply.Raw, aiLogOutputCap)
 
 	status, errText := "ok", ""

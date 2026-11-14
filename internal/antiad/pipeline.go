@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"menshen/internal/archive"
-	"menshen/internal/billing"
 	"menshen/internal/core"
 	"menshen/internal/store"
 	"menshen/internal/tg"
@@ -362,7 +361,7 @@ func judgeAndAct(b *core.Bot, snap *store.Snapshot, conf store.BotChat, m *tg.Me
 	// 内容哈希按识图之前的文字记，与 HandleGroupMessage 查的是同一个键。
 	// 纯图没有文字：空串当键的话，之后所有纯图都会互相命中。
 	text := displayText(m)
-	m, state, vis, ok := seeVisual(b, snap, m, state, text)
+	m, state, ok := seeVisual(b, snap, m, state, text)
 	if !ok {
 		return
 	}
@@ -388,14 +387,11 @@ func judgeAndAct(b *core.Bot, snap *store.Snapshot, conf store.BotChat, m *tg.Me
 			// 失败一律放行：判失败时按广告处理会误删整个群聊的消息。
 			slog.Warn("反广告：判定失败，放行", "chat", m.Chat.ID,
 				"uid", m.From.ID, "err", err)
-			logAd(b, m, adVerdict{Reason: err.Error(), Usage: vis.Usage, Cost: vis.Cost},
+			logAd(b, m, adVerdict{Reason: err.Error()},
 				"none", "判定失败")
 			return
 		}
 	}
-	// 识图的钱也是判这条消息花的。
-	v.Usage, v.Cost = billing.MergeUsage(v.Usage, vis.Usage), v.Cost+vis.Cost
-
 	// 初判下限：低于它的广告结论不足以据以先动手，但**仍交复判**。早期版本
 	// 在这里直接放行，实测会把低置信的真广告漏掉（邀请码返利一类初判常常
 	// 只给个位数到二十几的置信度），而复判模型对这种形态的把握远高于初判，

@@ -120,14 +120,6 @@ type aiReply struct {
 // （上游异常告警，见 alertUpstreamTrouble）。
 func aiCall(sh *core.Shared, ep upstream.Endpoint, models []string, payload map[string]any,
 	notify func(string)) (aiReply, error) {
-	return aiCallWithRefs(sh, ep, models, payload, nil, notify)
-}
-
-// aiCallWithRefs 与 aiCall 相同，但带上识图请求里每张图的存档路径：落
-// ai_log 时把 base64 换成占位符，避免同一张图在磁盘上存两遍。mediaRefs
-// 只影响存储，不影响实际发给上游的请求。
-func aiCallWithRefs(sh *core.Shared, ep upstream.Endpoint, models []string,
-	payload map[string]any, mediaRefs []string, notify func(string)) (aiReply, error) {
 
 	snap := sh.Cache.Snap()
 	models = cleanModels(models)
@@ -163,7 +155,7 @@ func aiCallWithRefs(sh *core.Shared, ep upstream.Endpoint, models []string,
 		}
 		attemptStart := time.Now()
 		actual = attempt + 1
-		r := aiRound(sh, snap, ep, models, attempt, fan, payload, mediaRefs, cap)
+		r := aiRound(sh, snap, ep, models, attempt, fan, payload, cap)
 		if r.err == nil {
 			sh.AIFailStreak.Store(0) // 成功一次就清零
 			if attempt > 0 {
@@ -337,7 +329,7 @@ type aiResult struct {
 // 全部失败时：只要有一路可重试，这一轮就可重试（某个上游不认这个模型，
 // 换一个也许就认）；只有每一路都不可退避，才按立即换处理。
 func aiRound(sh *core.Shared, snap *store.Snapshot, ep upstream.Endpoint,
-	models []string, attempt, fan int, payload map[string]any, mediaRefs []string,
+	models []string, attempt, fan int, payload map[string]any,
 	cap time.Duration) aiResult {
 
 	if cap <= 0 {
@@ -351,7 +343,7 @@ func aiRound(sh *core.Shared, snap *store.Snapshot, ep upstream.Endpoint,
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), cap)
 		defer cancel()
-		return aiAttempt(ctx, sh, snap, ep, model, ups[attempt%len(ups)], payload, mediaRefs)
+		return aiAttempt(ctx, sh, snap, ep, model, ups[attempt%len(ups)], payload)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), cap)
@@ -366,7 +358,7 @@ func aiRound(sh *core.Shared, snap *store.Snapshot, ep upstream.Endpoint,
 			continue
 		}
 		up := ups[(attempt+i)%len(ups)]
-		go func() { results <- aiAttempt(ctx, sh, snap, ep, model, up, payload, mediaRefs) }()
+		go func() { results <- aiAttempt(ctx, sh, snap, ep, model, up, payload) }()
 	}
 
 	agg := aiResult{noBackoff: true}
@@ -411,7 +403,7 @@ func msSetting(snap *store.Snapshot, key string, def int64) time.Duration {
 // 模型时每路各拷一份 map，互不影响。
 func aiAttempt(parent context.Context, sh *core.Shared, snap *store.Snapshot,
 	ep upstream.Endpoint, model string, up *upstream.Upstream,
-	payload map[string]any, mediaRefs []string) aiResult {
+	payload map[string]any) aiResult {
 
 	p := make(map[string]any, len(payload)+2)
 	for k, v := range payload {
@@ -461,7 +453,7 @@ func aiAttempt(parent context.Context, sh *core.Shared, snap *store.Snapshot,
 	r := aiAttemptDo(parent, sh, snap, ep, model, up, body, sid)
 	// 成功失败都要留痕：换模型校准阈值与排查漏判时，第一手证据是当时
 	// 发出去的载荷与拿回来的响应。剥离固定提示词只影响存储列，不影响请求。
-	logAICall(sh, ep, model, upName(up), stripFixedPrompts(ep, built), mediaRefs, r)
+	logAICall(sh, ep, model, upName(up), stripFixedPrompts(ep, built), r)
 	return r
 }
 

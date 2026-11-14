@@ -214,8 +214,6 @@ export const mockState: State = {
     antiad_hedge_retries: "5",
     antiad_hedge_minutes: "5",
     antiad_hedge_fanout: "2",
-    antiad_ocr_model: "",
-    antiad_vision_model: "",
     antiad_rule_model: "",
     antiad_so_trust: "95",
     antiad_pre_act_conf: "75",

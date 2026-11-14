@@ -109,12 +109,6 @@ var settingDefaults = map[string]string{
 	"antiad_hedge_retries": "5",
 	"antiad_hedge_minutes": "5", // 并发模式持续多久，期间再触发会顺延
 	"antiad_hedge_fanout":  "2", // 并发模式下每轮同时发几路；期间开销随之成倍
-	// 识图模型（看图片与贴纸），空则图片与贴纸不判。全局一份：它按图片去重缓存，
-	// 与哪个 bot 收到这张图无关。
-	"antiad_vision_model": "",
-	// OCR 模型（优先逐字转写图里的文字），空则跳过 OCR 直接走识图模型。
-	// 配了它以后文字类广告按原文进判定，只有图里没有文字时才回落识图。
-	"antiad_ocr_model": "",
 	// 规则发现 Agent（AI 必封规则）指定模型，形如 <上游名>/<模型ID>；
 	// 空 = 复判模型列表里第一个 OpenAI 兼容模型（见 antiad/ruleagent.go）。
 	"antiad_rule_model": "",

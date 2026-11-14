@@ -1,17 +1,16 @@
 package antiad
 
 import (
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"menshen/internal/core"
+	"menshen/internal/localvision"
 	"menshen/internal/testutil"
 	"menshen/internal/tg"
 )
@@ -148,34 +147,19 @@ func TestExtractFramesRejectsNonVideo(t *testing.T) {
 	}
 }
 
-// TestVideoFramesJudgedWithVision：不带配文的视频以抽帧识图的结果进判定正文，
-// 三帧一次请求带上去，留底也随之更新。同一段视频按 file_unique_id 只识一次。
 func TestVideoFramesJudgedWithVision(t *testing.T) {
 	b, fake := testutil.NewTestBot(t, 1)
 	testutil.EnableAntiad(t, b, -100)
-	videoFiles(t, b, fake, testVideo(t, 3))
-
-	seen, visionN := new(atomic.Value), new(atomic.Int32)
-	seen.Store("")
-	visionBody := new(atomic.Value)
-	visionBody.Store("")
-	fakeAI(t, b, func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/systemone"):
-			seen.Store(string(body))
-			w.Write([]byte(soReply("clean", 0.9, "none", "message")))
-		case strings.Contains(string(body), `"vision-model"`):
-			visionN.Add(1)
-			visionBody.Store(string(body))
-			w.Write([]byte(`{"choices":[{"message":{"content":"开头三帧写着：加微信 abc123"}}]}`))
-		default:
-			w.Write([]byte(llmReply(false, 0.9, "none", "message")))
-		}
-	})
-	if err := b.PutSetting("antiad_vision_model", "vision-model"); err != nil {
-		t.Fatal(err)
+	video := testVideo(t, 3)
+	videoFiles(t, b, fake, video)
+	media, _ := visualOf(videoMsg(1, "vu1", 1024))
+	images, err := visualImages(video, media)
+	if err != nil || len(images) != 3 {
+		t.Fatalf("expected three local video frames, got %d: %v", len(images), err)
 	}
+	seen, visionN := visionAI(t, b)
+	cacheLocalResult(b, media, "ocr", localvision.FrameResult{Text: "加微信 abc123"}, localvision.FrameResult{}, localvision.FrameResult{})
+	cacheLocalResult(b, media, "nsfw", localvision.FrameResult{}, localvision.FrameResult{}, localvision.FrameResult{})
 
 	HandleGroupMessage(b, videoMsg(1, "vu1", 1024))
 	waitIdle(t, b)
@@ -189,29 +173,14 @@ func TestVideoFramesJudgedWithVision(t *testing.T) {
 		t.Errorf("留底应带抽帧识图结果，得到 %q", text)
 	}
 
-	// 请求里三帧各带一条 image_url，且带上时间点标注：模型要分得清哪段文字
-	// 出自哪一帧。system 的 content 是字符串、user 的是数组，所以直接数
-	// JSON 里出现的次数，不按消息结构解。
-	body := visionBody.Load().(string)
-	if n := strings.Count(body, "data:image/jpeg;base64,"); n != 3 {
-		t.Errorf("三帧应各带一张图，实际 %d 张", n)
-	}
-	for _, w := range []string{"at 0 s", "at 1 s", "at 2 s"} {
-		if !strings.Contains(body, w) {
-			t.Errorf("请求里缺帧的时间点标注 %q", w)
-		}
-	}
-	if !strings.Contains(body, "video content reporter") {
-		t.Error("抽帧识图应走视频专用提示词")
-	}
-	if !strings.Contains(body, `"data:image/jpeg;base64,`) {
-		t.Error("帧应以 JPEG data URL 送出")
+	if !strings.Contains(seen.Load().(string), "Frame 1: 加微信 abc123") {
+		t.Error("本地抽帧结果缺少帧编号")
 	}
 
 	HandleGroupMessage(b, videoMsg(2, "vu1", 1024))
 	waitIdle(t, b)
-	if visionN.Load() != 1 {
-		t.Errorf("同一段视频应只识一次，实际 %d 次", visionN.Load())
+	if visionN.Load() != 0 || fake.CountCalls("getFile") != 0 {
+		t.Errorf("缓存视频不应再次下载或上传到上游")
 	}
 }
 

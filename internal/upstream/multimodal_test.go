@@ -11,8 +11,6 @@ import (
 	"testing"
 )
 
-// visionPayload 构造与 antiad.ocrVisual / visionVisual 同形状的载荷：
-// user content 为 [文本指令, image_url data URL] 数组。
 func visionPayload() map[string]any {
 	return map[string]any{
 		"temperature": 0,

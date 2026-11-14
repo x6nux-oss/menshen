@@ -446,7 +446,6 @@ func miniState(sh *core.Shared, w http.ResponseWriter, uid int64, username strin
 	}
 	defaults["antiad_so_models"] = snap.Setting("antiad_so_models")
 	defaults["antiad_llm_models"] = snap.Setting("antiad_llm_models")
-	defaults["antiad_ocr_model"] = snap.Setting("antiad_ocr_model")
 	defaults["antiad_rule_model"] = snap.Setting("antiad_rule_model")
 
 	out := map[string]any{
@@ -467,6 +466,8 @@ func miniState(sh *core.Shared, w http.ResponseWriter, uid int64, username strin
 		}
 		delete(g, "web_secret")
 		delete(g, "captcha_secret")
+		delete(g, "antiad_ocr_model")
+		delete(g, "antiad_vision_model")
 		out["global"] = g
 		out["digest"] = snap.Setting("antiad_digest")
 		out["digest_fix"] = snap.Setting("antiad_digest_fix")
@@ -562,7 +563,7 @@ func miniState(sh *core.Shared, w http.ResponseWriter, uid int64, username strin
 // 只铺在快照内存里、不会进表——设置页 `已设置 N 项` 要的正是这个区别。
 func miniSettingsSet(sh *core.Shared) []string {
 	keys := []string{}
-	rows, err := sh.Store.Read.Query(`SELECT k FROM settings`)
+	rows, err := sh.Store.Read.Query(`SELECT k FROM settings WHERE k NOT IN ('antiad_ocr_model', 'antiad_vision_model')`)
 	if err != nil {
 		slog.Error("miniapp：读取已设置键失败", "err", err)
 		return keys

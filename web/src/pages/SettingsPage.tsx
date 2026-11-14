@@ -73,10 +73,9 @@ const MASTER_TOGGLES: { key: string; label: string; hint: string }[] = [
   },
 ]
 
-type ModelWhich = 'so' | 'llm' | 'ocr' | 'vision' | 'rule'
+type ModelWhich = 'so' | 'llm' | 'rule'
 
-/** SINGLE_MODELS 是单值模型项：OCR、识图与规则发现各只接受一个模型。 */
-const SINGLE_MODELS: ReadonlySet<ModelWhich> = new Set(['ocr', 'vision', 'rule'])
+const SINGLE_MODELS: ReadonlySet<ModelWhich> = new Set(['rule'])
 
 const MODEL_ROWS: { which: ModelWhich; key: string; label: string; hint: string }[] = [
   {
@@ -91,13 +90,6 @@ const MODEL_ROWS: { which: ModelWhich; key: string; label: string; hint: string 
     label: '复判模型（大模型）',
     hint: '按重试顺序，逗号分隔',
   },
-  {
-    which: 'ocr',
-    key: 'antiad_ocr_model',
-    label: '远程 OCR 模型（可选）',
-    hint: '本地 OCR 未启用或失败时使用；留空关闭远程 OCR',
-  },
-  { which: 'vision', key: 'antiad_vision_model', label: '远程识图模型（可选）', hint: '用于补充画面描述或本地识别失败时回退；留空关闭远程识图' },
   {
     which: 'rule',
     key: 'antiad_rule_model',
@@ -623,11 +615,7 @@ export function SettingsPage() {
               onChange={(event) => setModelDraft(event.target.value)}
             />
             <FieldHint>
-              {modelEdit === 'ocr'
-                ? '留空不调用远程 OCR，不影响本地 OCR'
-                : modelEdit === 'vision'
-                  ? '留空不调用远程识图，不影响本地 OCR／NSFW'
-                  : '形如 上游名/模型ID；留空 = 复判模型列表里第一个 OpenAI 兼容模型'}
+              形如 上游名/模型ID；留空 = 复判模型列表里第一个 OpenAI 兼容模型
             </FieldHint>
           </>
         ) : (

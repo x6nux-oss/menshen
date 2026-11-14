@@ -22,7 +22,7 @@ var globalToggles = []string{"antiad_enabled", "alert_copy_main", "gban_enabled"
 	"antiad_rule_auto", "captcha_demo", "archive_enabled"}
 
 // singleModelKeys 是单值模型设置；列表型的见 legacyModelKey。
-var singleModelKeys = []string{"antiad_ocr_model", "antiad_vision_model", "antiad_rule_model"}
+var singleModelKeys = []string{"antiad_rule_model"}
 
 // setSetting 写一项设置。botID 为 0 写全局值（只有主管理员能写）；否则写
 // 该 bot 的覆盖值（只有 antiad / both 组的整数项能覆盖），val 为空或 `-`

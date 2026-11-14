@@ -94,7 +94,7 @@ func TestUpstream(ctx context.Context, sh *core.Shared, upstreamID int64) (strin
 		}
 	}
 	start := time.Now()
-	r := aiAttempt(ctx, sh, snap, ep, model, up, payload, nil)
+	r := aiAttempt(ctx, sh, snap, ep, model, up, payload)
 	latency := time.Since(start)
 	if r.err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {

@@ -26,6 +26,24 @@ func newLocalModelsEnv(t *testing.T) *miniTestEnv {
 	return env
 }
 
+func TestLegacyVisionSettingsAreNotExposed(t *testing.T) {
+	env := newLocalModelsEnv(t)
+	for _, key := range []string{"antiad_ocr_model", "antiad_vision_model"} {
+		if err := env.sh.PutSetting(key, "old/remote-model"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	response := miniDo(t, env.h, testutil.TestToken, env.adminInit(), testutil.TestBotID, "state", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("state failed: %d %s", response.Code, response.Body.String())
+	}
+	for _, key := range []string{"antiad_ocr_model", "antiad_vision_model"} {
+		if strings.Contains(response.Body.String(), key) {
+			t.Errorf("state exposes retired setting %s", key)
+		}
+	}
+}
+
 func TestLocalModelsPermissions(t *testing.T) {
 	env := newLocalModelsEnv(t)
 	if err := env.sh.AddAdmin(888, "次管", 777); err != nil {

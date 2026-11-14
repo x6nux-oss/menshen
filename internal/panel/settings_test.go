@@ -2,6 +2,7 @@ package panel
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"menshen/internal/testutil"
@@ -16,6 +17,21 @@ func privMsg(uid int64, text string) *tg.Message {
 func privCallback(uid int64, data string) *tg.CallbackQuery {
 	return &tg.CallbackQuery{ID: "cb", Data: data, From: &tg.TGUser{ID: uid},
 		Message: &tg.Message{MessageID: 5, Chat: &tg.Chat{ID: uid, Type: "private"}}}
+}
+
+func TestRetiredVisionCallbacksAreRejected(t *testing.T) {
+	bot, fake := testutil.NewTestBot(t, 777)
+	for _, model := range []string{"ocr", "vision"} {
+		handleSettingsCallback(bot, privCallback(777, "a:st:m:"+model))
+		answer := fake.LastCall("answerCallbackQuery")
+		text, _ := answer["text"].(string)
+		if !strings.Contains(text, "不支持") {
+			t.Errorf("retired %s callback accepted: %v", model, answer)
+		}
+	}
+	if fake.CountCalls("sendMessage") != 0 {
+		t.Fatal("retired callbacks opened a model editor")
+	}
 }
 
 func containsSpec(specs []settingSpec, key string) bool {
