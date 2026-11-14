@@ -201,7 +201,7 @@ describe('UpstreamDetailPage', () => {
     await screen.findByText('https://api.example.com')
 
     fireEvent.click(screen.getByRole('button', { name: '测试连通' }))
-    expect(await screen.findByText('✅ 连通 · 123ms · demo/gpt-5-mini')).toBeInTheDocument()
+    expect(await screen.findByText('✓ 连通 · 123ms · demo/gpt-5-mini')).toBeInTheDocument()
     expect(bodies[0]).toEqual({ action: 'test', id: 1 })
   })
 
@@ -215,7 +215,7 @@ describe('UpstreamDetailPage', () => {
     await screen.findByText('https://api.example.com')
 
     fireEvent.click(screen.getByRole('button', { name: '测试连通' }))
-    expect(await screen.findByText('❌ 上游 demo 返回 500')).toBeInTheDocument()
+    expect(await screen.findByText('× 上游 demo 返回 500')).toBeInTheDocument()
   })
 
   it('测试连通 pending：按钮禁用，不阻塞其他操作', async () => {
@@ -239,6 +239,6 @@ describe('UpstreamDetailPage', () => {
     expect(screen.getByRole('switch', { name: '启用' })).toBeEnabled()
 
     release()
-    expect(await screen.findByText('✅ 连通 · 5ms · demo/m')).toBeInTheDocument()
+    expect(await screen.findByText('✓ 连通 · 5ms · demo/m')).toBeInTheDocument()
   })
 })

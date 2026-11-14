@@ -390,14 +390,14 @@ export function UpstreamDetailPage({ id }: { id: number }) {
           if (resp.ok) {
             setTestResult({
               ok: true,
-              text: `✅ 连通 · ${resp.latency_ms ?? 0}ms · ${resp.model ?? ''}`,
+              text: `✓ 连通 · ${resp.latency_ms ?? 0}ms · ${resp.model ?? ''}`,
             })
           } else {
-            setTestResult({ ok: false, text: `❌ ${resp.error || '测试失败'}` })
+            setTestResult({ ok: false, text: `× ${resp.error || '测试失败'}` })
           }
         },
         // 配置类问题（没有可用模型等）服务端回 400，client 抛 ApiError。
-        onError: (err) => setTestResult({ ok: false, text: `❌ ${err.message}` }),
+        onError: (err) => setTestResult({ ok: false, text: `× ${err.message}` }),
       },
     )
   }

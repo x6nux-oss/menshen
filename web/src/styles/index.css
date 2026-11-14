@@ -106,7 +106,7 @@
     background: var(--popover);
     color: var(--popover-foreground);
     border: 1px solid var(--border);
-    box-shadow: 0 16px 48px oklch(0.15 0.02 185 / 16%);
+    box-shadow: 0 16px 48px oklch(0.15 0 0 / 16%);
   }
 
   .mini-topbar {
