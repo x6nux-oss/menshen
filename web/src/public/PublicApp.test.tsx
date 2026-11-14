@@ -517,6 +517,37 @@ describe('PublicApp · 查看凭据过期', () => {
       { e: 222, k: 'new' },
     ])
   })
+
+  it('记录已删除时展示不存在，不刷新凭据或提示过期', async () => {
+    at('/_w/v/9/sig')
+    let gateReads = 0
+    let posts = 0
+    server.use(
+      http.get('*/_w/v/9/sig', () => {
+        gateReads += 1
+        return HttpResponse.json({
+          gate: {
+            title: '原文与理由',
+            warn: '敏感内容，请勿转发',
+            exp: 123,
+            k: 'valid',
+            ttl_seconds: 300,
+          },
+        })
+      }),
+      http.post('*/_w/v/9/sig', () => {
+        posts += 1
+        return HttpResponse.json({ error: '记录不存在。' }, { status: 410 })
+      }),
+    )
+    render(<PublicApp />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '查看内容' }))
+    expect(await screen.findByText('记录不存在。')).toBeInTheDocument()
+    expect(screen.queryByText(/查看凭据已失效/)).not.toBeInTheDocument()
+    expect(gateReads).toBe(1)
+    expect(posts).toBe(1)
+  })
 })
 
 describe('PublicApp · 主题优先级', () => {

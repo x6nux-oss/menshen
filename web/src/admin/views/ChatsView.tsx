@@ -33,7 +33,7 @@ import { useAdminNav } from '../nav'
 import type { Chat } from '../../api/types'
 import { FilterChips, FilterField } from './list-tools'
 import { useSearchHotkey } from './use-search-hotkey'
-import { choiceParam, textParam, useUrlFilter } from './use-url-filters'
+import { choiceParam, intParam, textParam, useUrlFilter } from './use-url-filters'
 
 const sameChat = (a: Chat, b: Chat) => a.bot_id === b.bot_id && a.chat_id === b.chat_id
 /** ALL_BOTS 是「全部机器人」在下拉里的哨兵值（Base UI Select 用 null 表示未选中，空串会被当成没选）。 */
@@ -42,6 +42,7 @@ const CHAT_STATES = ['all', 'active', 'dryrun', 'disabled', 'alert'] as const
 type ChatState = (typeof CHAT_STATES)[number]
 const CHAT_STATE_PARAM = choiceParam(CHAT_STATES)
 const SEARCH_PARAM = textParam()
+const BOT_FILTER_PARAM = intParam(0)
 
 function matchesState(chat: Chat, state: ChatState): boolean {
   if (state === 'all') return true
@@ -60,7 +61,7 @@ export function ChatsView() {
 
   const [q, setQ] = useUrlFilter('q', '', SEARCH_PARAM)
   const [chatState, setChatState] = useUrlFilter('state', 'all', CHAT_STATE_PARAM)
-  const [botFilter, setBotFilter] = useState<number | 'all'>('all')
+  const [botFilter, setBotFilter] = useUrlFilter('bot_filter', 0, BOT_FILTER_PARAM)
   const [batch, setBatch] = useState(false)
   const [selected, setSelected] = useState<Chat[]>([])
   const [addOpen, setAddOpen] = useState(false)
@@ -70,7 +71,7 @@ export function ChatsView() {
   const { chats, bots, bot_settings, global_defaults } = state.data
   const botLabel = (botId: number) => bots.find((b) => b.bot_id === botId)?.label ?? `bot ${botId}`
 
-  const scoped = chats.filter((c) => botFilter === 'all' || c.bot_id === botFilter)
+  const scoped = chats.filter((c) => botFilter === 0 || c.bot_id === botFilter)
   const rows = filterRows(scoped, q, (c) => `${c.title} ${c.chat_id} ${botLabel(c.bot_id)}`).filter(
     (c) => matchesState(c, chatState),
   )
@@ -289,7 +290,7 @@ export function ChatsView() {
         onRowClick={batch ? undefined : (row) => nav.go({ k: 'chat', botId: row.bot_id, chatId: row.chat_id })}
         empty={
           <span className="text-[13px] text-muted-foreground">
-            {chatState !== 'all' || q ? '没有匹配的群组，试试放宽筛选。' : '还没有添加群组。'}
+            {chatState !== 'all' || q || botFilter !== 0 ? '没有匹配的群组，试试放宽筛选。' : '还没有添加群组。'}
           </span>
         }
         columns={columns}
@@ -300,9 +301,9 @@ export function ChatsView() {
             </div>
             <FilterField label="机器人">
               <Select
-                value={botFilter === 'all' ? ALL_BOTS : String(botFilter)}
+                value={botFilter === 0 ? ALL_BOTS : String(botFilter)}
                 onValueChange={(v) => {
-                  setBotFilter(v === ALL_BOTS ? 'all' : Number(v))
+                  setBotFilter(v === ALL_BOTS ? 0 : Number(v))
                   setSelected([])
                 }}
               >
@@ -338,7 +339,7 @@ export function ChatsView() {
           <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
             <span>
               显示 {rows.length} / {scoped.length} 个
-              {botFilter !== 'all' && `（${botLabel(botFilter)}）`}
+              {botFilter !== 0 && `（${botLabel(botFilter)}）`}
             </span>
             <span>
               {batch ? '勾选行以批量操作 · 不同机器人不可混选' : '点击行进入群组设置'}

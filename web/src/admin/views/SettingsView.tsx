@@ -231,7 +231,7 @@ function SettingsBody({
                   <SettingText label="Site key" hint="前端公钥。" value={global.captcha_site_key ?? ''} onSave={(v) => set('captcha_site_key', v)} />
                   <SettingText
                     label="Secret"
-                    hint={settingsSet.includes('captcha_secret') ? '已设置；留空保存表示清空。' : '服务端密钥，尚未设置。'}
+                    hint={settingsSet.includes('captcha_secret') ? '已设置；留空不修改，填 - 清空。' : '服务端密钥，尚未设置。'}
                     value=""
                     placeholder="留空不修改"
                     onSave={(v) => (v === '' ? undefined : set('captcha_secret', v))}

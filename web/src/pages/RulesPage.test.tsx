@@ -288,8 +288,8 @@ describe('RulesPage · 列表与新增', () => {
     // 启用/候选徽标与筛选 chip 同名：按行内 scope 断言，避免撞多元素。
     const row1 = screen.getByRole('button', { name: /（mock）兼职押金话术/ })
     const row2 = screen.getByRole('button', { name: /（mock）联系方式引流/ })
-    expect(within(row1).getByText('启用')).toBeInTheDocument()
-    expect(within(row2).getByText('候选')).toBeInTheDocument()
+    expect(within(row1.parentElement!).getByText('启用')).toBeInTheDocument()
+    expect(within(row2.parentElement!).getByText('候选')).toBeInTheDocument()
     expect(screen.getByTestId('rule-tpfp-1')).toHaveTextContent('TP 9 · FP 0')
     expect(screen.getByTestId('rule-tpfp-2')).toHaveTextContent('TP 4 · FP 2')
 

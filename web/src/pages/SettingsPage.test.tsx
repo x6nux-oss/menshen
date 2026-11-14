@@ -194,7 +194,7 @@ describe('SettingsPage 特殊卡', () => {
     await renderSettings()
 
     const row = screen.getByRole('button', { name: /规则发现模型（AI 必封规则）/ })
-    expect(within(row).getByText('demo/gpt-5-mini')).toBeInTheDocument()
+    expect(within(row.parentElement!).getByText('demo/gpt-5-mini')).toBeInTheDocument()
     expect(screen.getByText('留空 = 复判模型列表里第一个 OpenAI 兼容模型')).toBeInTheDocument()
 
     fireEvent.click(row)
@@ -248,7 +248,7 @@ describe('SettingsPage 特殊卡', () => {
     await renderSettings()
 
     fireEvent.click(screen.getByText('附加文本'))
-    fireEvent.change(await screen.findByLabelText('附加文本'), {
+    fireEvent.change(await screen.findByRole('textbox', { name: '附加文本' }), {
       target: { value: '② 使用指南 (https://t.me/guide)' },
     })
     fireEvent.click(screen.getByRole('button', { name: '保存' }))

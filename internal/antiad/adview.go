@@ -42,7 +42,7 @@ func handleLogViewPage(sh *core.Shared, w http.ResponseWriter, r *http.Request, 
 		}
 		data, ok := logViewDataOf(sh, rt.id)
 		if !ok {
-			writeWebJSON(w, http.StatusNotFound, map[string]any{"error": "记录不存在。"})
+			writeWebJSON(w, http.StatusGone, map[string]any{"error": "记录不存在。"})
 			return
 		}
 		writeWebJSON(w, http.StatusOK, map[string]any{"view": data})
@@ -68,7 +68,7 @@ func handleAppealDetailPage(sh *core.Shared, w http.ResponseWriter, r *http.Requ
 		}
 		data, ok := appealViewDataOf(sh, rt.id)
 		if !ok {
-			writeWebJSON(w, http.StatusNotFound, map[string]any{"error": "申诉单不存在。"})
+			writeWebJSON(w, http.StatusGone, map[string]any{"error": "申诉单不存在。"})
 			return
 		}
 		writeWebJSON(w, http.StatusOK, map[string]any{"view": data})

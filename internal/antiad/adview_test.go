@@ -93,6 +93,61 @@ func TestViewPageGateAndContent(t *testing.T) {
 	}
 }
 
+func TestViewPagesMissingEntityGone(test *testing.T) {
+	bot, _ := testutil.NewTestBot(test, 1)
+	bot.Cfg.PublicURL = "https://ad.example.com"
+	if err := EnsureWebSecret(bot.Shared); err != nil {
+		test.Fatal(err)
+	}
+	handler := WebHandler(bot.Shared)
+	const missingID = 999999
+
+	cases := []struct {
+		name string
+		path string
+		msg  string
+	}{
+		{
+			name: "原文记录已删除",
+			path: "/_w/v/" + itoaTest(missingID) + "/" + logViewSig(bot.Shared, missingID),
+			msg:  "记录不存在",
+		},
+		{
+			name: "申诉单已删除",
+			path: "/_w/apv/" + itoaTest(missingID) + "/" + appealViewSig(bot.Shared, missingID),
+			msg:  "申诉单不存在",
+		},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, testCase.path+"?json=1", nil))
+			if response.Code != http.StatusOK {
+				test.Fatalf("门槛 GET 应 200，得到 %d：%s", response.Code, response.Body.String())
+			}
+			var gate struct {
+				Gate struct {
+					Exp int64  `json:"exp"`
+					Key string `json:"k"`
+				} `json:"gate"`
+			}
+			if err := json.Unmarshal(response.Body.Bytes(), &gate); err != nil || gate.Gate.Key == "" {
+				test.Fatalf("门槛响应缺查看凭据：%v（%s）", err, response.Body.String())
+			}
+			body, _ := json.Marshal(map[string]any{"e": gate.Gate.Exp, "k": gate.Gate.Key})
+			response = httptest.NewRecorder()
+			handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, testCase.path,
+				strings.NewReader(string(body))))
+			if response.Code != http.StatusGone {
+				test.Errorf("实体不存在应 410，得到 %d：%s", response.Code, response.Body.String())
+			}
+			if !strings.Contains(response.Body.String(), testCase.msg) {
+				test.Errorf("410 响应应说明实体不存在：%s", response.Body.String())
+			}
+		})
+	}
+}
+
 // TestAppealDetailShowsUserDossier：申诉详情页左栏要给出账号信息与各种资料
 // （处罚、留底发言、判定流水、网页验证明细），不能只有右栏一张单子。
 func TestAppealDetailShowsUserDossier(t *testing.T) {

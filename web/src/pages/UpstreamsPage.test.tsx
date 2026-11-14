@@ -154,7 +154,7 @@ describe('UpstreamDetailPage', () => {
 
     fireEvent.click(screen.getByText('名称'))
     expect(await screen.findByText('重命名上游')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('名称'), { target: { value: 'demo-renamed' } })
+    fireEvent.change(screen.getByRole('textbox', { name: '名称' }), { target: { value: 'demo-renamed' } })
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(bodies).toHaveLength(1))

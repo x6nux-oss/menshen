@@ -115,8 +115,9 @@ describe('ChatsView', () => {
     expect(screen.getByText(/已选 1 个/)).toBeInTheDocument()
   })
 
-  it('过滤机器人后计数基于当前 scope', async () => {
-    render()
+  it('机器人筛选保存到 URL 并在重新进入时恢复', async () => {
+    history.replaceState(null, '', '/admin/chats?bot=42')
+    const view = render()
     await screen.findByText('测试群')
     await userEvent.click(screen.getByRole('combobox', { name: '机器人' }))
     await userEvent.click(await screen.findByRole('option', { name: '演示机器人' }))
@@ -127,5 +128,18 @@ describe('ChatsView', () => {
     )
     expect(screen.getByText('演练群')).toBeInTheDocument()
     expect(screen.queryByText('测试群')).not.toBeInTheDocument()
+    expect(new URLSearchParams(location.search).get('bot_filter')).toBe('2')
+    expect(new URLSearchParams(location.search).get('bot')).toBe('42')
+
+    view.unmount()
+    render()
+    await screen.findByText('演练群')
+    expect(screen.queryByText('测试群')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('combobox', { name: '机器人' }))
+    await userEvent.click(await screen.findByRole('option', { name: '全部机器人' }))
+    expect(await screen.findByText('测试群')).toBeInTheDocument()
+    expect(new URLSearchParams(location.search).has('bot_filter')).toBe(false)
+    expect(new URLSearchParams(location.search).get('bot')).toBe('42')
   })
 })

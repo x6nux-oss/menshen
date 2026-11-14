@@ -1,5 +1,5 @@
 import { ChevronRight } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { cn } from '../../lib/utils'
 
 export interface ListRowProps {
@@ -31,12 +31,14 @@ export function ListRow({
   disabled = false,
   className,
 }: ListRowProps) {
+  const labelId = useId()
   const content = (
     <>
-      <span className="min-w-0 flex-1 text-left">
-        <span className="block text-sm leading-[1.45] font-medium wrap-anywhere">{primary}</span>
+      <span className="relative min-w-0 flex-1 text-left">
+        <span id={labelId} className="block text-sm leading-[1.45] font-medium wrap-anywhere">{primary}</span>
         {secondary !== undefined && (
           <span
+            id={`${labelId}-secondary`}
             className={cn(
               'mt-0.5 block text-xs leading-[1.45] break-all text-muted-foreground',
               secondaryMono && 'font-mono',
@@ -46,7 +48,7 @@ export function ListRow({
           </span>
         )}
       </span>
-      <span className="flex min-w-0 max-w-1/2 shrink-0 items-center gap-1.5 pl-2">
+      <span id={`${labelId}-meta`} className="relative flex min-w-0 max-w-1/2 shrink-0 items-center gap-1.5 pl-2">
         {badge}
         {value !== undefined && (
           <span className="min-w-0 text-right text-xs leading-[1.4] text-muted-foreground wrap-anywhere">
@@ -71,20 +73,29 @@ export function ListRow({
   }
 
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => {
+    <div
+      onClick={(event) => {
+        if (
+          event.target instanceof Element &&
+          event.target.closest('a, button, input, select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="switch"]')
+        ) return
         if (!disabled) onClick()
       }}
       className={cn(
         rowClass,
-        'transition-colors outline-none hover:bg-accent active:bg-accent',
-        'focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset',
-        'disabled:cursor-not-allowed disabled:opacity-50',
+        'relative transition-colors',
+        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-accent active:bg-accent',
       )}
     >
+      <button
+        type="button"
+        aria-labelledby={labelId}
+        aria-describedby={`${secondary !== undefined ? `${labelId}-secondary ` : ''}${labelId}-meta`}
+        disabled={disabled}
+        onClick={onClick}
+        className="absolute inset-0 rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+      />
       {content}
-    </button>
+    </div>
   )
 }

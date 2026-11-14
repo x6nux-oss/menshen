@@ -31,6 +31,32 @@ describe('ListRow', () => {
     expect(onClick).toHaveBeenCalledTimes(2)
   })
 
+  it('行内链接与独立按钮不嵌套在行按钮中，也不触发行操作', async () => {
+    const onOpen = vi.fn()
+    const onAction = vi.fn()
+    render(
+      <ListRow
+        primary={<ChatRef name="公开群" url="https://t.me/public_group" />}
+        secondary="群组说明"
+        trailing={<button onClick={onAction}>独立操作</button>}
+        onClick={onOpen}
+      />,
+    )
+    const link = screen.getByRole('link', { name: '公开群' })
+    const action = screen.getByRole('button', { name: '独立操作' })
+    expect(link.closest('button')).toBeNull()
+    expect(action.parentElement?.closest('button')).toBeNull()
+    await userEvent.click(link)
+    await userEvent.click(action)
+    expect(onAction).toHaveBeenCalledOnce()
+    expect(onOpen).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByText('群组说明'))
+    expect(onOpen).toHaveBeenCalledOnce()
+    screen.getByRole('button', { name: '公开群' }).focus()
+    await userEvent.keyboard('{Enter}')
+    expect(onOpen).toHaveBeenCalledTimes(2)
+  })
+
   it('渲染副行、徽标、值、箭头', () => {
     render(<ListRow primary="主" secondary="副" badge={<span>徽</span>} value="值" chevron />)
     expect(screen.getByText('副')).toBeInTheDocument()
