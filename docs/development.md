@@ -24,6 +24,11 @@ go vet ./...
 **公开页**（`/_w/*`）。三者共用 `web/src/components` 与设计 token，管理端共用
 `web/src/api`、`web/src/lib` 数据和工具层；页面与外壳各自装配。需要 Node ≥ 22.12：
 
+三端统一使用不透明的墨绿主题，主题和布局约定见[前端重设计](frontend-redesign.md)。
+桌面管理台可用 `⌘K` / `Ctrl+K` 搜索页面；机器人、群组和记录的筛选保存在地址栏，
+便于刷新、分享和通过浏览器后退恢复。Mini App 的明暗模式跟随 Telegram，管理台
+与公开页支持手动切换或跟随系统。
+
 ```bash
 npm --prefix web install          # 安装依赖
 npm --prefix web run dev          # Mini App 开发服务器；/miniapp/api 代理到 127.0.0.1:8081

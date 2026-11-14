@@ -53,10 +53,6 @@ export interface SheetContentProps extends ComponentProps<typeof BaseDialog.Popu
   hideClose?: boolean
 }
 
-/**
- * 抽屉主体。**用玻璃底**（浮起元素，§4.4）。
- * 垂直方向的两侧（left/right）内容通常较多，所以自带纵向滚动。
- */
 export function SheetContent({
   className,
   children,
@@ -69,7 +65,7 @@ export function SheetContent({
       <SheetBackdrop />
       <BaseDialog.Popup
         className={cn(
-          'glass fixed z-50 border-glass-border p-5 transition-transform',
+          'overlay-surface fixed z-50 p-5 transition-transform',
           side === 'left' || side === 'right' ? 'overflow-y-auto' : 'overflow-y-auto max-h-[85dvh]',
           SIDE_CLASS[side],
           className,
@@ -81,7 +77,7 @@ export function SheetContent({
           <BaseDialog.Close
             aria-label="关闭"
             className={cn(
-              'absolute top-3 right-3 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none',
+              'absolute top-3 right-3 inline-flex size-11 items-center justify-center rounded-md text-muted-foreground outline-none',
               'hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/50',
             )}
           >
@@ -94,7 +90,7 @@ export function SheetContent({
 }
 
 export function SheetHeader({ className, ...props }: ComponentProps<'div'>) {
-  return <div className={cn('mb-3 flex flex-col gap-1 pr-6', className)} {...props} />
+  return <div className={cn('mb-3 flex flex-col gap-1 pr-10', className)} {...props} />
 }
 
 export function SheetFooter({ className, ...props }: ComponentProps<'div'>) {

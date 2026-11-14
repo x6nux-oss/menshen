@@ -127,4 +127,68 @@ describe('DataTable（可排序）', () => {
     await userEvent.click(screen.getByRole('button', { name: /名称/ }))
     expect(columnTexts('名称')).toEqual(['#a#', '#b#', '#c#'])
   })
+
+  it('toolbar/footer 与表格共用一层面板', () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        toolbar={<span>筛选区</span>}
+        footer={<span>分页区</span>}
+      />,
+    )
+    expect(screen.getByText('筛选区')).toBeInTheDocument()
+    expect(screen.getByText('分页区')).toBeInTheDocument()
+    expect(screen.getByRole('table')).toBeInTheDocument()
+  })
+
+  it('行内按钮点击/按键不触发行跳转', async () => {
+    const onRowClick = vi.fn()
+    const inner = vi.fn()
+    const withAction: Column<Row>[] = [
+      ...columns,
+      {
+        key: 'action',
+        header: '操作',
+        render: () => (
+          <button type="button" onClick={inner}>
+            打开菜单
+          </button>
+        ),
+      },
+    ]
+    render(
+      <DataTable
+        columns={withAction}
+        rows={rows}
+        rowKey={(r) => r.id}
+        onRowClick={onRowClick}
+      />,
+    )
+    const action = screen.getAllByRole('button', { name: '打开菜单' })[0]
+    await userEvent.click(action)
+    expect(inner).toHaveBeenCalledOnce()
+    expect(onRowClick).not.toHaveBeenCalled()
+
+    action.focus()
+    await userEvent.keyboard(' ')
+    expect(onRowClick).not.toHaveBeenCalled()
+  })
+
+  it('行可键盘打开，且只在行本身获得焦点时触发', async () => {
+    const onRowClick = vi.fn()
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        onRowClick={onRowClick}
+      />,
+    )
+    const row = screen.getAllByRole('row')[1]
+    row.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(onRowClick).toHaveBeenCalledWith(rows[0])
+  })
 })

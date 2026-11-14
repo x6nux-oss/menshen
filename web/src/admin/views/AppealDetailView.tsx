@@ -1,7 +1,7 @@
 // 申诉详情：状况、AI 复核、解禁码与兑换记录，以及人工处置。
 import { useAppeal, useMiniState } from '../../api/hooks'
 import { useAppealactMutation } from '../../api/mutations'
-import { apAI, apStatus, displayTz, fmtTSFull } from '../../lib/format'
+import { apAI, displayTz, fmtTSFull } from '../../lib/format'
 import { appealStatusInfo } from '../../lib/status'
 import { openLink } from '../../telegram'
 import { Button } from '../../components/ui'
@@ -38,71 +38,85 @@ export function AppealDetailView({ id }: { id: number }) {
         actions={<StatusBadge info={appealStatusInfo(a.status)} />}
       />
 
-      <CardBlock title="申诉">
-        <InfoList
-          items={[
-            { label: '状态', value: apStatus(a.status) },
-            { label: '提交时间', value: fmtTSFull(a.created_at, tz) },
-            { label: '更新时间', value: fmtTSFull(a.updated_at, tz) },
-            { label: '网页尝试', value: `${a.web_attempts} 次（通过 ${a.web_passes} / 校验 ${a.web_checks}）` },
-          ]}
-        />
-        <p className="mt-3 text-[13.5px] leading-relaxed whitespace-pre-wrap">
-          {a.statement || '（无申诉陈述）'}
-        </p>
-      </CardBlock>
-
-      <CardBlock
-        title="AI 复核"
-        actions={
-          a.detail_url ? (
-            <Button size="sm" variant="ghost" onClick={() => openLink(a.detail_url)}>
-              公开详情页
-            </Button>
-          ) : undefined
-        }
-      >
-        <InfoList
-          items={[
-            { label: '结论', value: apAI(a.ai_result) },
-            { label: '置信度', value: a.ai_conf },
-            { label: '模型', value: a.ai_model || '—' },
-            { label: '开销', value: a.ai_cost || '—' },
-          ]}
-        />
-        <p className="mt-3 text-[13.5px] leading-relaxed whitespace-pre-wrap">
-          {a.ai_reason || '—'}
-        </p>
-      </CardBlock>
-
-      <CardBlock title="解禁码">
-        {a.code ? (
-          <>
-            <p className="text-base">
-              <MonoText>{a.code}</MonoText>
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0">
+          <CardBlock title="申诉陈述">
+            <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">
+              {a.statement || '（无申诉陈述）'}
             </p>
-            <p className="mt-1 text-[12.5px] text-muted-foreground">
-              {a.code_expires > 0 ? `有效期至 ${fmtTSFull(a.code_expires, tz)}` : '已过期或未签发'}
-            </p>
-          </>
-        ) : (
-          <p className="text-[13px] text-muted-foreground">尚未签发解禁码。</p>
-        )}
-        {a.redeems.length > 0 && (
-          <div className="mt-3">
-            <p className="mb-1 text-[13px]">兑换记录</p>
-            {a.redeems.map((r, index) => (
-              <p key={index} className="text-[12.5px] text-muted-foreground">
-                {fmtTSFull(r.at, tz)} · 群{' '}
-                <ChatRef name={r.chat} url={r.chat_url} fallback={r.chat_id} /> · by uid {r.by_uid}
-              </p>
-            ))}
-          </div>
-        )}
-      </CardBlock>
+            <div className="mt-4 border-t border-border pt-3">
+              <InfoList
+                items={[
+                  { label: '提交时间', value: fmtTSFull(a.created_at, tz) },
+                  { label: '更新时间', value: fmtTSFull(a.updated_at, tz) },
+                  {
+                    label: '网页尝试',
+                    value: `${a.web_attempts} 次（通过 ${a.web_passes} / 校验 ${a.web_checks}）`,
+                  },
+                ]}
+              />
+            </div>
+          </CardBlock>
 
-      {open && (
-        <CardBlock title="人工处置">
+          <CardBlock
+            title="AI 复核"
+            actions={
+              a.detail_url ? (
+                <Button size="sm" variant="ghost" onClick={() => openLink(a.detail_url)}>
+                  公开详情页
+                </Button>
+              ) : undefined
+            }
+          >
+            <div className="grid gap-4 sm:grid-cols-[160px_minmax(0,1fr)]">
+              <InfoList
+                items={[
+                  { label: '结论', value: apAI(a.ai_result) },
+                  { label: '置信度', value: a.ai_conf },
+                  { label: '开销', value: a.ai_cost || '—' },
+                ]}
+              />
+              <div className="min-w-0 rounded-md border border-border bg-muted/40 p-3">
+                <p className="font-mono text-[11.5px] text-muted-foreground">
+                  {a.ai_model || '未记录模型'}
+                </p>
+                <p className="mt-1.5 text-[13px] leading-relaxed whitespace-pre-wrap">
+                  {a.ai_reason || '—'}
+                </p>
+              </div>
+            </div>
+          </CardBlock>
+        </div>
+
+        <div className="min-w-0">
+          <CardBlock title="解禁码">
+            {a.code ? (
+              <>
+                <p className="text-base">
+                  <MonoText>{a.code}</MonoText>
+                </p>
+                <p className="mt-1 text-[12.5px] text-muted-foreground">
+                  {a.code_expires > 0 ? `有效期至 ${fmtTSFull(a.code_expires, tz)}` : '已过期或未签发'}
+                </p>
+              </>
+            ) : (
+              <p className="text-[13px] text-muted-foreground">尚未签发解禁码。</p>
+            )}
+            {a.redeems.length > 0 && (
+              <div className="mt-3 border-t border-border pt-3">
+                <p className="mb-1 text-[13px]">兑换记录</p>
+                {a.redeems.map((r, index) => (
+                  <p key={index} className="text-[12.5px] text-muted-foreground">
+                    {fmtTSFull(r.at, tz)} · 群{' '}
+                    <ChatRef name={r.chat} url={r.chat_url} fallback={r.chat_id} /> · by uid {r.by_uid}
+                  </p>
+                ))}
+              </div>
+            )}
+          </CardBlock>
+
+          {open && (
+            <CardBlock title="人工处置">
           <div className="flex flex-wrap gap-2">
             <ConfirmButton
               variant="contained"
@@ -140,8 +154,10 @@ export function AppealDetailView({ id }: { id: number }) {
               </Button>
             )}
           </div>
-        </CardBlock>
-      )}
+            </CardBlock>
+          )}
+        </div>
+      </div>
     </>
   )
 }

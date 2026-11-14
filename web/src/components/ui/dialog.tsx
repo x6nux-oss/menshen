@@ -41,10 +41,6 @@ export function DialogBackdrop({ className, ...props }: ComponentProps<typeof Ba
   )
 }
 
-/**
- * 对话框主体。**用玻璃底** —— 弹层是「浮起」的元素（设计文档 §4.4）。
- * 右上角自带关闭按钮（图标 + aria-label，供键盘与屏幕阅读器使用）。
- */
 export function DialogContent({
   className,
   children,
@@ -55,8 +51,8 @@ export function DialogContent({
       <DialogBackdrop />
       <BaseDialog.Popup
         className={cn(
-          'glass fixed top-1/2 left-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2',
-          'max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl p-5',
+          'overlay-surface fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2',
+          'max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl p-6',
           'transition-[opacity,transform] data-[starting-style]:scale-95 data-[starting-style]:opacity-0',
           'data-[ending-style]:scale-95 data-[ending-style]:opacity-0',
           className,
@@ -67,7 +63,7 @@ export function DialogContent({
         <BaseDialog.Close
           aria-label="关闭"
           className={cn(
-            'absolute top-3 right-3 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none',
+            'absolute top-3 right-3 inline-flex size-11 items-center justify-center rounded-md text-muted-foreground outline-none',
             'hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/50',
           )}
         >
@@ -79,7 +75,7 @@ export function DialogContent({
 }
 
 export function DialogHeader({ className, ...props }: ComponentProps<'div'>) {
-  return <div className={cn('mb-3 flex flex-col gap-1 pr-6', className)} {...props} />
+  return <div className={cn('mb-3 flex flex-col gap-1 pr-10', className)} {...props} />
 }
 
 export function DialogFooter({ className, ...props }: ComponentProps<'div'>) {

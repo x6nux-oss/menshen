@@ -1,8 +1,3 @@
-// 通用列表行：左主文案 16px + 可选灰色副行 13px（可等宽），
-// 右侧徽标/值/自定义 trailing 与可选 › 箭头；有 onClick 时整行可点。
-//
-// props 与旧 src/ui/ListRow 完全对齐（Phase 2/3 迁移时调用点不用改）。
-// 触控高度 ≥52px 是移动端可点性底线（iOS HIG 建议 44px，列表行取更宽松的 52）。
 import { ChevronRight } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/utils'
@@ -39,11 +34,11 @@ export function ListRow({
   const content = (
     <>
       <span className="min-w-0 flex-1 text-left">
-        <span className="block text-[16px] leading-[1.4] wrap-anywhere">{primary}</span>
+        <span className="block text-sm leading-[1.45] font-medium wrap-anywhere">{primary}</span>
         {secondary !== undefined && (
           <span
             className={cn(
-              'block text-[13px] leading-[1.4] break-all text-muted-foreground',
+              'mt-0.5 block text-xs leading-[1.45] break-all text-muted-foreground',
               secondaryMono && 'font-mono',
             )}
           >
@@ -51,23 +46,23 @@ export function ListRow({
           </span>
         )}
       </span>
-      <span className="flex min-w-0 max-w-1/2 shrink-0 items-center gap-1.5 pl-1">
+      <span className="flex min-w-0 max-w-1/2 shrink-0 items-center gap-1.5 pl-2">
         {badge}
         {value !== undefined && (
-          <span className="min-w-0 text-right text-[14px] text-muted-foreground wrap-anywhere">
+          <span className="min-w-0 text-right text-xs leading-[1.4] text-muted-foreground wrap-anywhere">
             {value}
           </span>
         )}
         {trailing}
         {chevron && (
-          <ChevronRight className="size-5 shrink-0 text-muted-foreground/60" aria-hidden />
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" aria-hidden />
         )}
       </span>
     </>
   )
 
   const rowClass = cn(
-    'flex min-h-[52px] w-full items-center gap-2 px-4 py-1 text-foreground',
+    'flex min-h-13 w-full items-center gap-2 border-b border-border px-4 py-2.5 text-foreground last:border-b-0',
     className,
   )
 
@@ -79,8 +74,6 @@ export function ListRow({
     <button
       type="button"
       disabled={disabled}
-      // 双保险：disabled 属性已拦截原生点击，但键盘路径（Enter/Space 触发 click）
-      // 在某些浏览器仍需显式守卫 —— 旧实现踩过这个坑，沿用同样的做法。
       onClick={() => {
         if (!disabled) onClick()
       }}

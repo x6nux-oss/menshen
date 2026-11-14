@@ -12,6 +12,8 @@
 // 与服务端的口径打架，对无限列表更是错的。排序则是纯前端增量 —— 用户点表头排
 // 当前已加载的行，不需要服务端参与。
 import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
+import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import {
   getCoreRowModel,
   getSortedRowModel,
@@ -29,6 +31,10 @@ export interface DataTableProps<T> extends BaseDataTableProps<T> {
    * 排序作用在**已加载的行**上（客户端），不触发请求。
    */
   sortable?: string[]
+  /** 表格上方的工具区（筛选/搜索），与表格共用一层 solid 面板。 */
+  toolbar?: ReactNode
+  /** 表格下方的分页/统计区，与表格共用一层 solid 面板。 */
+  footer?: ReactNode
 }
 
 /** align 取值 → Tailwind 的文本对齐类（与静态版一致）。 */
@@ -59,6 +65,8 @@ export function DataTable<T>({
   loading,
   empty,
   sortable,
+  toolbar,
+  footer,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([])
 
@@ -92,25 +100,30 @@ export function DataTable<T>({
     getRowId: (row) => String(rowKey(row)),
   })
 
-  if (loading && rows.length === 0) {
-    return (
+  const hasChrome = toolbar !== undefined || footer !== undefined
+  const content =
+    loading && rows.length === 0 ? (
       <div data-testid="table-loading" className="flex justify-center py-12">
         <Spinner size={26} className="text-muted-foreground" />
       </div>
-    )
-  }
-  if (rows.length === 0) {
-    if (empty !== undefined) return <>{empty}</>
-    return <EmptyRow text="暂无数据" />
-  }
-
-  return (
-    <div className="w-full overflow-x-auto rounded-xl border border-border bg-card">
+    ) : rows.length === 0 ? (
+      empty !== undefined ? (
+        <div className={hasChrome ? 'p-6' : undefined}>{empty}</div>
+      ) : (
+        <EmptyRow text="暂无数据" />
+      )
+    ) : (
       <table className="w-full border-collapse text-sm">
-        <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur-sm">
+        <thead className="bg-muted/70">
           <tr className="border-b border-border">
             {table.getHeaderGroups()[0].headers.map((header, i) => {
               const col = columns[i]
+              const headerLabel =
+                col.header === '' || col.header === null || col.header === undefined ? (
+                  <span className="sr-only">操作</span>
+                ) : (
+                  col.header
+                )
               const canSort = header.column.getCanSort()
               const dir = header.column.getIsSorted()
               return (
@@ -119,7 +132,7 @@ export function DataTable<T>({
                   scope="col"
                   aria-sort={canSort ? ariaSort(dir) : undefined}
                   className={cn(
-                    'h-9 px-3 text-left align-middle text-[12.5px] font-medium whitespace-nowrap text-muted-foreground',
+                    'h-11 px-4 text-left align-middle text-xs font-medium whitespace-nowrap text-muted-foreground',
                     ALIGN_CLASS[col.align ?? 'left'],
                   )}
                   style={{ width: col.width }}
@@ -134,14 +147,20 @@ export function DataTable<T>({
                         dir !== false && 'text-foreground',
                       )}
                     >
-                      {col.header}
+                      {headerLabel}
                       {/* 排序方向指示：未排序时给一个淡的提示，避免表头看起来不可点 */}
-                      <span aria-hidden="true" className="text-[10px] leading-none">
-                        {dir === 'asc' ? '▲' : dir === 'desc' ? '▼' : '⇅'}
+                      <span aria-hidden="true" className="leading-none opacity-70">
+                        {dir === 'asc' ? (
+                          <ArrowUp className="size-3" />
+                        ) : dir === 'desc' ? (
+                          <ArrowDown className="size-3" />
+                        ) : (
+                          <ChevronsUpDown className="size-3 opacity-50" />
+                        )}
                       </span>
                     </button>
                   ) : (
-                    col.header
+                    headerLabel
                   )}
                 </th>
               )
@@ -152,9 +171,38 @@ export function DataTable<T>({
           {table.getRowModel().rows.map((row) => (
             <tr
               key={row.id}
-              onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+              onClick={
+                onRowClick
+                  ? (event) => {
+                      if (
+                        event.target instanceof Element &&
+                        event.target.closest(
+                          'button, a, input, select, textarea, [role="button"], [role="checkbox"]',
+                        )
+                      ) {
+                        return
+                      }
+                      onRowClick(row.original)
+                    }
+                  : undefined
+              }
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (event) => {
+                      if (
+                        event.target !== event.currentTarget ||
+                        (event.key !== 'Enter' && event.key !== ' ')
+                      ) {
+                        return
+                      }
+                      event.preventDefault()
+                      onRowClick(row.original)
+                    }
+                  : undefined
+              }
               className={cn(
-                'border-b border-border transition-colors last:border-0 hover:bg-muted/50',
+                'border-b border-border transition-colors last:border-0 hover:bg-muted/50 focus-visible:bg-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                 onRowClick && 'cursor-pointer',
               )}
             >
@@ -163,7 +211,7 @@ export function DataTable<T>({
                   key={col.key}
                   data-align={col.align ?? 'left'}
                   className={cn(
-                    'max-w-[420px] px-3 py-2 align-middle',
+                    'max-w-[420px] px-4 py-3.5 align-middle',
                     ALIGN_CLASS[col.align ?? 'left'],
                   )}
                 >
@@ -174,6 +222,18 @@ export function DataTable<T>({
           ))}
         </tbody>
       </table>
+    )
+
+  if (!hasChrome) {
+    return (
+      <div className="w-full overflow-x-auto rounded-xl border border-border bg-card">{content}</div>
+    )
+  }
+  return (
+    <div className="w-full overflow-hidden rounded-xl border border-border bg-card">
+      {toolbar !== undefined && <div className="border-b border-border px-3 py-2.5">{toolbar}</div>}
+      <div className="w-full overflow-x-auto">{content}</div>
+      {footer !== undefined && <div className="border-t border-border px-3 py-2.5">{footer}</div>}
     </div>
   )
 }

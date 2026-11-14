@@ -39,13 +39,27 @@ export function BotDetailView({ botId }: { botId: number }) {
       />
 
       <CardBlock title="基本信息">
-        <InfoList
-          items={[
-            { label: '归属', value: ownerLabel(state.data.owner_opts, bot.owner_id) },
-            { label: '群组数', value: `${chats.length} 个` },
-            { label: '主 bot', value: bot.is_main ? '是（只做配置管理，不入群、不判定）' : '否' },
-          ]}
-        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <InfoList
+            items={[
+              { label: '归属', value: ownerLabel(state.data.owner_opts, bot.owner_id) },
+              { label: '群组数', value: `${chats.length} 个` },
+              { label: '主 bot', value: bot.is_main ? '是（只做配置管理，不入群、不判定）' : '否' },
+            ]}
+          />
+          <div className="rounded-md border border-border bg-muted/40 p-3">
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground">判定路由</p>
+            <p className="mt-1.5 text-[12.5px] leading-relaxed">
+              初判 {bot.so_models.length > 0 ? `${bot.so_models.length} 个模型` : '跟随全局'}
+            </p>
+            <p className="text-[12.5px] leading-relaxed">
+              复判 {bot.llm_models.length > 0 ? `${bot.llm_models.length} 个模型` : '跟随全局'}
+            </p>
+            <p className="mt-1.5 font-mono text-[11.5px] text-muted-foreground">
+              bot id {bot.bot_id}
+            </p>
+          </div>
+        </div>
       </CardBlock>
 
       <CardBlock
@@ -80,7 +94,7 @@ export function BotDetailView({ botId }: { botId: number }) {
       </CardBlock>
 
       {main && !bot.is_main && (
-        <>
+        <div className="grid items-start gap-x-4 lg:grid-cols-2">
           <OwnerCard
             bot={bot}
             owners={state.data.owner_opts ?? []}
@@ -97,7 +111,7 @@ export function BotDetailView({ botId }: { botId: number }) {
               run(botMut.mutateAsync({ bot_id: bot.bot_id, action: 'models', which, value }))
             }
           />
-        </>
+        </div>
       )}
 
       <OverridesCard

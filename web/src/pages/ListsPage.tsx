@@ -371,31 +371,24 @@ export function ListsPage({ section }: { section?: string }) {
   return (
     <div
       data-testid="lists-page"
-      // 悬浮新增按钮压在内容上，给它留出可滚到的底部空间。
-      style={{
-        paddingBottom: showAdd ? 'calc(72px + env(safe-area-inset-bottom))' : undefined,
-      }}
+      className="pb-2"
     >
-      <Segmented
-        value={activeSeg}
-        onChange={(next) => setSeg(next as MainSection)}
-        options={segOptions}
-        ariaLabel="名单分段"
-        className="mb-2"
-      />
-
-      {showAdd && (
-        // ListsPage 是二级页，TabBar 在这时不渲染：贴着底部安全区放。
-        <button
-          type="button"
-          aria-label="新增"
-          onClick={openAdd}
-          className="fixed right-4 z-20 grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2"
-          style={{ bottom: 'calc(16px + env(safe-area-inset-bottom))' }}
-        >
-          <Plus className="size-6" aria-hidden />
-        </button>
-      )}
+      <div className="mb-3 rounded-lg border border-border bg-card p-3">
+        <div className="flex items-center gap-2">
+          <Segmented
+            value={activeSeg}
+            onChange={(next) => setSeg(next as MainSection)}
+            options={segOptions}
+            ariaLabel="名单分段"
+            className="min-w-0 flex-1"
+          />
+          {showAdd && (
+            <Button size="icon" aria-label="新增" onClick={openAdd} className="shrink-0">
+              <Plus aria-hidden />
+            </Button>
+          )}
+        </div>
+      </div>
 
       {activeSeg === 'white' && (
         <>
@@ -513,16 +506,17 @@ export function ListsPage({ section }: { section?: string }) {
 
       {activeSeg === 'gban' && (
         <>
-          <Segmented
-            value={gbanSub}
-            onChange={(next) => setGbanSub(next === 'own' ? 'own' : 'global')}
-            options={[
-              { value: 'global', label: '全局组' },
-              { value: 'own', label: '我的专属组' },
-            ]}
-            ariaLabel="联封分组"
-            className="mb-3"
-          />
+          <div className="mb-3 rounded-lg border border-border bg-card p-3">
+            <Segmented
+              value={gbanSub}
+              onChange={(next) => setGbanSub(next === 'own' ? 'own' : 'global')}
+              options={[
+                { value: 'global', label: '全局组' },
+                { value: 'own', label: '我的专属组' },
+              ]}
+              ariaLabel="联封分组"
+            />
+          </div>
 
           {gbanSub === 'global' ? (
             <SectionCard title="全局联合封禁组">

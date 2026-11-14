@@ -395,7 +395,7 @@ export function RulesPage() {
   }
 
   return (
-    <div data-testid="rules-page">
+    <div data-testid="rules-page" className="space-y-3">
       <AgentCard />
 
       {rulesQuery.isError ? (
@@ -407,8 +407,8 @@ export function RulesPage() {
         <Skeletons rows={3} />
       ) : (
         <>
-          <div className="mb-1.5 flex items-center pl-2">
-            <h2 className="flex-1 text-[13px] font-medium text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <h2 className="flex-1 text-sm font-semibold">
               规则（{filteredRules.length}
               {filteredRules.length !== rules.length ? `/${rules.length}` : ''}）
             </h2>
@@ -428,7 +428,7 @@ export function RulesPage() {
               ＋ 手动新增
             </Button>
           </div>
-          <div className="mb-1.5 flex flex-col gap-1.5 px-2">
+          <div className="space-y-2 rounded-lg border border-border bg-card p-3">
             <SearchField
               value={search}
               onChange={setSearch}
@@ -891,7 +891,14 @@ export function RuleDetailPage({ id }: { id: number }) {
   }
 
   return (
-    <div data-testid="rule-detail-page">
+    <div data-testid="rule-detail-page" className="space-y-3">
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-semibold">{rule.name}</p>
+          <p className="truncate font-mono text-xs text-muted-foreground">{rule.pattern}</p>
+        </div>
+        <RuleBadges rule={rule} />
+      </div>
       <SectionCard>
         <ListRow primary={rule.name} secondary={sourceText(rule, tz)} badge={<RuleBadges rule={rule} />} />
         <InfoRow label="正则">

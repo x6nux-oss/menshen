@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
 import { mockState } from '../mocks/fixtures'
 import type { State } from '../api/types'
+import { ToastProvider } from '../components/feedback'
 import { AdminNavProvider } from './nav'
 import { AdminShell } from './shell'
 
@@ -36,9 +37,11 @@ function renderShell(main: boolean) {
   })
   return render(
     <QueryClientProvider client={client}>
-      <AdminNavProvider>
-        <AdminShell />
-      </AdminNavProvider>
+      <ToastProvider>
+        <AdminNavProvider>
+          <AdminShell />
+        </AdminNavProvider>
+      </ToastProvider>
     </QueryClientProvider>,
   )
 }
@@ -86,6 +89,19 @@ describe('AdminShell 侧栏', () => {
     renderShell(true)
     const logout = await screen.findByRole('link', { name: '退出登录' })
     expect(logout).toHaveAttribute('href', '/admin/logout')
+  })
+
+  it('快捷导航按角色过滤，搜索后保留 bot 上下文跳转', async () => {
+    renderShell(false)
+    await userEvent.click(await screen.findByRole('button', { name: '前往页面' }))
+    const dialog = screen.getByRole('dialog', { name: '前往页面' })
+    expect(within(dialog).queryByRole('button', { name: '模型定价' })).not.toBeInTheDocument()
+    await userEvent.type(within(dialog).getByRole('textbox', { name: '搜索页面' }), '群组')
+    expect(within(dialog).queryByRole('button', { name: '机器人' })).not.toBeInTheDocument()
+    await userEvent.click(within(dialog).getByRole('button', { name: '群组' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '前往页面' })).not.toBeInTheDocument())
+    expect(location.pathname).toBe('/admin/chats')
+    expect(location.search).toBe('?bot=42')
   })
 
   it.each([true, false])('导航抽屉保留权限、跳转上下文并在选中后关闭（主管=%s）', async (main) => {

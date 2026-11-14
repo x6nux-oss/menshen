@@ -93,10 +93,10 @@ export function ModelsPage() {
   }
 
   return (
-    <div data-testid="models-page">
+    <div data-testid="models-page" className="space-y-3">
       <LocalModelsCard />
 
-      <div className="mb-2">
+      <div>
         <SearchField
           value={q}
           onChange={setQ}
@@ -106,7 +106,8 @@ export function ModelsPage() {
       </div>
 
       <SectionCard
-        title={countText(visible.length, models.length)}
+        title="已登记模型"
+        meta={countText(visible.length, models.length)}
         footer={
           enabledUpstreams.length === 0 ? undefined : (
             <ListRow primary="＋ 添加模型" chevron onClick={openAdd} />
@@ -393,7 +394,16 @@ export function ModelDetailPage({ name }: { name: string }) {
   }
 
   return (
-    <div data-testid="model-detail-page">
+    <div data-testid="model-detail-page" className="space-y-3">
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-mono text-base font-semibold">{model.name}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {model.upstream || '（旧格式）'} · {model.model_id}
+          </p>
+        </div>
+        <Badge tone={model.enabled ? 'ok' : 'no'}>{model.enabled ? '启用' : '停用'}</Badge>
+      </div>
       <SectionCard>
         <ListRow
           primary={<span className="font-mono text-[15px]">{model.name}</span>}

@@ -1,7 +1,3 @@
-// 分段控件：横向胶囊 chips，受控；用于记录[判定|申诉]、名单分段。
-//
-// props 与旧 src/ui/Segmented 对齐。用 role="group" + aria-pressed 表达选中态：
-// 旧实现用 MUI ToggleButtonGroup（内部也是这个语义），保持一致以便迁移。
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/utils'
 
@@ -18,11 +14,17 @@ export interface SegmentedProps {
   className?: string
 }
 
+/** 单选分段：浅灰槽 + 实底选中项，适合表单分段与筛选。 */
 export function Segmented({ value, onChange, options, ariaLabel, className }: SegmentedProps) {
   return (
-    // flex-wrap：320px 屏 + iOS 动态字体下，5 项胶囊（RecordsPage 的判定筛选）
-    // 总宽会超过可用宽度，不换行会被裁掉。旧实现是 MUI Chip 的 flexWrap: 'wrap'。
-    <div role="group" aria-label={ariaLabel} className={cn('flex flex-wrap gap-1.5', className)}>
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className={cn(
+        'flex flex-wrap gap-1 rounded-lg border border-border bg-muted/60 p-1',
+        className,
+      )}
+    >
       {options.map((option) => {
         const selected = option.value === value
         return (
@@ -31,15 +33,14 @@ export function Segmented({ value, onChange, options, ariaLabel, className }: Se
             type="button"
             aria-pressed={selected}
             onClick={() => {
-              // 再点当前项时保持原值，避免出现没有分段的空态（旧实现同此处理）。
               if (!selected) onChange(option.value)
             }}
             className={cn(
-              'rounded-full px-3 py-1 text-[13px] leading-[1.4] transition-colors outline-none',
+              'min-h-9 flex-1 rounded-md px-2.5 py-1.5 text-[13px] leading-[1.4] outline-none transition-colors',
               'focus-visible:ring-2 focus-visible:ring-ring/50',
               selected
-                ? 'bg-primary font-medium text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:text-foreground',
+                ? 'bg-card font-semibold text-foreground shadow-sm ring-1 ring-border'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {option.label}

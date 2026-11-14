@@ -71,10 +71,16 @@ describe('EmptyState', () => {
 })
 
 describe('ErrorState', () => {
-  // 文案逐字来自旧 src/ui/ErrorState.tsx 的 copyFor()，两处必须一致。
   it('401 提示身份失效', () => {
     render(<ErrorState status={401} />)
     expect(screen.getByText('请通过 Telegram 菜单按钮打开')).toBeInTheDocument()
+  })
+
+  it('桌面端 401 引导重新获取网页版登录链接', () => {
+    history.replaceState(null, '', '/admin/records')
+    render(<ErrorState status={401} />)
+    expect(screen.getByText('登录已过期')).toBeInTheDocument()
+    expect(screen.getByText(/重新获取网页版登录链接/)).toBeInTheDocument()
   })
 
   it('403 提示无权限', () => {

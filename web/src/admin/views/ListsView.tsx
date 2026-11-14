@@ -6,7 +6,8 @@ import { useMiniState } from '../../api/hooks'
 import { filterRows, gbanKey, profileOKKey, whiteKey } from '../../lib/filters'
 import { fmtTSFull, whiteSourceLabel } from '../../lib/format'
 import { ChatRef, SearchField } from '../../components/mobile'
-import { CardBlock, DataTable, PageHeader, Toolbar } from '../components'
+import { CardBlock, PageHeader } from '../components'
+import { DataTable } from '../data-table'
 import type { Column } from '../components'
 import { useRunFeedback } from '../feedback'
 import type { AdminRow, GbanRow, ProfileOKRow, WhiteRow } from '../../api/types'
@@ -22,10 +23,13 @@ export function ListsView({ section, main }: { section?: string; main: boolean }
 
   return (
     <>
-      <PageHeader title="名单管理" subtitle="白名单、资料放行、联合封禁与次级管理员的集中入口" />
+      <PageHeader
+        title="名单管理"
+        subtitle="白名单、资料放行、联合封禁与次级管理员的集中入口"
+      />
       {main ? (
         <Tabs value={effective} onValueChange={(v) => setSeg(v as Seg)}>
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 h-9">
             <TabsTrigger value="white">白名单</TabsTrigger>
             <TabsTrigger value="profile">资料放行</TabsTrigger>
             <TabsTrigger value="gban">联合封禁</TabsTrigger>
@@ -122,8 +126,8 @@ function WhitelistSection() {
   return (
     <>
       <CardBlock title="加入白名单">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex min-w-[180px] flex-col gap-1">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[180px_220px_160px_140px_auto] xl:items-end">
+          <div className="flex flex-col gap-1">
             <Label htmlFor="white-bot">机器人</Label>
             <Select value={String(botId)} onValueChange={(v) => setBotId(Number(v))}>
               <SelectTrigger id="white-bot" aria-label="机器人">
@@ -139,15 +143,15 @@ function WhitelistSection() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex w-[220px] flex-col gap-1">
+          <div className="flex flex-col gap-1">
             <Label htmlFor="white-chat">chat id（0=该 bot 所有群）</Label>
             <Input id="white-chat" value={chatId} onChange={(e) => setChatId(e.target.value)} />
           </div>
-          <div className="flex w-[160px] flex-col gap-1">
+          <div className="flex flex-col gap-1">
             <Label htmlFor="white-user">用户 uid</Label>
             <Input id="white-user" value={userId} onChange={(e) => setUserId(e.target.value)} />
           </div>
-          <div className="flex min-w-[130px] flex-col gap-1">
+          <div className="flex flex-col gap-1">
             <Label htmlFor="white-hours">时长</Label>
             <Select value={String(hours)} onValueChange={(v) => setHours(Number(v))}>
               <SelectTrigger id="white-hours" aria-label="时长">
@@ -161,6 +165,7 @@ function WhitelistSection() {
             </Select>
           </div>
           <Button
+            className="w-full xl:w-auto"
             disabled={!valid || mut.isPending}
             onClick={() => {
               run(
@@ -181,14 +186,20 @@ function WhitelistSection() {
         </div>
       </CardBlock>
 
-      <Toolbar>
-        <SearchField value={q} onChange={setQ} placeholder="搜索用户 / 来源 / 范围" className="max-w-[320px]" />
-      </Toolbar>
       <DataTable
         rows={rows}
         rowKey={(row) => `${row.bot_id}:${row.chat_id}:${row.user_id}`}
         empty={<span className="text-[13px] text-muted-foreground">白名单为空。</span>}
         columns={columns}
+        toolbar={
+          <SearchField value={q} onChange={setQ} placeholder="搜索用户 / 来源 / 范围" className="max-w-[320px]" />
+        }
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
+            <span>共 {rows.length} 条白名单</span>
+            <span>到期后自动失效；永久项需手动移除</span>
+          </div>
+        }
       />
     </>
   )
@@ -230,14 +241,20 @@ function ProfileSection() {
 
   return (
     <>
-      <Toolbar>
-        <SearchField value={q} onChange={setQ} placeholder="搜索用户 / 机器人" className="max-w-[320px]" />
-      </Toolbar>
       <DataTable
         rows={rows}
         rowKey={(row) => `${row.bot_id}:${row.user_id}`}
         empty={<span className="text-[13px] text-muted-foreground">没有资料放行记录。</span>}
         columns={columns}
+        toolbar={
+          <SearchField value={q} onChange={setQ} placeholder="搜索用户 / 机器人" className="max-w-[320px]" />
+        }
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
+            <span>共 {rows.length} 条资料放行</span>
+            <span>撤销后该用户不再免检资料</span>
+          </div>
+        }
       />
     </>
   )
@@ -281,12 +298,12 @@ function GbanSection() {
 
   const addForm = (
     <CardBlock title="加入联合封禁">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex w-[160px] flex-col gap-1">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex min-w-[150px] flex-1 flex-col gap-1">
           <Label htmlFor="gban-user">用户 uid</Label>
           <Input id="gban-user" value={userId} onChange={(e) => setUserId(e.target.value)} />
         </div>
-        <div className="flex w-[280px] flex-col gap-1">
+        <div className="flex min-w-[220px] flex-[2] flex-col gap-1">
           <Label htmlFor="gban-reason">原因</Label>
           <Input id="gban-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
         </div>
@@ -314,9 +331,6 @@ function GbanSection() {
         </TabsList>
         <TabsContent value="global">
           {addForm}
-          <Toolbar>
-            <SearchField value={q} onChange={setQ} placeholder="搜索用户 / 原因" className="max-w-[320px]" />
-          </Toolbar>
           <DataTable
             rows={filterRows(gban, q, gbanKey)}
             rowKey={(row) => row.user_id}
@@ -324,6 +338,12 @@ function GbanSection() {
             columns={gbanColumns((row) =>
               run(gbanMut.mutateAsync({ action: 'remove', user_id: row.user_id }), '已移除'),
             )}
+            toolbar={
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <SearchField value={q} onChange={setQ} placeholder="搜索用户 / 原因" className="max-w-[320px]" />
+                <span className="text-[12px] text-muted-foreground">全局组对所有使用本服务的群生效</span>
+              </div>
+            }
           />
         </TabsContent>
         <TabsContent value="own">
@@ -365,9 +385,6 @@ function GbanSection() {
               </div>
             )}
           </CardBlock>
-          <Toolbar>
-            <SearchField value={q} onChange={setQ} placeholder="搜索用户 / 原因" className="max-w-[320px]" />
-          </Toolbar>
           <DataTable
             rows={filterRows(gban_own.bans, q, gbanKey)}
             rowKey={(row) => row.user_id}
@@ -375,6 +392,9 @@ function GbanSection() {
             columns={gbanColumns((row) =>
               run(ownMut.mutateAsync({ action: 'remove', user_id: row.user_id }), '已移除'),
             )}
+            toolbar={
+              <SearchField value={q} onChange={setQ} placeholder="搜索用户 / 原因" className="max-w-[320px]" />
+            }
           />
         </TabsContent>
       </Tabs>
@@ -417,12 +437,12 @@ function AdminsSection() {
   return (
     <>
       <CardBlock title="添加次级管理员">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex w-[160px] flex-col gap-1">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex min-w-[150px] flex-1 flex-col gap-1">
             <Label htmlFor="admin-user">用户 uid</Label>
             <Input id="admin-user" value={userId} onChange={(e) => setUserId(e.target.value)} />
           </div>
-          <div className="flex w-[280px] flex-col gap-1">
+          <div className="flex min-w-[220px] flex-[2] flex-col gap-1">
             <Label htmlFor="admin-note">备注</Label>
             <Input id="admin-note" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
@@ -443,6 +463,12 @@ function AdminsSection() {
         rowKey={(row) => row.user_id}
         empty={<span className="text-[13px] text-muted-foreground">没有次级管理员。</span>}
         columns={columns}
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
+            <span>共 {admins.length} 位次级管理员</span>
+            <span>次级管理员只能查看被授权的机器人及联合封禁</span>
+          </div>
+        }
       />
     </>
   )

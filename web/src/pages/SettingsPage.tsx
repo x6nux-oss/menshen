@@ -425,6 +425,24 @@ export function SettingsPage() {
 
   return (
     <div data-testid="settings-page">
+      <div className="grid grid-cols-3 divide-x divide-border overflow-hidden rounded-lg border border-border bg-card">
+        <div className="px-3 py-3">
+          <p className="text-[11px] text-muted-foreground">反广告</p>
+          <p className="mt-0.5 text-sm font-semibold">
+            {global.antiad_enabled === '1' ? '已启用' : '已停用'}
+          </p>
+        </div>
+        <div className="px-3 py-3">
+          <p className="text-[11px] text-muted-foreground">联合封禁</p>
+          <p className="mt-0.5 text-sm font-semibold">
+            {global.gban_enabled === '1' ? '已启用' : '已停用'}
+          </p>
+        </div>
+        <div className="px-3 py-3">
+          <p className="text-[11px] text-muted-foreground">显式设置</p>
+          <p className="mt-0.5 text-sm font-semibold tabular-nums">{settingsSet.size} 项</p>
+        </div>
+      </div>
       <SectionCard title="总开关">
         {MASTER_TOGGLES.map((t) => (
           <SwitchRow
@@ -457,7 +475,7 @@ export function SettingsPage() {
         </div>
       </SectionCard>
 
-      <h2 className="mt-0 mb-1.5 pl-2 text-[13px] font-medium text-muted-foreground">
+      <h2 className="mb-1.5 px-0.5 text-sm font-semibold">
         全局参数（各 bot 未覆盖时使用）
       </h2>
       {data.sections.map((sec) => (

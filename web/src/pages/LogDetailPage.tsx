@@ -58,8 +58,8 @@ const GBAN_ACTIONS: ActionSpec[] = [
 
 /** 底部操作栏兜底高度：普通管理员 4 按钮约 170px；主管理员 6 按钮 ≥210px。
  * 有 ResizeObserver 时以实测为准（useBarReserve），这里只是 jsdom 等环境的保底。 */
-const BAR_FALLBACK = 170
-const BAR_FALLBACK_MAIN = 210
+const BAR_FALLBACK = 210
+const BAR_FALLBACK_MAIN = 290
 
 export function LogDetailPage({ id }: { id: number }) {
   const nav = useNav()
@@ -178,12 +178,11 @@ export function LogDetailPage({ id }: { id: number }) {
         </div>
       </SectionCard>
 
-      {/* 纯色底 + 上边框，不用玻璃：这是压在长内容上的固定操作条，
-          玻璃会让下面的正文透上来，按钮与文字互相干扰。 */}
+      {/* 实底操作条；压在长内容上时保证按钮与正文不互相干扰。 */}
       <div
         ref={barRef}
         data-testid="log-action-bar"
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-2.5 pt-1.5 pb-[calc(6px+env(safe-area-inset-bottom))]"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]"
       >
         <div className="flex flex-wrap gap-1.5">
           {PRIMARY_ACTIONS.map((spec) => (

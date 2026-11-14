@@ -1,6 +1,6 @@
 // 公开网页（_w）行为测试：申诉验证页渲染处罚依据与失效态；原文查看页
 // 门槛凭据 → 内容；申诉详情页资料渲染。
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { server, startTestServer } from '../test/server'
@@ -8,6 +8,16 @@ import type { AppealData, AppealDossierView, JoinVerifyData, LogRecordView } fro
 import { PublicApp } from './PublicApp'
 
 startTestServer()
+
+const { captchaHooks } = vi.hoisted(() => ({
+  captchaHooks: [] as ((token: string) => void)[],
+}))
+vi.mock('./captcha', () => ({
+  mountCaptcha: (_el: unknown, opts: { onToken: (token: string) => void }) => {
+    captchaHooks.push(opts.onToken)
+    return () => {}
+  },
+}))
 
 function mockSystemTheme(initial: 'light' | 'dark') {
   let dark = initial === 'dark'
@@ -289,7 +299,8 @@ describe('PublicApp', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '查看内容' }))
     expect(await screen.findByText('账号信息')).toBeInTheDocument()
-    expect(screen.getByText(/生效中限制：0 条/)).toBeInTheDocument()
+    expect(screen.getByText('生效中限制')).toBeInTheDocument()
+    expect(screen.getByText('0 条')).toBeInTheDocument()
     expect(screen.queryByTestId('error-boundary')).not.toBeInTheDocument()
   })
 
@@ -342,6 +353,39 @@ describe('PublicApp · 入群验证页', () => {
     )
     render(<PublicApp />)
     expect(await screen.findByText(/未配置人机验证/)).toBeInTheDocument()
+  })
+
+  it('验证失败后可重新验证并再次提交', async () => {
+    captchaHooks.length = 0
+    at('/_w/jv/3/sig')
+    const posted: string[] = []
+    server.use(
+      http.get('*/_w/jv/3/sig', () => HttpResponse.json(joinVerify)),
+      http.post('*/_w/jv/3/sig', async ({ request }) => {
+        const body = (await request.json()) as { token: string }
+        posted.push(body.token)
+        return posted.length === 1
+          ? HttpResponse.json({ ok: false, msg: '验证未通过，请刷新页面重试。' })
+          : HttpResponse.json({ ok: true, msg: '验证通过，你现在可以在群里发言了。' })
+      }),
+    )
+    render(<PublicApp />)
+
+    await waitFor(() => expect(captchaHooks).toHaveLength(1))
+    await act(async () => {
+      captchaHooks[0]('token-1')
+      captchaHooks[0]('token-duplicate')
+    })
+    expect(await screen.findByText('验证未通过')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '重新验证' }))
+    await waitFor(() => expect(captchaHooks).toHaveLength(2))
+    await act(async () => {
+      await captchaHooks[1]('token-2')
+    })
+
+    expect(await screen.findByText('验证通过')).toBeInTheDocument()
+    expect(posted).toEqual(['token-1', 'token-2'])
   })
 })
 
@@ -427,6 +471,51 @@ describe('PublicApp · 申诉详情响应式列数', () => {
     expect(screen.getByTestId('appeal-main')).toBeInTheDocument()
     expect(screen.getByTestId('appeal-profile')).toBeInTheDocument()
     expect(screen.getByTestId('appeal-activity')).toBeInTheDocument()
+  })
+})
+
+describe('PublicApp · 查看凭据过期', () => {
+  it('凭据过期后原地换新凭据，重试即可查看内容', async () => {
+    at('/_w/v/9/sig')
+    let gateReads = 0
+    const posted: { e: number; k: string }[] = []
+    server.use(
+      http.get('*/_w/v/9/sig', () => {
+        gateReads += 1
+        return HttpResponse.json({
+          gate: {
+            title: '原文与理由',
+            warn: '敏感内容，请勿转发',
+            exp: gateReads === 1 ? 111 : 222,
+            k: gateReads === 1 ? 'old' : 'new',
+            ttl_seconds: 300,
+          },
+        })
+      }),
+      http.post('*/_w/v/9/sig', async ({ request }) => {
+        const body = (await request.json()) as { e: number; k: string }
+        posted.push(body)
+        if (body.e === 111) {
+          return HttpResponse.json(
+            { error: '查看凭据已失效，请刷新页面重试。' },
+            { status: 404 },
+          )
+        }
+        return HttpResponse.json({ view: logView })
+      }),
+    )
+    render(<PublicApp />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '查看内容' }))
+    expect(await screen.findByText(/查看凭据已失效/)).toBeInTheDocument()
+    expect(screen.queryByText('链接无法使用')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '重试查看' }))
+    expect(await screen.findByText('被拦原文')).toBeInTheDocument()
+    expect(posted).toEqual([
+      { e: 111, k: 'old' },
+      { e: 222, k: 'new' },
+    ])
   })
 })
 

@@ -12,13 +12,13 @@ import { cn } from '../../lib/utils'
  * 的 TONE_TEXT 实测值（在 16% 同色淡底上 ≥4.5:1，11px 小字 AA）。
  */
 const badgeVariants = cva(
-  'inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-4 whitespace-nowrap',
+  'inline-flex max-w-full items-center rounded-sm px-2 py-0.5 text-xs font-medium leading-5 whitespace-nowrap',
   {
     variants: {
       tone: {
-        ok: 'bg-success/16 text-[#067A3E] dark:text-[#4ADE80]',
-        no: 'bg-destructive/16 text-[#C62828] dark:text-[#FF8A80]',
-        warn: 'bg-warning/16 text-[#7A5B00] dark:text-[#FFD54F]',
+        ok: 'bg-success/10 text-success',
+        no: 'bg-destructive/10 text-destructive',
+        warn: 'bg-warning/10 text-warning',
         neutral: 'bg-muted text-muted-foreground',
       },
     },

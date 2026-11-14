@@ -64,7 +64,7 @@ export function SelectTrigger({
   return (
     <BaseSelect.Trigger
       className={cn(
-        'inline-flex h-9 w-full items-center justify-between gap-1.5 rounded-md border border-input bg-card px-3 text-sm outline-none',
+        'inline-flex h-10 w-full items-center justify-between gap-2 rounded-md border border-input bg-card px-3 text-sm outline-none',
         'focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30',
         'disabled:cursor-not-allowed disabled:opacity-50',
         className,
@@ -88,17 +88,13 @@ export function SelectValue({ className, ...props }: ComponentProps<typeof BaseS
   )
 }
 
-/**
- * 下拉面板。**用玻璃底** —— 它是「浮起」的元素（设计文档 §4.4），
- * 底下压着页面内容，毛玻璃让它与背景产生层次。
- */
 export function SelectContent({ className, children, ...props }: ComponentProps<typeof BaseSelect.Popup>) {
   return (
     <BaseSelect.Portal>
       <BaseSelect.Positioner sideOffset={4} className="z-50">
         <BaseSelect.Popup
           className={cn(
-            'glass max-h-[min(18rem,var(--available-height))] min-w-[var(--anchor-width)] overflow-y-auto rounded-lg p-1',
+            'overlay-surface max-h-[min(18rem,var(--available-height))] min-w-[var(--anchor-width)] overflow-y-auto rounded-lg p-1',
             className,
           )}
           {...props}

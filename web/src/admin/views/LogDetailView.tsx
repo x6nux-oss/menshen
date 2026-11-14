@@ -46,30 +46,50 @@ export function LogDetailView({ id }: { id: number }) {
         actions={<StatusBadge info={verdictInfo(row.verdict)} />}
       />
 
-      <CardBlock title="判定">
-        <InfoList
-          items={[
-            { label: '结论', value: verdictLabel(row.verdict) },
-            { label: '置信度', value: row.confidence },
-            { label: '判定方', value: deciderLabel(row.decider) },
-            { label: '类型', value: kindLabel(row.kind) },
-            { label: '处置', value: actionLabel(row.action) },
-            { label: '开销', value: row.cost_text || '—' },
-            { label: '用户', value: `uid ${row.user_id}` },
-            {
-              label: '群组',
-              value: (
-                <ChatRef name={row.chat || chat?.title} url={row.chat_url} fallback={row.chat_id} />
-              ),
-            },
-          ]}
-        />
-      </CardBlock>
+      <div className="grid items-start gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+        <div className="min-w-0">
+          <CardBlock title="判定">
+            <InfoList
+              items={[
+                { label: '结论', value: verdictLabel(row.verdict) },
+                { label: '置信度', value: row.confidence },
+                { label: '判定方', value: deciderLabel(row.decider) },
+                { label: '类型', value: kindLabel(row.kind) },
+                { label: '处置', value: actionLabel(row.action) },
+                { label: '开销', value: row.cost_text || '—' },
+                { label: '用户', value: `uid ${row.user_id}` },
+                {
+                  label: '群组',
+                  value: (
+                    <ChatRef name={row.chat || chat?.title} url={row.chat_url} fallback={row.chat_id} />
+                  ),
+                },
+              ]}
+            />
+          </CardBlock>
+          <div>
+            <Button size="sm" variant="ghost" onClick={() => nav.go({ k: 'user', id: row.user_id })}>
+              查看该用户资料 →
+            </Button>
+          </div>
+        </div>
 
-      <CardBlock
-        title="处置"
-        actions={
-          <div className="flex flex-wrap gap-2">
+        <div className="min-w-0">
+          <CardBlock title="正文">
+            <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">
+              {row.text || '（无正文留底）'}
+            </p>
+          </CardBlock>
+
+          <CardBlock title="理由">
+            <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">{row.reason || '—'}</p>
+          </CardBlock>
+
+          <CardBlock title="处置">
+            <p className="mb-3 text-[12.5px] leading-relaxed text-muted-foreground">
+              处置会立即作用到群组。解封与加白对之后 24 小时内的发言生效；「AI 写规则」围绕本条原文提炼正则。
+            </p>
+            <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" disabled={actMut.isPending} onClick={() => act('review', '已发起 AI 复查')}>
               AI 复查
             </Button>
@@ -126,37 +146,17 @@ export function LogDetailView({ id }: { id: number }) {
                 </Button>
               </>
             )}
-          </div>
-        }
-      >
-        <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-          处置会立即作用到群组。解封与加白对之后 24 小时内的发言生效；「AI 写规则」围绕本条原文提炼正则。
-        </p>
-      </CardBlock>
+            </div>
+          </CardBlock>
 
-      <CardBlock
-        title="正文"
-        actions={
-          row.view_url ? (
-            <Button size="sm" variant="ghost" onClick={() => openLink(row.view_url)}>
-              查看原文
-            </Button>
-          ) : undefined
-        }
-      >
-        <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">
-          {row.text || '（无正文留底）'}
-        </p>
-      </CardBlock>
-
-      <CardBlock title="理由">
-        <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">{row.reason || '—'}</p>
-      </CardBlock>
-
-      <div>
-        <Button size="sm" variant="ghost" onClick={() => nav.go({ k: 'user', id: row.user_id })}>
-          查看该用户资料 →
-        </Button>
+          {row.view_url && (
+            <div>
+              <Button size="sm" variant="ghost" onClick={() => openLink(row.view_url)}>
+                查看原文 →
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </>
   )

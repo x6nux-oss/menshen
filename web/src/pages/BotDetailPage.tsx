@@ -4,7 +4,7 @@
 // - 模型卡仅主管理员可编辑（已登记且启用的模型快选），次管只读；
 // - 参数覆盖卡只渲染 specs∩覆盖表（antiad/both 分组），行内智能控件 + 恢复全局；
 // - `管理其群组` 带 bot 过滤切到群组页；危险区移除该 bot（ActionSheet）。
-import { MinusCircle, PlusCircle } from 'lucide-react'
+import { Bot, MinusCircle, PlusCircle } from 'lucide-react'
 import { useState } from 'react'
 import { errorStatus } from '../api/client'
 import { useMiniState } from '../api/hooks'
@@ -104,6 +104,8 @@ export function BotDetailPage({ botId }: { botId: number }) {
   const ownerText = ownerOpt ? `${ownerOpt.label} · ${bot.owner_id}` : `uid ${bot.owner_id}`
 
   const setPending = setMut.isPending || optimisticSet.isPending
+  const modelCount =
+    bot.so_models.length + bot.llm_models.length + overridden.length
 
   const toggleEnabled = (next: boolean) => {
     enableMut.mutate(
@@ -293,6 +295,18 @@ export function BotDetailPage({ botId }: { botId: number }) {
 
   return (
     <div data-testid="bot-detail-page">
+      <div className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+          <Bot className="size-5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-semibold">{bot.label}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {bot.is_main ? '主 bot' : '业务 bot'} · {groupCount} 个群 · {modelCount} 项自定义
+          </p>
+        </div>
+        <BotStatusBadge bot={bot} />
+      </div>
       <SectionCard>
         <ListRow
           primary={
@@ -307,7 +321,6 @@ export function BotDetailPage({ botId }: { botId: number }) {
             </>
           }
           secondary={`@${bot.username || '—'} · bot_id ${bot.bot_id}`}
-          badge={<BotStatusBadge bot={bot} />}
         />
         <SwitchRow
           primary="启用"

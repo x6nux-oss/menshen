@@ -35,13 +35,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <div
           data-testid="error-boundary"
-          className="mx-auto mt-8 max-w-[520px] rounded-lg bg-card p-3"
+          role="alert"
+          className="mx-auto mt-8 max-w-[520px] rounded-xl border border-border bg-card p-6"
         >
-          <p className="mb-1 text-[17px] font-bold">{this.props.title ?? '页面出错了'}</p>
+          <p className="mb-2 text-lg font-semibold">{this.props.title ?? '页面出错了'}</p>
           <p className="text-[13.5px] break-words text-muted-foreground">
             {this.state.error.message || String(this.state.error)}
           </p>
-          <Button className="mt-2" onClick={() => window.location.reload()}>
+          <Button className="mt-5" onClick={() => window.location.reload()}>
             刷新重试
           </Button>
         </div>

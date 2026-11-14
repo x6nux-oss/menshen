@@ -13,7 +13,7 @@
 // 玻璃效果依赖可控的底色；Telegram 允许任意自定义主色，白玻璃叠在自选深蓝上
 // 会发脏，且每套自定义主题都要单独调玻璃参数 —— 那是无法收敛的维护路径。
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Bot, LayoutDashboard, ReceiptText, User, Users } from 'lucide-react'
+import { Bot, LayoutDashboard, ReceiptText, ShieldCheck, User, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ApiError, setApiBridge } from './api/client'
 import { useMiniState } from './api/hooks'
@@ -24,7 +24,7 @@ import { Skeleton } from './components/ui'
 import { meLabel } from './lib/format'
 import { applyThemeMode } from './lib/theme-mode'
 import { NavProvider, PageScope, useNav } from './nav'
-import type { TabKey } from './nav'
+import type { Page, TabKey } from './nav'
 import { routeSlug } from './route'
 import { detailTitle, renderStackPage, renderTabPage, TAB_NAMES } from './shellPages'
 import { initTelegram } from './telegram'
@@ -132,8 +132,8 @@ function Shell() {
   if (state.isPending) {
     return (
       <div className="px-4 pt-2">
-        <Skeleton className="mx-auto mb-2 h-7 w-24" />
-        <Skeleton className="mb-3 h-22 rounded-xl" />
+        <Skeleton className="mb-3 h-7 w-24" />
+        <Skeleton className="mb-3 h-22 rounded-lg" />
         <Skeletons rows={3} />
       </div>
     )
@@ -152,17 +152,19 @@ function Shell() {
   const me = state.data.me
   const role = me.main ? '主管理员' : '次级管理员'
   const currentName = top ? detailTitle(top, state.data) : TAB_NAMES[nav.tab]
+  const section = top ? sectionOf(top) : tabSection(nav.tab)
 
   return (
     <>
       <TopBar
         className="sticky top-0 z-20"
-        title={top ? currentName : '门神'}
-        subtitle={top ? undefined : `${role} · ${meLabel(me)}`}
+        brand={top === null}
+        title={top ? currentName : TAB_NAMES[nav.tab]}
+        subtitle={top ? `${section} · 返回${TAB_NAMES[nav.tab]}` : `${role} · ${meLabel(me)}`}
         onBack={top ? nav.pop : undefined}
       />
       <main
-        className="px-4 pt-1"
+        className="mx-auto w-full max-w-lg px-4 pt-3"
         style={{ paddingBottom: top ? '1rem' : 'calc(var(--mini-nav-clearance) + 24px)' }}
       >
         {/* Tab 根页常驻：push 二级页时只隐藏不卸载，返回后搜索词/批量选择等内存状态不丢。
@@ -197,10 +199,15 @@ function Shell() {
 /** BootSkeleton 初始化阶段的整页骨架（此时还没有主题与导航）。 */
 function BootSkeleton() {
   return (
-    <div data-testid="boot-skeleton" className="min-h-dvh px-4 pt-6">
-      <Skeleton className="mx-auto h-7 w-20" />
-      <Skeleton className="mx-auto mt-1 mb-4 h-5 w-36" />
-      <Skeleton className="mb-3 h-22 rounded-xl" />
+    <div data-testid="boot-skeleton" className="mx-auto min-h-dvh max-w-lg px-4 pt-6">
+      <div className="mb-4 flex items-center gap-3">
+        <Skeleton className="size-10 rounded-md" />
+        <div className="space-y-1.5">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-6 w-24" />
+        </div>
+      </div>
+      <Skeleton className="mb-3 h-22 rounded-lg" />
       <Skeletons rows={3} />
     </div>
   )
@@ -209,16 +216,56 @@ function BootSkeleton() {
 /** UnavailableGuide 在 SDK 未加载出来时给出可操作提示。 */
 function UnavailableGuide() {
   return (
-    <div data-testid="unavailable-guide" className="min-h-dvh p-4 pt-12">
-      <div className="rounded-xl bg-card p-4 text-card-foreground shadow-sm">
-        <p className="text-[15px] leading-relaxed">
+    <div data-testid="unavailable-guide" className="mx-auto min-h-dvh max-w-lg p-4 pt-12">
+      <div className="mb-5 flex items-center gap-3">
+        <span className="grid size-11 place-items-center rounded-md bg-primary/10 text-primary">
+          <ShieldCheck className="size-6" aria-hidden />
+        </span>
+        <div>
+          <p className="text-[11px] font-semibold tracking-[0.16em] text-primary">门神</p>
+          <h1 className="text-[26px] leading-[1.2] font-semibold">需要在 Telegram 中打开</h1>
+        </div>
+      </div>
+      <div className="rounded-lg border border-border bg-card p-4 text-card-foreground">
+        <p className="text-sm leading-relaxed">
           请通过 Telegram 里的菜单按钮「配置」打开本页。
         </p>
-        <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
           如果你已经在 Telegram 里打开，请关闭后重新打开本页；仍不行请更新 Telegram
           客户端或换网络重试。
         </p>
       </div>
     </div>
   )
+}
+
+/** sectionOf 给二级页一个稳定的业务归属，顶部副标题展示当前位置。 */
+function sectionOf(page: Page): string {
+  switch (page.k) {
+    case 'bot':
+      return '机器人'
+    case 'chat':
+      return '群组'
+    case 'log':
+    case 'user':
+    case 'appeal':
+      return '记录'
+    case 'lists':
+      return '名单管理'
+    case 'upstreams':
+    case 'upstream':
+    case 'models':
+    case 'model':
+    case 'rules':
+    case 'rule':
+    case 'settings':
+    case 'syslog':
+    case 'ailog':
+    case 'ailogitem':
+      return '我的'
+  }
+}
+
+function tabSection(tab: TabKey): string {
+  return TAB_NAMES[tab]
 }

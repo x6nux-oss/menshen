@@ -25,14 +25,17 @@ export function AILogItemPage({ id }: { id: number }) {
   const ok = item.data.status === 'ok'
 
   return (
-    <div data-testid="ailogitem-page" className="px-1">
-      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+    <div data-testid="ailogitem-page" className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-4 py-3">
         <Badge tone={ok ? 'ok' : 'no'}>{ok ? '成功' : '失败'}</Badge>
-        <span className="text-[13px] font-semibold break-all">{item.data.model || '（未记录）'}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
+          {item.data.model || '（未记录）'}
+        </span>
+        <span className="text-xs text-muted-foreground">{item.data.latency_ms}ms</span>
       </div>
       <p
         data-testid="ailogitem-meta"
-        className="text-[12.5px] leading-[1.9] text-muted-foreground"
+        className="rounded-lg border border-border bg-card px-4 py-3 text-xs leading-[1.9] text-muted-foreground"
       >
         {fmtTSFull(item.data.ts, tz)} · 端点 {item.data.endpoint} · 上游{' '}
         {item.data.upstream || '—'}
@@ -73,14 +76,14 @@ function pretty(s: string): string {
 /** PayloadBlock 是一段等宽的只读载荷：标题行 + 滚动区。 */
 function PayloadBlock({ title, text, testId }: { title: string; text: string; testId: string }) {
   return (
-    <div className="mt-3">
-      <p className="mb-1 text-[12.5px] font-semibold">{title}</p>
+    <section>
+      <p className="mb-1.5 px-0.5 text-sm font-semibold">{title}</p>
       <div
         data-testid={testId}
-        className="max-h-90 overflow-auto rounded-md bg-muted p-2 font-mono text-[12px] leading-[1.6] break-all whitespace-pre-wrap"
+        className="max-h-96 overflow-auto rounded-lg border border-border bg-card p-3 font-mono text-xs leading-[1.6] break-all whitespace-pre-wrap"
       >
         {text}
       </div>
-    </div>
+    </section>
   )
 }

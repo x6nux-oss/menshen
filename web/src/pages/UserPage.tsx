@@ -30,7 +30,13 @@ export function UserPage({ id }: { id: number }) {
   const tz = state.data ? displayTz(state.data) : undefined
 
   return (
-    <div data-testid="user-page">
+    <div data-testid="user-page" className="space-y-3">
+      <div className="rounded-lg border border-border bg-card px-4 py-3">
+        <p className="truncate text-lg font-semibold">{profile?.name || `uid ${id}`}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          {profile?.username ? `@${profile.username}` : '没有公开用户名'} · uid {id}
+        </p>
+      </div>
       <SectionCard title="用户资料">
         {profile && (
           <>
@@ -38,7 +44,6 @@ export function UserPage({ id }: { id: number }) {
               <span className="font-mono">{profile.user_id}</span>
             </InfoRow>
             {profile.username !== '' && <InfoRow label="用户名">@{profile.username}</InfoRow>}
-            <InfoRow label="昵称">{profile.name !== '' ? profile.name : '（查不到）'}</InfoRow>
             <InfoRow label="个人简介">{profile.bio !== '' ? profile.bio : '（空或查不到）'}</InfoRow>
             <InfoRow label="发言">
               留底 {profile.kept} 条 ｜ 画像累计 {profile.msgs} 条 ｜ 历史命中 {profile.hits} 次
@@ -54,7 +59,7 @@ export function UserPage({ id }: { id: number }) {
         )}
       </SectionCard>
 
-      <div className="mb-2">
+      <div>
         <Segmented
           value={filter}
           onChange={(next) => setFilter(next === 'all' ? 'all' : 'act')}

@@ -24,7 +24,7 @@ export function DropdownMenuContent({
     <BaseMenu.Portal>
       <BaseMenu.Positioner sideOffset={4} className="z-50">
         <BaseMenu.Popup
-          className={cn('glass min-w-40 rounded-lg p-1', className)}
+          className={cn('overlay-surface min-w-40 rounded-lg p-1', className)}
           {...props}
         >
           {children}

@@ -157,7 +157,11 @@ export function UpstreamsPage() {
   }
 
   return (
-    <div data-testid="upstreams-page">
+    <div data-testid="upstreams-page" className="space-y-3">
+      <div className="rounded-lg border border-border bg-card px-4 py-3">
+        <p className="text-xs text-muted-foreground">已登记渠道</p>
+        <p className="mt-0.5 text-[24px] font-semibold tabular-nums">{upstreams.length}</p>
+      </div>
       <SectionCard title="渠道" footer={<ListRow primary="＋ 添加渠道" chevron onClick={openAdd} />}>
         {upstreams.length === 0 ? (
           <p className="px-4 py-3 text-[13px] text-muted-foreground">
@@ -399,11 +403,17 @@ export function UpstreamDetailPage({ id }: { id: number }) {
   }
 
   return (
-    <div data-testid="upstream-detail-page">
+    <div data-testid="upstream-detail-page" className="space-y-3">
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-semibold">{upstream.name}</p>
+          <p className="truncate text-xs text-muted-foreground">{upstream.base_url}</p>
+        </div>
+        <StatusBadge status={upstream.status} />
+      </div>
       <SectionCard>
         <ListRow
           primary={upstream.name}
-          secondary={upstream.base_url}
           badge={<StatusBadge status={upstream.status} />}
         />
         <SwitchRow

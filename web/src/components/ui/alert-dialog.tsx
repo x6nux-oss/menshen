@@ -33,7 +33,6 @@ export function AlertDialogBackdrop({
   )
 }
 
-/** 确认框主体。**用玻璃底**（浮起元素，§4.4）。 */
 export function AlertDialogContent({
   className,
   children,
@@ -44,8 +43,8 @@ export function AlertDialogContent({
       <AlertDialogBackdrop />
       <BaseAlertDialog.Popup
         className={cn(
-          'glass fixed top-1/2 left-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2',
-          'max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl p-5',
+          'overlay-surface fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2',
+          'max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl p-6',
           'transition-[opacity,transform] data-[starting-style]:scale-95 data-[starting-style]:opacity-0',
           'data-[ending-style]:scale-95 data-[ending-style]:opacity-0',
           className,

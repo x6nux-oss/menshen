@@ -1,7 +1,3 @@
-// 搜索框：圆角灰底、Search 图标、受控 value/onChange、可清空、可回车提交。
-//
-// props 与旧 src/ui/SearchField 对齐（含 autoFocus/disabled/clearable/onSubmit/
-// ariaLabel —— 这些在旧实现的多个调用点用到，不能省）。
 import { Search, X } from 'lucide-react'
 import type { KeyboardEvent } from 'react'
 import { cn } from '../../lib/utils'
@@ -46,16 +42,14 @@ export function SearchField({
           if (event.key === 'Enter') onSubmit?.()
         }}
         placeholder={placeholder}
-        // placeholder 只作视觉提示，读屏更依赖 aria-label（沿用旧实现的处理）。
         aria-label={ariaLabel ?? placeholder}
         autoFocus={autoFocus}
         disabled={disabled}
         className={cn(
-          'h-10 w-full rounded-md bg-muted pr-9 pl-9 text-[15px] text-foreground outline-none',
+          'h-11 w-full rounded-md border border-input bg-card pr-10 pl-9 text-sm text-foreground outline-none',
           'placeholder:text-muted-foreground',
-          'focus-visible:ring-2 focus-visible:ring-ring/40',
+          'focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          // 去掉 type=search 的原生清除按钮，用我们自己的（样式可控）
           '[&::-webkit-search-cancel-button]:appearance-none',
         )}
       />
@@ -64,7 +58,7 @@ export function SearchField({
           type="button"
           aria-label="清空"
           onClick={() => onChange('')}
-          className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="absolute top-1/2 right-1 grid size-9 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
         >
           <X className="size-4" aria-hidden />
         </button>

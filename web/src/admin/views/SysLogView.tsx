@@ -5,7 +5,8 @@ import { displayTz, fmtTSFull } from '../../lib/format'
 import { logLevelInfo } from '../../lib/status'
 import { Button, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui'
 import { SearchField } from '../../components/mobile'
-import { CardBlock, DataTable, MonoText, PageHeader, StatusBadge, Toolbar } from '../components'
+import { CardBlock, MonoText, PageHeader, StatusBadge } from '../components'
+import { DataTable } from '../data-table'
 import { useDebouncedValue } from '../nav'
 import type { Column } from '../components'
 import type { SysLogRow } from '../../api/types'
@@ -74,50 +75,65 @@ export function SysLogView() {
           </Button>
         }
       />
-      <Toolbar>
-        <div className="flex min-w-[160px] flex-col gap-1">
-          <Label htmlFor="syslog-level">级别</Label>
-          <Select
-            value={level === '' ? ALL : level}
-            onValueChange={(v) => setLevel(v === ALL ? '' : v)}
-          >
-            <SelectTrigger id="syslog-level" aria-label="级别">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LEVELS.map((l) => (
-                <SelectItem key={l.value} value={l.value === '' ? ALL : l.value}>
-                  {l.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <SearchField value={q} onChange={setQ} placeholder="搜索消息 / 字段" className="max-w-[320px]" />
-      </Toolbar>
-
       <DataTable
         loading={logs.isPending}
         rows={rows}
         rowKey={(row) => row.seq}
         empty={<span className="text-[13px] text-muted-foreground">没有匹配的日志。</span>}
         columns={columns}
+        toolbar={
+          <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+            <div className="flex min-w-[160px] flex-col gap-1">
+              <Label htmlFor="syslog-level" className="text-[11px] font-medium text-muted-foreground">
+                级别
+              </Label>
+              <Select
+                value={level === '' ? ALL : level}
+                onValueChange={(v) => setLevel(v === ALL ? '' : v)}
+              >
+                <SelectTrigger id="syslog-level" aria-label="级别">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LEVELS.map((l) => (
+                    <SelectItem key={l.value} value={l.value === '' ? ALL : l.value}>
+                      {l.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <SearchField
+              value={q}
+              onChange={setQ}
+              placeholder="搜索消息 / 字段"
+              className="max-w-[320px]"
+            />
+            {counts && (
+              <span className="ml-auto self-center font-mono text-[11.5px] text-muted-foreground tabular-nums">
+                D {counts.debug} · I {counts.info} · W {counts.warn} · E {counts.error}
+              </span>
+            )}
+          </div>
+        }
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
+            <span>已加载 {rows.length} 条（进程内缓冲，重启清空）</span>
+            {logs.hasNextPage ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={logs.isFetchingNextPage}
+                onClick={() => void logs.fetchNextPage()}
+              >
+                {logs.isFetchingNextPage ? '加载中…' : '加载更多'}
+              </Button>
+            ) : (
+              rows.length > 0 && <span>已到末尾</span>
+            )}
+          </div>
+        }
       />
-
-      <div className="mt-1.5 flex justify-center gap-2">
-        {logs.hasNextPage && (
-          <Button
-            variant="outline"
-            disabled={logs.isFetchingNextPage}
-            onClick={() => void logs.fetchNextPage()}
-          >
-            {logs.isFetchingNextPage ? '加载中…' : '加载更多'}
-          </Button>
-        )}
-        {!logs.hasNextPage && rows.length > 0 && (
-          <span className="text-[13px] text-muted-foreground">已到末尾（{rows.length} 条）</span>
-        )}
-      </div>
     </>
   )
 }

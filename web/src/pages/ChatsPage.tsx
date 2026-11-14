@@ -211,7 +211,11 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
           ariaLabel="搜索群组"
           className="flex-1"
         />
-        <Button size="sm" variant="secondary" onClick={() => (batch ? exitBatch() : setBatch(true))}>
+        <Button
+          size="sm"
+          variant={batch ? 'default' : 'outline'}
+          onClick={() => (batch ? exitBatch() : setBatch(true))}
+        >
           {batch ? '取消' : '管理'}
         </Button>
         {!batch && (
@@ -249,7 +253,7 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
           <EmptyState title="没有匹配的群" description="换个关键词，或清除筛选后重试。" />
         )
       ) : (
-        <SectionCard>
+        <SectionCard title={batch ? '选择群组' : '群组'} meta={`${visible.length} 个`}>
           {visible.map((chat) => {
             const picked = selected.some((c) => chatKey(c) === chatKey(chat))
             return (
@@ -290,7 +294,7 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
         <div
           ref={barRef}
           data-testid="batch-bar"
-          className="fixed inset-x-0 z-20 border-t border-border bg-card px-2 py-2"
+          className="fixed inset-x-0 z-20 border-t border-border bg-card px-3 py-2 shadow-[0_-1px_0_var(--border)]"
           style={{ bottom: 'calc(var(--mini-nav-clearance) + 8px)' }}
         >
           <p className="mb-1.5 text-center text-[12px] text-muted-foreground">

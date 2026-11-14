@@ -5,7 +5,8 @@ import { actionLabel, displayTz, fmtTS, fmtTSFull } from '../../lib/format'
 import { verdictInfo } from '../../lib/status'
 import { Button } from '../../components/ui'
 import { ChatRef, Segmented } from '../../components/mobile'
-import { CardBlock, DataTable, InfoList, PageHeader, StatCard, StatusBadge } from '../components'
+import { CardBlock, InfoList, PageHeader, StatCard, StatusBadge } from '../components'
+import { DataTable } from '../data-table'
 import type { Column } from '../components'
 import type { UserLogRow } from '../../api/types'
 
@@ -30,8 +31,22 @@ export function UserView({ id }: { id: number }) {
   const tz = state.data ? displayTz(state.data) : undefined
   const pages = Math.max(1, Math.ceil(d.shown / PAGE_SIZE))
   const columns: Column<UserLogRow>[] = [
-    { key: 'id', header: '#', width: 70, render: (row) => row.id },
-    { key: 'time', header: '时间', width: 130, render: (row) => fmtTS(row.created_at, tz) },
+    {
+      key: 'id',
+      header: '#',
+      width: 70,
+      render: (row) => (
+        <span className="font-mono text-[12px] text-muted-foreground tabular-nums">{row.id}</span>
+      ),
+    },
+    {
+      key: 'time',
+      header: '时间',
+      width: 130,
+      render: (row) => (
+        <span className="font-mono text-[12px] tabular-nums">{fmtTS(row.created_at, tz)}</span>
+      ),
+    },
     { key: 'verdict', header: '判定', width: 90, render: (row) => <StatusBadge info={verdictInfo(row.verdict)} /> },
     { key: 'action', header: '处置', width: 120, render: (row) => actionLabel(row.action) },
     { key: 'chat', header: '群组', width: 140, render: (row) => <ChatRef name={row.chat} url={row.chat_url} fallback={row.chat_id} /> },
@@ -53,7 +68,7 @@ export function UserView({ id }: { id: number }) {
         subtitle={d.username ? `@${d.username} · uid ${d.user_id}` : `uid ${d.user_id}`}
       />
 
-      <div className="mb-2 grid gap-1.5 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
+      <div className="mb-4 grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
         <StatCard label="留底消息" value={d.msgs} hint={`缓存 ${d.kept} 条`} />
         <StatCard label="命中记录" value={d.hits} hint={`共 ${d.total} 条记录`} />
         <StatCard label="涉及群组" value={d.chats} />
@@ -91,23 +106,32 @@ export function UserView({ id }: { id: number }) {
           rowKey={(row) => row.id}
           empty={<span className="text-[13px] text-muted-foreground">没有匹配的记录。</span>}
           columns={columns}
+          footer={
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
+              <span>
+                第 {page} / {pages} 页 · 共 {d.shown} 条
+              </span>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={page <= 1 || user.isFetching}
+                  onClick={() => setPage(page - 1)}
+                >
+                  上一页
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={page >= pages || user.isFetching}
+                  onClick={() => setPage(page + 1)}
+                >
+                  下一页
+                </Button>
+              </div>
+            </div>
+          }
         />
-        <div className="mt-1.5 flex items-center gap-2">
-          <Button size="sm" variant="outline" disabled={page <= 1 || user.isFetching} onClick={() => setPage(page - 1)}>
-            上一页
-          </Button>
-          <span className="text-[13px] text-muted-foreground">
-            第 {page} / {pages} 页（{d.shown} 条）
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={page >= pages || user.isFetching}
-            onClick={() => setPage(page + 1)}
-          >
-            下一页
-          </Button>
-        </div>
       </CardBlock>
     </>
   )

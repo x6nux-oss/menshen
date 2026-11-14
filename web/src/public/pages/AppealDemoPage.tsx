@@ -7,16 +7,17 @@
 // `验证未通过`，密钥、域名白名单或 cdata 绑定出了问题，具体原因
 // 全靠这页显示。
 //
-// Phase 4：展示层换到新设计系统（Tailwind + components/ui）。
-// **验证链路一字未动** —— collectSignals / postJSON 的调用、回调签名、
+// **验证链路保持不变** —— collectSignals / postJSON 的调用、回调签名、
 // TurnstileWidget 的 props 全部保持原样（CSP 与安全边界）。
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { CheckCircle2, FlaskConical, TriangleAlert } from 'lucide-react'
 import { Button, Spinner } from '../../components/ui'
 import { getJSON, postJSON } from '../api'
 import type { AppealDemoData, WebRoute } from '../api'
 import { collectSignals } from '../fingerprint'
 import { errorText, InvalidState } from '../InvalidState'
 import { TurnstileWidget } from '../TurnstileWidget'
+import { PageHeader, SectionCard } from '../ui'
 
 export function AppealDemoPage({ route }: { route: WebRoute }) {
   const [data, setData] = useState<AppealDemoData | null>(null)
@@ -25,8 +26,8 @@ export function AppealDemoPage({ route }: { route: WebRoute }) {
   useEffect(() => {
     let alive = true
     getJSON<AppealDemoData>(route.path + '?json=1')
-      .then((d) => {
-        if (alive) setData(d)
+      .then((response) => {
+        if (alive) setData(response)
       })
       .catch((err: unknown) => {
         if (alive) setError(errorText(err))
@@ -44,16 +45,14 @@ export function AppealDemoPage({ route }: { route: WebRoute }) {
     )
 
   return (
-    <div data-testid="appeal-demo">
-      <h1 className="mb-1 text-xl font-bold">申诉验证测试台</h1>
-      <p className="mb-4 text-[13px] text-muted-foreground">
-        与用户申诉页同一条校验路径（action=appeal、cdata 绑定、hostname 核对），
-        通过即代表申诉验证也通；失败原因会显示在下方。
-      </p>
-      <div className="rounded-lg bg-card p-4 text-card-foreground">
-        <p className="text-[15px] font-bold">Cloudflare Turnstile</p>
+    <div data-testid="appeal-demo" className="space-y-4">
+      <PageHeader
+        title="申诉验证测试台"
+        description="与用户申诉页同一条校验路径（action=appeal、cdata 绑定、hostname 核对），通过即代表申诉验证也通。"
+      />
+      <SectionCard icon={<FlaskConical />} title="Cloudflare Turnstile">
         <DemoCard route={route} sitekey={data.sitekey} cdata={data.cdata} />
-      </div>
+      </SectionCard>
     </div>
   )
 }
@@ -77,17 +76,19 @@ function DemoCard({
       if (busyRef.current) return
       busyRef.current = true
       setSubmitting(true)
+      let passed = false
       try {
         const signals = await collectSignals()
         const resp = await postJSON<{ ok: boolean; msg: string }>(route.path, {
           token,
           signals,
         })
+        passed = resp.ok
         setResult(resp)
       } catch (err) {
         setResult({ ok: false, msg: errorText(err) })
       } finally {
-        busyRef.current = false
+        busyRef.current = passed
         setSubmitting(false)
       }
     },
@@ -100,35 +101,57 @@ function DemoCard({
   }, [])
   const retry = useCallback(() => {
     setResult(null)
-    setResetKey((k) => k + 1)
+    setResetKey((current) => current + 1)
   }, [])
 
   return (
     <>
-      <TurnstileWidget
-        sitekey={sitekey}
-        cdata={cdata}
-        resetKey={resetKey}
-        onToken={onToken}
-        onError={onError}
-      />
-      <p className="text-[12px] break-all text-muted-foreground">
+      {!result?.ok && (
+        <div className="rounded-md border border-border bg-muted/50 p-3">
+          <TurnstileWidget
+            sitekey={sitekey}
+            cdata={cdata}
+            resetKey={resetKey}
+            onToken={onToken}
+            onError={onError}
+          />
+        </div>
+      )}
+      <p className="mt-3 text-[12px] break-all text-muted-foreground">
         site key：{sitekey} · cdata：{cdata}
       </p>
       {submitting && (
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-3 flex items-center gap-2">
           <Spinner size={14} />
           <span className="text-[13px]">正在校验…</span>
         </div>
       )}
       {result && (
-        <div className="mt-2">
-          <p className={result.ok ? 'text-[13.5px] text-success' : 'text-[13.5px] text-destructive'}>
-            {result.ok ? '✅ ' : '❌ '}
-            {result.msg}
-          </p>
+        <div
+          role={result.ok ? 'status' : 'alert'}
+          className={`mt-4 rounded-md border p-4 ${
+            result.ok ? 'border-success/40 bg-success/8' : 'border-destructive/35 bg-destructive/6'
+          }`}
+        >
+          <div className="flex gap-3">
+            {result.ok ? (
+              <CheckCircle2 aria-hidden className="mt-0.5 size-5 shrink-0 text-success" />
+            ) : (
+              <TriangleAlert aria-hidden className="mt-0.5 size-5 shrink-0 text-destructive" />
+            )}
+            <div className="min-w-0">
+              <p
+                className={`text-[14px] font-semibold ${
+                  result.ok ? 'text-success' : 'text-destructive'
+                }`}
+              >
+                {result.ok ? '校验通过' : '校验未通过'}
+              </p>
+              <p className="mt-1 text-[14px] leading-6 break-words">{result.msg}</p>
+            </div>
+          </div>
           {!result.ok && (
-            <Button size="sm" variant="outline" className="mt-2" onClick={retry}>
+            <Button size="sm" variant="outline" className="mt-3 ml-8" onClick={retry}>
               重试验证
             </Button>
           )}

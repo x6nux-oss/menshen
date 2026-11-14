@@ -41,8 +41,10 @@ export function ChatDetailView({ botId, chatId }: { botId: number; chatId: numbe
         actions={<StatusBadge info={chatStatus(chat)} />}
       />
 
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0">
       <CardBlock title="运行状态">
-        <div className="grid gap-2">
+        <div className="divide-y divide-border">
           <ToggleRow
             label="启用判定"
             hint="停用后该群的消息不再判定。"
@@ -90,15 +92,19 @@ export function ChatDetailView({ botId, chatId }: { botId: number; chatId: numbe
           </span>
         </div>
       </CardBlock>
+        </div>
 
-      <CardBlock title="其他">
+        <div className="min-w-0">
+      <CardBlock title="标识">
         <InfoList
           items={[
             { label: '机器人', value: bot?.label ?? `bot ${botId}` },
             { label: 'chat id', value: chat.chat_id },
           ]}
         />
-        <div className="mt-4 flex flex-wrap gap-2">
+      </CardBlock>
+      <CardBlock title="维护">
+        <div className="flex flex-col items-start gap-2">
           <Button
             variant="outline"
             disabled={chatMut.isPending}
@@ -122,6 +128,8 @@ export function ChatDetailView({ botId, chatId }: { botId: number; chatId: numbe
           </ConfirmButton>
         </div>
       </CardBlock>
+        </div>
+      </div>
     </>
   )
 }
@@ -140,10 +148,10 @@ function ToggleRow({
   onChange: (v: boolean) => void
 }) {
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
       <div className="flex-1">
-        <p className="text-[13.5px]">{label}</p>
-        <p className="text-[12px] text-muted-foreground">{hint}</p>
+        <p className="text-[13.5px] font-medium">{label}</p>
+        <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{hint}</p>
       </div>
       <Switch
         checked={checked}

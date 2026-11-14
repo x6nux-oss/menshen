@@ -1,17 +1,5 @@
-// 桌面端专用展示组件：页面头、工具条、数据表、指标卡、确认按钮、键值列表。
-//
-// Phase 2 起改用新的设计系统（Tailwind + shadcn 风格的 components/ui + 玻璃层），
-// 不再依赖 MUI。**props 与旧实现保持兼容** —— 16 个视图的调用点不因这次迁移而改。
-//
-// 几处必须知道的历史包袱：
-//   1. `ConfirmButton` 的调用方仍传 MUI 风格的 `variant`/`color`/`size`
-//      （`contained`/`outlined`/`text`、`error`/`primary`、`small`），本组件负责翻译；
-//      等视图逐个迁完后（Phase 2 的 Task 4-19）可以收紧这层翻译。
-//   2. `StatusBadge` 收的是 `info: StatusInfo`（不是散开的 label/tone），
-//      `EmptyRow` 收的是 `text`（不是 children）—— 都照旧实现来。
-//   3. `CardBlock` 曾经接受 MUI 的 `sx`；迁移后改为 `className`，但为兼容仍接受
-//      并忽略 `sx`（当前无调用方使用，见 Phase 2 的扫描）。
 import type { ReactNode } from 'react'
+import { ArrowUpRight, Inbox } from 'lucide-react'
 import { cn } from '../lib/utils'
 import type { StatusInfo } from '../lib/status'
 import { Badge } from '../components/ui'
@@ -38,17 +26,19 @@ export function PageHeader({
   title,
   subtitle,
   actions,
+  className,
 }: {
   title: ReactNode
   subtitle?: ReactNode
   actions?: ReactNode
+  className?: string
 }) {
   return (
-    <div className="mb-4 flex flex-wrap items-start gap-4">
+    <div className={cn('mb-7 flex flex-wrap items-start gap-4', className)}>
       <div className="min-w-0">
-        <h1 className="text-xl leading-tight font-bold">{title}</h1>
+        <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-[28px]">{title}</h1>
         {subtitle !== undefined && (
-          <p className="mt-1 text-[13px] text-muted-foreground">{subtitle}</p>
+          <p className="mt-2 text-[13px] leading-6 text-muted-foreground">{subtitle}</p>
         )}
       </div>
       {actions !== undefined && (
@@ -59,8 +49,8 @@ export function PageHeader({
 }
 
 /** Toolbar 一行筛选控件（搜索框、分段、按钮），自动换行。 */
-export function Toolbar({ children }: { children: ReactNode }) {
-  return <div className="mb-3 flex flex-wrap items-center gap-3">{children}</div>
+export function Toolbar({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn('mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3', className)}>{children}</div>
 }
 
 /** StatCard 指标卡；onClick 存在时整卡可点。 */
@@ -69,35 +59,40 @@ export function StatCard({
   value,
   hint,
   onClick,
+  icon,
 }: {
   label: ReactNode
   value: ReactNode
   hint?: ReactNode
   onClick?: () => void
+  icon?: ReactNode
 }) {
   const body = (
     <>
-      <div className="text-[13px] text-muted-foreground">{label}</div>
-      <div className="mt-1 text-2xl leading-tight font-bold">{value}</div>
+      <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+        {label}
+        {icon && <span aria-hidden className="ml-auto [&_svg]:size-4">{icon}</span>}
+        {onClick && <ArrowUpRight className="ml-auto size-4" aria-hidden />}
+      </div>
+      <div className="mt-4 text-[30px] font-semibold leading-tight tracking-tight tabular-nums">{value}</div>
       {hint !== undefined && (
-        <div className="mt-1 text-[12.5px] text-muted-foreground">{hint}</div>
+        <div className="mt-2 text-xs leading-5 text-muted-foreground">{hint}</div>
       )}
     </>
   )
 
-  // 玻璃卡：统计卡是「浮起」元素（§4.4）。不开 refract —— 折射只给少量静态装饰。
   if (onClick) {
     return (
       <button
         type="button"
         onClick={onClick}
-        className="glass block w-full rounded-xl p-4 text-left outline-none transition-colors hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="block w-full rounded-lg border border-border bg-card p-5 text-left outline-none transition-colors hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring"
       >
         {body}
       </button>
     )
   }
-  return <div className="glass block w-full rounded-xl p-4">{body}</div>
+  return <div className="block w-full rounded-lg border border-border bg-card p-5">{body}</div>
 }
 
 export interface Column<T> {
@@ -153,19 +148,19 @@ export function DataTable<T>({
   return (
     <div className="w-full overflow-x-auto rounded-xl border border-border bg-card">
       <table className="w-full border-collapse text-sm">
-        <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur-sm">
+        <thead className="bg-muted/70">
           <tr className="border-b border-border">
             {columns.map((col) => (
               <th
                 key={col.key}
                 scope="col"
                 className={cn(
-                  'h-9 px-3 text-left align-middle text-[12.5px] font-medium whitespace-nowrap text-muted-foreground',
+                  'h-11 px-4 text-left align-middle text-xs font-medium whitespace-nowrap text-muted-foreground',
                   ALIGN_CLASS[col.align ?? 'left'],
                 )}
                 style={{ width: col.width }}
               >
-                {col.header}
+                {col.header === '' ? <span className="sr-only">操作</span> : col.header}
               </th>
             ))}
           </tr>
@@ -174,9 +169,19 @@ export function DataTable<T>({
           {rows.map((row) => (
             <tr
               key={rowKey(row)}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              onClick={onRowClick ? (event) => {
+                if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea, [role="button"], [role="checkbox"]')) return
+                onRowClick(row)
+              } : undefined}
+              onKeyDown={onRowClick ? (event) => {
+                if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                  event.preventDefault()
+                  onRowClick(row)
+                }
+              } : undefined}
               className={cn(
-                'border-b border-border transition-colors last:border-0 hover:bg-muted/50',
+                'border-b border-border transition-colors last:border-0 hover:bg-muted/50 focus-visible:bg-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                 onRowClick && 'cursor-pointer',
               )}
             >
@@ -185,7 +190,7 @@ export function DataTable<T>({
                   key={col.key}
                   data-align={col.align ?? 'left'}
                   className={cn(
-                    'max-w-[420px] px-3 py-2 align-middle',
+                    'max-w-[420px] px-4 py-3.5 align-middle',
                     ALIGN_CLASS[col.align ?? 'left'],
                   )}
                 >
@@ -205,8 +210,9 @@ export function EmptyRow({ text }: { text: ReactNode }) {
   return (
     <div
       data-testid="table-empty"
-      className="rounded-xl border border-border bg-card p-8 text-center"
+      className="rounded-lg border border-border bg-card px-6 py-12 text-center"
     >
+      <Inbox className="mx-auto mb-3 size-6 text-muted-foreground" aria-hidden />
       <p className="text-sm text-muted-foreground">{text}</p>
     </div>
   )
@@ -336,7 +342,7 @@ export function ConfirmButton({
 /** InfoList 键值信息块（详情页通用）。 */
 export function InfoList({ items }: { items: { label: ReactNode; value: ReactNode }[] }) {
   return (
-    <dl className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[auto_1fr] sm:items-baseline">
+    <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[minmax(96px,auto)_1fr] sm:items-baseline">
       {items.map((item, index) => (
         <div key={index} className="contents">
           <dt className="text-[13px] whitespace-nowrap text-muted-foreground">{item.label}</dt>
@@ -363,9 +369,9 @@ export function CardBlock({
   sx?: unknown
 }) {
   return (
-    <Card className={cn('mb-4 gap-0 p-4', className)}>
+    <Card className={cn('mb-5 min-w-0 gap-0 p-5', className)}>
       {(title !== undefined || actions !== undefined) && (
-        <CardHeader className="mb-3 flex-row items-center gap-2 p-0">
+        <CardHeader className="mb-4 flex-row flex-wrap items-center gap-3 p-0">
           {title !== undefined && <CardTitle className="text-[15px] font-semibold">{title}</CardTitle>}
           {actions !== undefined && <div className="ml-auto">{actions}</div>}
         </CardHeader>

@@ -1,10 +1,3 @@
-// 错误态：按 ApiError.status 分流文案。
-//
-// **文案表逐字照抄旧 src/ui/ErrorState.tsx 的 copyFor()** —— 两个前端面在迁移
-// 期间并存，若这里另写一套，同一个 401 在两处会给出不同提示，用户会以为遇到了
-// 不同的问题。改动文案时两处要一起改（Phase 2/3 迁完删掉旧的那份）。
-//
-// status 语义：0 = 网络层失败、401 = 身份失效、403 = 无权限、其余 = 网络异常兜底。
 import { Ban, CloudOff, Lock } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/utils'
@@ -25,6 +18,13 @@ interface ErrorCopy {
 
 function copyFor(status: number): ErrorCopy {
   if (status === 401) {
+    if (typeof location !== 'undefined' && location.pathname.startsWith('/admin')) {
+      return {
+        icon: <Lock />,
+        title: '登录已过期',
+        description: '请回到 Telegram 与机器人的私聊，重新获取网页版登录链接，再回来重试。',
+      }
+    }
     return {
       icon: <Lock />,
       title: '请通过 Telegram 菜单按钮打开',
@@ -50,13 +50,14 @@ export function ErrorState({ status, onRetry, className }: ErrorStateProps) {
   return (
     <div
       data-testid="error-state"
-      className={cn('flex flex-col items-center px-3 py-6 text-center', className)}
+      role="alert"
+      className={cn('flex flex-col items-center rounded-lg border border-border bg-card px-5 py-10 text-center', className)}
     >
-      <div className="mb-1 text-muted-foreground/50 [&_svg]:size-12">{icon}</div>
-      <p className="text-[15px]">{title}</p>
-      <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{description}</p>
+      <div aria-hidden className="mb-4 grid size-12 place-items-center rounded-xl bg-muted text-muted-foreground [&_svg]:size-6">{icon}</div>
+      <p className="text-[15px] font-semibold">{title}</p>
+      <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-muted-foreground">{description}</p>
       {onRetry !== undefined && (
-        <Button variant="outline" onClick={onRetry} className="mt-2 px-3">
+        <Button variant="outline" onClick={onRetry} className="mt-4 px-4">
           重试
         </Button>
       )}

@@ -59,9 +59,7 @@ describe('LogDetailPage', () => {
     renderPage(<LogDetailPage id={9812} />)
     await screen.findByText('AI 复查')
 
-    // 操作栏按钮必须是紧凑尺寸：默认 h-9（36px）会把六个动作撑满屏幕，
-    // COMPACT_BTN 把它压到 h-8（32px）。
-    expect(screen.getByRole('button', { name: 'AI 复查' })).toHaveClass('h-8')
+    expect(screen.getByRole('button', { name: 'AI 复查' })).toHaveClass('h-9')
 
     fireEvent.click(screen.getByRole('button', { name: 'AI 复查' }))
     await waitFor(() => expect(bodies).toHaveLength(1))

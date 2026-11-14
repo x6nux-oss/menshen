@@ -1,20 +1,20 @@
 // 原文查看页（_w/v/<id>/<sig>）：门槛凭据 → 判定记录详情。
 //
-// Phase 4：展示层换到新设计系统。`useGate` 的调用与 reveal 流程一字未动。
-import type { ReactNode } from 'react'
-import { Button, Spinner } from '../../components/ui'
+// 这是管理员核对判定依据的页面，信息密度高于申诉页：先给结论，
+// 再给原文与留底，避免一进来就被大量流水淹没。
+import { CheckCircle2, FileText, ListChecks, ShieldAlert, TriangleAlert } from 'lucide-react'
+import { Badge, Spinner } from '../../components/ui'
 import { ChatRef } from '../../components/mobile'
+import { verdictInfo } from '../../lib/status'
 import type { LogRecordView, WebRoute } from '../api'
+import { GatePrompt } from '../GatePrompt'
 import { InvalidState } from '../InvalidState'
 import { useGate } from '../useGate'
-
-const CARD = 'mb-4 rounded-lg bg-card p-4 text-card-foreground'
-const TITLE = 'mb-2 text-[15px] font-bold'
-// 表格单元格：py: 0.75(6px) → py-1.5；pr: 1.5(12px) → pr-3；13.5px 字号。
-const TD = 'border-b border-border py-1.5 pr-3 text-[13.5px]'
+import { Callout, Meta, MetaGrid, Mono, PageHeader, SectionCard } from '../ui'
 
 export function LogViewPage({ route }: { route: WebRoute }) {
-  const { gate, view, error, loading, reveal } = useGate<LogRecordView>(route)
+  const { gate, view, error, revealError, expired, loading, reveal } =
+    useGate<LogRecordView>(route)
 
   if (error) return <InvalidState message={error} />
   if (view) return <LogContent view={view} />
@@ -25,109 +25,153 @@ export function LogViewPage({ route }: { route: WebRoute }) {
       </div>
     )
   return (
-    <>
-      <WarnCard text={gate.warn} />
-      <div className={CARD}>
-        <Button disabled={loading} onClick={() => void reveal()}>
-          {loading ? '正在读取…' : '查看内容'}
-        </Button>
-        <p className="mt-2 text-[13px] text-muted-foreground">
-          链接只对持有者有效；查看凭据 {Math.round((gate.ttl_seconds || 300) / 60)} 分钟内有效。
-        </p>
-      </div>
-    </>
+    <GatePrompt
+      warn={gate.warn}
+      ttlSeconds={gate.ttl_seconds}
+      loading={loading}
+      error={revealError}
+      expired={expired}
+      onReveal={() => void reveal()}
+    />
   )
 }
 
 function LogContent({ view }: { view: LogRecordView }) {
-  const r = view.record
+  const record = view.record
+  const verdict = verdictInfo(record.verdict)
   return (
     <div data-testid="log-view">
-      <WarnCard text="敏感内容，请勿转发。页面仅供管理员核对判定依据。" />
-      <div className={CARD}>
-        <p className="text-[13.5px] leading-[1.9]">
-          记录：<Mono>#{r.id}</Mono> ｜ 时间：{r.created}
-          <br />
-          用户：<Mono>{r.user_id}</Mono>
-          {r.user_name && `（${r.user_name}）`}
-          <br />
-          群组：<ChatRef name={r.chat} url={r.chat_url} fallback={r.chat_id} />
-          <br />
-          入群时间：{view.member.joined || '未知'} ｜ 群内发言：{view.member.msgs} ｜ 历史命中：
-          {view.member.hits}
-        </p>
+      <PageHeader
+        title="判定记录"
+        description="仅供管理员核对判定依据。请勿转发或截图外传。"
+        badge={
+          <Badge tone={verdict.tone}>
+            {verdict.label} · {Math.round(record.confidence * 100)}%
+          </Badge>
+        }
+      />
+
+      <div className="space-y-4">
+        <Callout tone="warning" icon={<TriangleAlert />} title="敏感内容">
+          本页包含被判定消息的原文与账号资料，请勿转发。
+        </Callout>
+
+        <SectionCard
+          icon={<ShieldAlert />}
+          title="判定结论"
+          aside={<Mono className="text-[12px] text-muted-foreground">#{record.id}</Mono>}
+        >
+          <MetaGrid>
+            <Meta label="结论">
+              <span className="flex flex-wrap items-center gap-2">
+                <Badge tone={verdict.tone}>{verdict.label}</Badge>
+                <span className="text-[14px] text-muted-foreground">
+                  置信度 {Math.round(record.confidence * 100)}%
+                </span>
+              </span>
+            </Meta>
+            <Meta label="处置">{record.action_label || record.action}</Meta>
+            <Meta label="类型">{record.kind || '—'}</Meta>
+            <Meta label="来源">{record.decider}</Meta>
+            <Meta label="时间" wide>
+              <Mono>{record.created}</Mono>
+            </Meta>
+            {record.reason && (
+              <Meta label="判定理由" wide>
+                <span className="whitespace-pre-wrap">{record.reason}</span>
+              </Meta>
+            )}
+          </MetaGrid>
+        </SectionCard>
+
+        <SectionCard icon={<FileText />} title="被拦原文">
+          <pre className="m-0 rounded-md border border-border bg-muted px-3 py-2.5 font-mono text-[13.5px] leading-6 break-words whitespace-pre-wrap">
+            {record.text}
+          </pre>
+        </SectionCard>
+
+        <SectionCard icon={<CheckCircle2 />} title="账号与群">
+          <MetaGrid>
+            <Meta label="用户">
+              <Mono>{record.user_id}</Mono>
+              {record.user_name && (
+                <span className="text-muted-foreground">（{record.user_name}）</span>
+              )}
+            </Meta>
+            <Meta label="群组">
+              <ChatRef name={record.chat} url={record.chat_url} fallback={record.chat_id} />
+            </Meta>
+            <Meta label="入群时间">{view.member.joined || '未知'}</Meta>
+            <Meta label="群内发言">{view.member.msgs} 条</Meta>
+            <Meta label="历史命中">{view.member.hits} 次</Meta>
+            <Meta label="消息 ID">
+              <Mono>#{record.message_id}</Mono>
+            </Meta>
+          </MetaGrid>
+        </SectionCard>
+
+        {view.history.length > 0 && (
+          <SectionCard icon={<FileText />} title={`该群最近留底（${view.history.length} 条）`}>
+            <table className="w-full border-collapse">
+              <tbody>
+                {view.history.map((item) => (
+                  <tr
+                    key={item.message_id}
+                    className={item.blocked ? 'bg-destructive/8' : undefined}
+                  >
+                    <td className="border-b border-border py-2 pr-3 align-top whitespace-nowrap text-[12.5px] text-muted-foreground">
+                      {item.time}
+                    </td>
+                    <td className="border-b border-border py-2 text-[14px] leading-6 break-words">
+                      {item.text}
+                      {item.blocked && (
+                        <Badge tone="no" className="ml-2 align-[1px]">
+                          被拦
+                        </Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </SectionCard>
+        )}
+
+        {view.logs.length > 0 && (
+          <SectionCard icon={<ListChecks />} title={`该群最近判定记录（${view.logs.length} 条）`}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="text-left text-[12px] text-muted-foreground">
+                    <th className="border-b border-border py-2 pr-3 font-medium">记录</th>
+                    <th className="border-b border-border py-2 pr-3 font-medium">时间</th>
+                    <th className="border-b border-border py-2 pr-3 font-medium">结论</th>
+                    <th className="border-b border-border py-2 font-medium">处置</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {view.logs.map((row) => (
+                    <tr key={row.id}>
+                      <td className="border-b border-border py-2 pr-3 text-[13px] whitespace-nowrap">
+                        <Mono>#{row.id}</Mono>
+                      </td>
+                      <td className="border-b border-border py-2 pr-3 text-[12.5px] whitespace-nowrap text-muted-foreground">
+                        {row.time}
+                      </td>
+                      <td className="border-b border-border py-2 pr-3 text-[13.5px] whitespace-nowrap">
+                        {verdictInfo(row.verdict).label} {Math.round(row.confidence * 100)}%
+                      </td>
+                      <td className="border-b border-border py-2 text-[13.5px]">
+                        {row.action_label || row.action}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
+        )}
       </div>
-
-      <div className={CARD}>
-        <p className={TITLE}>判定</p>
-        <p className="text-[13.5px] leading-[1.9]">
-          结论：{r.verdict} ｜ 类型：{r.kind || '—'} ｜ 置信度：
-          {Math.round(r.confidence * 100)}%
-          <br />
-          来源：{r.decider}
-          {r.reason && ` ｜ 理由：${r.reason}`}
-          <br />
-          处置：{r.action_label || r.action}
-        </p>
-        <p className={`${TITLE} mt-3`}>被拦原文</p>
-        {/* 旧实现是 Box component="pre" + m:0 p:1.25(10px) → p-2.5，圆角 1(4px) → rounded */}
-        <pre className="m-0 rounded bg-muted p-2.5 font-mono text-[13px] break-words whitespace-pre-wrap">
-          {r.text}
-        </pre>
-      </div>
-
-      {view.history.length > 0 && (
-        <div className={CARD}>
-          <p className={TITLE}>该群最近留底（{view.history.length} 条）</p>
-          <table className="w-full border-collapse">
-            <tbody>
-              {view.history.map((h) => (
-                <tr key={h.message_id} className={h.blocked ? 'bg-destructive/10' : undefined}>
-                  <td className={`${TD} whitespace-nowrap text-muted-foreground`}>{h.time}</td>
-                  <td className={TD}>
-                    {h.text}
-                    {h.blocked && <b> ← 被拦</b>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {view.logs.length > 0 && (
-        <div className={CARD}>
-          <p className={TITLE}>该群最近判定记录（{view.logs.length} 条）</p>
-          <table className="w-full border-collapse">
-            <tbody>
-              {view.logs.map((l) => (
-                <tr key={l.id}>
-                  <td className={TD}>
-                    <Mono>#{l.id}</Mono>
-                  </td>
-                  <td className={`${TD} whitespace-nowrap text-muted-foreground`}>{l.time}</td>
-                  <td className={TD}>
-                    {l.verdict} {Math.round(l.confidence * 100)}%
-                  </td>
-                  <td className={TD}>{l.action_label || l.action}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   )
-}
-
-function WarnCard({ text }: { text: string }) {
-  return (
-    <div className="mb-4 rounded-lg bg-warning p-3 text-[13px] leading-[1.7] text-warning-foreground">
-      {text}
-    </div>
-  )
-}
-
-function Mono({ children }: { children: ReactNode }) {
-  return <span className="font-mono">{children}</span>
 }

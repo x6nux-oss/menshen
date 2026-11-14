@@ -5,7 +5,8 @@ import { useRuleAgent, useRules, useMiniState } from '../../api/hooks'
 import { useRulesMutation } from '../../api/mutations'
 import { fmtTS } from '../../lib/format'
 import { SearchField } from '../../components/mobile'
-import { CardBlock, ConfirmButton, DataTable, InfoList, MonoText, PageHeader, StatCard, StatusBadge, Toolbar } from '../components'
+import { CardBlock, ConfirmButton, InfoList, MonoText, PageHeader, StatCard, StatusBadge } from '../components'
+import { DataTable } from '../data-table'
 import type { Column } from '../components'
 import { useRunFeedback } from '../feedback'
 import { useAdminNav } from '../nav'
@@ -141,39 +142,6 @@ export function RulesView() {
         )}
       </CardBlock>
 
-      <Toolbar>
-        <SearchField value={q} onChange={setQ} placeholder="搜索名称 / 正则" className="max-w-[300px]" />
-        <div className="flex min-w-[140px] flex-col gap-1">
-          <Label htmlFor="rules-filter">状态</Label>
-          <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger id="rules-filter" aria-label="状态">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部</SelectItem>
-              <SelectItem value="enabled">启用</SelectItem>
-              <SelectItem value="candidate">候选</SelectItem>
-              <SelectItem value="enforce">强制</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex min-w-[160px] flex-col gap-1">
-          <Label htmlFor="rules-sort">排序</Label>
-          <Select value={sort} onValueChange={setSort}>
-            <SelectTrigger id="rules-sort" aria-label="排序">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="default">默认</SelectItem>
-              <SelectItem value="coverage">覆盖率</SelectItem>
-              <SelectItem value="tp">命中广告</SelectItem>
-              <SelectItem value="hits">规则命中</SelectItem>
-              <SelectItem value="recent">最近创建</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </Toolbar>
-
       <DataTable
         loading={rules.isPending}
         rows={rows}
@@ -181,6 +149,58 @@ export function RulesView() {
         onRowClick={(row) => nav.go({ k: 'rule', id: row.id })}
         empty={<span className="text-[13px] text-muted-foreground">没有匹配的规则。</span>}
         columns={columns}
+        toolbar={
+          <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+            <SearchField
+              value={q}
+              onChange={setQ}
+              placeholder="搜索名称 / 正则"
+              className="max-w-[300px]"
+            />
+            <div className="flex min-w-[130px] flex-col gap-1">
+              <Label htmlFor="rules-filter" className="text-[11px] font-medium text-muted-foreground">
+                状态
+              </Label>
+              <Select value={filter} onValueChange={setFilter}>
+                <SelectTrigger id="rules-filter" aria-label="状态">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部</SelectItem>
+                  <SelectItem value="enabled">启用</SelectItem>
+                  <SelectItem value="candidate">候选</SelectItem>
+                  <SelectItem value="enforce">强制</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex min-w-[150px] flex-col gap-1">
+              <Label htmlFor="rules-sort" className="text-[11px] font-medium text-muted-foreground">
+                排序
+              </Label>
+              <Select value={sort} onValueChange={setSort}>
+                <SelectTrigger id="rules-sort" aria-label="排序">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">默认</SelectItem>
+                  <SelectItem value="coverage">覆盖率</SelectItem>
+                  <SelectItem value="tp">命中广告</SelectItem>
+                  <SelectItem value="hits">规则命中</SelectItem>
+                  <SelectItem value="recent">最近创建</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <span className="ml-auto self-center text-[12px] text-muted-foreground">
+              显示 {rows.length} / {all.length} 条
+            </span>
+          </div>
+        }
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
+            <span>强制需启用、测试过且零误封</span>
+            <span>点击行查看规则详情</span>
+          </div>
+        }
       />
 
       <SaveRuleDialog open={saveOpen} onClose={() => setSaveOpen(false)} onSaved={(resp) => run(Promise.resolve(resp), '已创建')} />

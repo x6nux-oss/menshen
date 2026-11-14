@@ -86,37 +86,39 @@ export function SysLogPage() {
   const countLoading = logs.isPending || logs.isPlaceholderData
 
   return (
-    <div data-testid="syslog-page">
-      <div className="mb-2 flex items-center gap-2">
-        <SearchField
-          value={q}
-          onChange={changeQ}
-          onSubmit={submitQ}
-          placeholder="搜消息 / 字段"
-          ariaLabel="搜索运行日志"
-        />
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => void logs.refetch()}
-          className="h-10 shrink-0 px-3"
-        >
-          刷新
-        </Button>
-      </div>
-
-      <div className="mb-1 flex flex-wrap items-center gap-1.5">
-        <Segmented
-          value={level}
-          onChange={setLevel}
-          options={LEVELS}
-          ariaLabel="日志级别"
-        />
-        <span className="text-[12px] text-muted-foreground">级别含更高档</span>
+    <div data-testid="syslog-page" className="space-y-3">
+      <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+        <div className="flex items-center gap-2">
+          <SearchField
+            value={q}
+            onChange={changeQ}
+            onSubmit={submitQ}
+            placeholder="搜消息 / 字段"
+            ariaLabel="搜索运行日志"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void logs.refetch()}
+            className="h-11 shrink-0 px-3"
+          >
+            刷新
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Segmented
+            value={level}
+            onChange={setLevel}
+            options={LEVELS}
+            ariaLabel="日志级别"
+            className="min-w-0 flex-1"
+          />
+          <span className="text-[11px] text-muted-foreground">级别含更高档</span>
+        </div>
       </div>
 
       {counts !== undefined && !countLoading && (
-        <div data-testid="syslog-counts" className="mb-1 px-1 text-[12.5px] text-muted-foreground">
+        <div data-testid="syslog-counts" className="px-1 text-xs text-muted-foreground">
           {`各级：调试 ${counts.debug} · 信息 ${counts.info} · 警告 ${counts.warn} · 错误 ${counts.error}`}
         </div>
       )}
@@ -136,7 +138,7 @@ export function SysLogPage() {
             )
           ) : (
             <>
-              <div className="mt-1">
+              <div className="overflow-hidden rounded-lg border border-border bg-card">
                 {rows.map((log) => (
                   <SysLogListRow key={log.seq} log={log} tz={tz} />
                 ))}
@@ -168,10 +170,10 @@ function SysLogListRow({ log, tz }: { log: SysLogRow; tz?: string }) {
   return (
     <div
       data-testid={`syslog-row-${log.seq}`}
-      className="border-b border-border px-1 py-1.5"
+      className="border-b border-border px-3 py-2.5 last:border-b-0"
     >
       <div className="flex flex-wrap items-baseline gap-2">
-        <span className="font-mono text-[12.5px] text-muted-foreground">
+        <span className="font-mono text-xs text-muted-foreground">
           {fmtTSFull(log.at, tz)}
         </span>
         <Badge tone={info.tone}>{info.label}</Badge>
@@ -180,7 +182,7 @@ function SysLogListRow({ log, tz }: { log: SysLogRow; tz?: string }) {
         </span>
       </div>
       {log.attrs.length > 0 && (
-        <div className="mt-1 font-mono text-[12px] leading-[1.6] break-words text-muted-foreground">
+        <div className="mt-1 font-mono text-xs leading-[1.6] break-words text-muted-foreground">
           {log.attrs.map((attr, i) => (
             <span key={`${attr.k}-${i}`} className="mr-2">
               {attr.k}={attr.v}

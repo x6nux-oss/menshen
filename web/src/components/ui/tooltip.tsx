@@ -42,7 +42,7 @@ export function Tooltip({ label, children, className }: TooltipProps) {
         id={id}
         role="tooltip"
         className={cn(
-          'glass pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2',
+          'overlay-surface pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2',
           'rounded-md px-2 py-1 text-[12px] whitespace-nowrap text-foreground opacity-0 transition-opacity',
           'group-hover:opacity-100 group-focus-within:opacity-100',
           // reduced-motion：不要过渡（无障碍基线）

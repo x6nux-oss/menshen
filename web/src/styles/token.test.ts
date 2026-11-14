@@ -19,20 +19,6 @@ const REQUIRED = [
   '--warning', '--border', '--input', '--ring',
 ]
 
-/**
- * 玻璃层 token 分两类（设计文档 §4.3 的 CSS 契约）：
- *   - VARIED：亮暗取值不同，必须两套都有（毛玻璃的材质感要让位给暗色底）
- *   - FIXED：与主题无关，只在 :root 定义一次（模糊半径、饱和度、噪点纹理及其不透明度
- *     —— 这些在任何主题下都是同一个值，重复进 .dark 只会制造一份要同步维护的副本）
- */
-const GLASS_VARIED = [
-  '--glass-bg', '--glass-border', '--glass-highlight', '--glass-shade',
-  '--glass-shadow', '--glass-sheen',
-]
-const GLASS_FIXED = [
-  '--glass-blur', '--glass-saturate', '--glass-noise', '--glass-noise-opacity',
-]
-
 describe('设计 token', () => {
   it('亮色定义在 :root', () => {
     expect(tokenCss).toMatch(/:root\s*\{/)
@@ -42,14 +28,9 @@ describe('设计 token', () => {
     expect(tokenCss).toMatch(/\.dark\s*\{/)
   })
 
-  it.each([...REQUIRED, ...GLASS_VARIED])('%s 在亮暗中都有定义', (name) => {
+  it.each(REQUIRED)('%s 在亮暗中都有定义', (name) => {
     const hits = tokenCss.match(new RegExp(`${name}:`, 'g')) ?? []
     expect(hits.length, `${name} 应定义两次（亮+暗）`).toBeGreaterThanOrEqual(2)
-  })
-
-  // 与主题无关的玻璃参数：定义在 :root 即可（.dark 不必重复）
-  it.each(GLASS_FIXED)('%s 有定义', (name) => {
-    expect(tokenCss).toContain(`${name}:`)
   })
 
   it('颜色值用 oklch', () => {

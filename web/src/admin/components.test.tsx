@@ -112,6 +112,28 @@ describe('DataTable', () => {
     expect(onRowClick).toHaveBeenCalledWith(rows[0])
   })
 
+  it('可点行支持键盘打开，内部按钮不触发行跳转', async () => {
+    const onRowClick = vi.fn()
+    const onAction = vi.fn()
+    render(
+      <DataTable
+        columns={[...columns, { key: 'action', header: '操作', render: () => <button onClick={onAction}>操作</button> }]}
+        rows={rows}
+        rowKey={(row) => row.id}
+        onRowClick={onRowClick}
+      />,
+    )
+    const row = screen.getAllByRole('row')[1]
+    expect(row).toHaveAttribute('tabindex', '0')
+    row.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(onRowClick).toHaveBeenCalledWith(rows[0])
+    onRowClick.mockClear()
+    await userEvent.click(within(row).getByRole('button', { name: '操作' }))
+    expect(onAction).toHaveBeenCalledOnce()
+    expect(onRowClick).not.toHaveBeenCalled()
+  })
+
   it('loading 且无数据时显示加载指示', () => {
     render(<DataTable columns={columns} rows={[]} rowKey={(r) => r.id} loading />)
     expect(screen.getByTestId('table-loading')).toBeInTheDocument()

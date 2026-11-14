@@ -25,7 +25,7 @@ export function Tabs({ onValueChange, ...props }: TabsProps) {
 export function TabsList({ className, ...props }: ComponentProps<typeof BaseTabs.List>) {
   return (
     <BaseTabs.List
-      className={cn('inline-flex items-center gap-1 rounded-lg bg-muted p-1', className)}
+      className={cn('inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1', className)}
       {...props}
     />
   )
@@ -35,7 +35,7 @@ export function TabsTrigger({ className, ...props }: ComponentProps<typeof BaseT
   return (
     <BaseTabs.Tab
       className={cn(
-        'inline-flex items-center justify-center rounded-md px-3 py-1 text-[13px] font-medium text-muted-foreground outline-none transition-colors select-none',
+        'inline-flex min-h-9 shrink-0 items-center justify-center rounded-md px-4 py-2 text-[13px] font-medium text-muted-foreground outline-none transition-colors select-none',
         'hover:text-foreground',
         'data-[selected]:bg-card data-[selected]:text-foreground data-[selected]:shadow-sm',
         'focus-visible:ring-2 focus-visible:ring-ring/50',

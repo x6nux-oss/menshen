@@ -1,6 +1,6 @@
 // shadcn 组件的类名/行为契约测试。jsdom 不跑真实样式，所以断的是
 // **结构契约**（类名、role、可交互性）；真机观感由组件预览页人工验收。
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -304,16 +304,22 @@ describe('Dialog', () => {
     expect(screen.getByText('这步不可撤销')).toBeInTheDocument()
   })
 
-  it('弹层内容用玻璃底（浮起元素，§4.4）', async () => {
+  it('Esc 关闭后焦点回到触发按钮', async () => {
     render(
-      <Dialog defaultOpen>
+      <Dialog>
+        <DialogTrigger render={<Button>打开</Button>} />
         <DialogContent data-testid="dc">
           <DialogTitle>标题</DialogTitle>
           <DialogDescription>说明</DialogDescription>
         </DialogContent>
       </Dialog>,
     )
-    expect((await screen.findByTestId('dc')).className).toContain('glass')
+    const trigger = screen.getByRole('button', { name: '打开' })
+    await userEvent.click(trigger)
+    expect(await screen.findByTestId('dc')).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
   })
 })
 

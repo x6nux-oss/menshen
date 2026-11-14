@@ -30,23 +30,25 @@ export function ChatStatusBadge({ chat }: { chat: Pick<Chat, 'enabled' | 'dryrun
  * 按钮贴底一屏尽量放下，不遮挡正文。记录与申诉详情共用。
  */
 export const COMPACT_BTN =
-  'h-8 min-w-0 flex-1 basis-auto px-1.25 text-[13px] whitespace-nowrap'
+  'h-9 min-w-0 flex-1 basis-[calc(50%-0.375rem)] px-2 text-[13px] whitespace-nowrap'
 
-/** Metric 是概览 2×2 指标格里的一格。 */
+/** Metric 是概览/统计区的指标格。 */
 export function Metric({ label, value }: { label: ReactNode; value: ReactNode }) {
   return (
-    <div>
-      <div className="text-[13px] leading-[1.4] text-muted-foreground">{label}</div>
-      <div className="text-xl leading-[1.5] font-semibold tabular-nums">{value}</div>
+    <div className="min-w-0">
+      <div className="text-xs leading-[1.4] text-muted-foreground">{label}</div>
+      <div className="mt-0.5 truncate text-xl leading-[1.35] font-semibold tracking-tight tabular-nums">
+        {value}
+      </div>
     </div>
   )
 }
 
-/** InfoRow 是详情页信息卡里的一行：左标签（灰色 13px）+ 右内容（可换行）。 */
+/** InfoRow 是详情页信息卡里的一行：左标签 + 右内容（可换行）。 */
 export function InfoRow({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex items-start gap-4 px-4 py-1.5">
-      <span className="w-19 shrink-0 text-[13px] leading-[1.6] text-muted-foreground">{label}</span>
+    <div className="flex items-start gap-3 border-b border-border px-4 py-2.5 last:border-b-0">
+      <span className="w-18 shrink-0 pt-0.5 text-xs leading-[1.6] text-muted-foreground">{label}</span>
       <div className="min-w-0 flex-1 text-sm leading-[1.6] break-words">{children}</div>
     </div>
   )
@@ -66,7 +68,7 @@ export function ListCount({
   testId?: string
 }) {
   return (
-    <div data-testid={testId} className="mb-1 px-0.5 text-[13px] text-muted-foreground">
+    <div data-testid={testId} className="px-0.5 text-xs text-muted-foreground">
       {loading || total === undefined ? '共 … 条' : `共 ${total} 条`}
     </div>
   )
@@ -75,7 +77,7 @@ export function ListCount({
 /** ListLoading 是筛选/搜索请求进行中的轻量占位，替代会误导的空态。 */
 export function ListLoading() {
   return (
-    <p data-testid="list-loading" className="py-2 text-center text-[13px] text-muted-foreground">
+    <p data-testid="list-loading" className="py-3 text-center text-xs text-muted-foreground">
       加载中…
     </p>
   )

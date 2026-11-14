@@ -12,8 +12,6 @@
 //   /admin/rules          必封规则         /admin/rules/5          规则详情
 //   /admin/settings       全局设置         /admin/syslog           运行日志
 //
-// 页面内的搜索词与筛选不写 URL（桌面端刷新丢失筛选是可接受的取舍），只有
-// 只有看哪一页进路径。登录链接带的 ?bot= 是目标 bot，所有导航都原样带着它。
 const BASE = '/admin'
 
 export type Section =

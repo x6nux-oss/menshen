@@ -17,17 +17,16 @@ export function EmptyState({ icon, title, description, action, className }: Empt
   return (
     <div
       data-testid="empty-state"
-      className={cn('flex flex-col items-center px-3 py-6 text-center', className)}
+      className={cn('flex flex-col items-center px-5 py-10 text-center', className)}
     >
-      {/* 图标默认用 lucide Inbox；[&_svg]:size-12 让调用方传任意图标都统一尺寸 */}
-      <div className="mb-1 text-muted-foreground/50 [&_svg]:size-12">
+      <div aria-hidden className="mb-4 grid size-12 place-items-center rounded-xl border border-border bg-muted text-muted-foreground [&_svg]:size-6">
         {icon ?? <Inbox />}
       </div>
-      <p className="text-[15px]">{title}</p>
+      <p className="text-[15px] font-medium">{title}</p>
       {description !== undefined && (
-        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{description}</p>
+        <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-muted-foreground">{description}</p>
       )}
-      {action !== undefined && <div className="mt-2">{action}</div>}
+      {action !== undefined && <div className="mt-4">{action}</div>}
     </div>
   )
 }

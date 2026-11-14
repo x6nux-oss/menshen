@@ -67,11 +67,11 @@ describe('AdminApp', () => {
     mockApiByOp()
     render(<AdminApp />)
 
-    expect(await screen.findByText('🛡 门神')).toBeInTheDocument()
+    expect(await screen.findByText('门神')).toBeInTheDocument()
     expect(screen.getAllByText('机器人').length).toBeGreaterThan(0)
     expect(screen.getAllByText('群组').length).toBeGreaterThan(0)
     expect(screen.getAllByText('记录').length).toBeGreaterThan(0)
-    expect(screen.getByText('退出登录')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '退出登录' })).toBeInTheDocument()
     // 概览的指标卡。
     expect((await screen.findAllByText('近 24 小时')).length).toBeGreaterThan(0)
   })
@@ -84,7 +84,7 @@ describe('AdminApp', () => {
     render(<AdminApp />)
 
     expect(await screen.findByText('需要登录')).toBeInTheDocument()
-    expect(screen.getByText(/🖥 网页版（浏览器打开）/)).toBeInTheDocument()
+    expect(screen.getByText(/网页版（浏览器打开）/)).toBeInTheDocument()
   })
 
   it('系统主题变化不覆盖用户显式选择', async () => {
@@ -93,7 +93,7 @@ describe('AdminApp', () => {
     mockApiByOp()
     render(<AdminApp />)
 
-    await screen.findByText('🛡 门神')
+    await screen.findByText('门神')
     expect(document.documentElement.classList.contains('dark')).toBe(true)
 
     act(() => system.set('light'))
@@ -105,7 +105,7 @@ describe('AdminApp', () => {
     mockApiByOp()
     render(<AdminApp />)
 
-    await screen.findByText('🛡 门神')
+    await screen.findByText('门神')
     const toggle = screen.getByRole('button', { name: '主题：跟随系统' })
     fireEvent.click(toggle)
     fireEvent.click(toggle)

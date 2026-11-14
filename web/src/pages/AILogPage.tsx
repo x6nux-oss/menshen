@@ -82,27 +82,26 @@ export function AILogPage() {
   const countLoading = logs.isPending || logs.isPlaceholderData
 
   return (
-    <div data-testid="ailog-page">
-      <div className="mb-1 flex items-center gap-2">
-        <SearchField
-          value={q}
-          onChange={changeQ}
-          onSubmit={submitQ}
-          placeholder="搜模型 / 上游 / 错误"
-          ariaLabel="搜索模型调用流水"
-          className="flex-1"
-        />
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => void logs.refetch()}
-          className="h-10 shrink-0 px-3"
-        >
-          刷新
-        </Button>
-      </div>
-
-      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+    <div data-testid="ailog-page" className="space-y-3">
+      <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+        <div className="flex items-center gap-2">
+          <SearchField
+            value={q}
+            onChange={changeQ}
+            onSubmit={submitQ}
+            placeholder="搜模型 / 上游 / 错误"
+            ariaLabel="搜索模型调用流水"
+            className="flex-1"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void logs.refetch()}
+            className="h-11 shrink-0 px-3"
+          >
+            刷新
+          </Button>
+        </div>
         <Segmented
           value={status}
           onChange={setStatus}
@@ -129,7 +128,7 @@ export function AILogPage() {
             )
           ) : (
             <>
-              <div className="mt-1">
+              <div className="overflow-hidden rounded-lg border border-border bg-card">
                 {rows.map((row) => (
                   <AILogListRow
                     key={row.id}
@@ -168,7 +167,7 @@ function AILogListRow({ row, tz, onOpen }: { row: AILogRow; tz?: string; onOpen:
       type="button"
       data-testid={`ailog-row-${row.id}`}
       onClick={onOpen}
-      className="block min-h-[52px] w-full border-b border-border px-2 py-1.5 text-left transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+        className="block min-h-14 w-full border-b border-border px-4 py-2.5 text-left transition-colors outline-none last:border-b-0 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
     >
       <span className="flex items-center gap-1.5">
         <Badge tone={ok ? 'ok' : 'no'}>{ok ? '成功' : '失败'}</Badge>
@@ -177,7 +176,7 @@ function AILogListRow({ row, tz, onOpen }: { row: AILogRow; tz?: string; onOpen:
         </span>
         <span className="shrink-0 text-[12px] text-muted-foreground">{row.latency_ms}ms</span>
       </span>
-      <span className="mt-1 block truncate text-[12px] text-muted-foreground">
+        <span className="mt-1 block truncate text-xs text-muted-foreground">
         {fmtTSFull(row.ts, tz)} · {row.endpoint} · {row.upstream || '—'} ·{' '}
         {row.prompt_tokens}+{row.completion_tokens} tok · {row.cost_text}
         {!ok && row.status ? ` · ${row.status}` : ''}

@@ -120,7 +120,7 @@ export function RecordsPage() {
   ]
 
   return (
-    <div data-testid="records-page">
+    <div data-testid="records-page" className="space-y-3">
       <div className="mb-2">
         <Segmented
           value={section}
@@ -132,14 +132,14 @@ export function RecordsPage() {
 
       {section === 'logs' ? (
         <>
-          <SearchField
-            value={q}
-            onChange={changeQ}
-            onSubmit={submitQ}
-            placeholder="搜原文 / 理由 / 记录号 / uid / 群号"
-            ariaLabel="搜索记录"
-          />
-          <div className="mt-2 mb-1">
+          <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+            <SearchField
+              value={q}
+              onChange={changeQ}
+              onSubmit={submitQ}
+              placeholder="搜原文 / 理由 / 记录号 / uid / 群号"
+              ariaLabel="搜索记录"
+            />
             <Segmented
               value={logFilter}
               onChange={setLogFilter}
@@ -162,7 +162,7 @@ export function RecordsPage() {
                 )
               ) : (
                 <>
-                  <div className="mt-1">
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
                     {logRows.map((log) => (
                       <LogListRow
                         key={log.id}
@@ -188,7 +188,7 @@ export function RecordsPage() {
         </>
       ) : (
         <>
-          <div className="mb-1">
+          <div className="rounded-lg border border-border bg-card p-3">
             <Segmented
               value={appealFilter}
               onChange={setAppealFilter}
@@ -211,7 +211,7 @@ export function RecordsPage() {
                 )
               ) : (
                 <>
-                  <div className="mt-1">
+              <div className="overflow-hidden rounded-lg border border-border bg-card">
                     {appealRows.map((appeal) => (
                       <AppealListRow
                         key={appeal.id}

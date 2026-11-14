@@ -26,7 +26,7 @@ import {
   Separator,
   Spinner,
 } from '../../components/ui'
-import { CardBlock, MonoText, PageHeader, StatusBadge, Toolbar } from '../components'
+import { CardBlock, MonoText, PageHeader, StatusBadge } from '../components'
 import { DataTable } from '../data-table'
 import { useDebouncedValue } from '../nav'
 import type { Column } from '../components'
@@ -101,33 +101,6 @@ export function AILogView() {
           </Button>
         }
       />
-      <Toolbar>
-        <div className="flex min-w-[140px] flex-col gap-1">
-          <Label htmlFor="ailog-status">结果</Label>
-          <Select
-            value={status === '' ? ALL : status}
-            onValueChange={(v) => setStatus(v === ALL ? '' : v)}
-          >
-            <SelectTrigger id="ailog-status" aria-label="结果">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_FILTERS.map((s) => (
-                <SelectItem key={s.value} value={s.value === '' ? ALL : s.value}>
-                  {s.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <SearchField
-          value={q}
-          onChange={setQ}
-          placeholder="搜索模型 / 上游 / 状态 / 错误"
-          className="max-w-[360px]"
-        />
-      </Toolbar>
-
       {logs.isError ? (
         <ErrorState status={errorStatus(logs.error)} onRetry={() => void logs.refetch()} />
       ) : (
@@ -139,23 +112,60 @@ export function AILogView() {
           onRowClick={(row) => setOpenId(row.id)}
           empty={<span className="text-[13px] text-muted-foreground">没有匹配的调用记录。</span>}
           columns={columns}
+          toolbar={
+            <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+              <div className="flex min-w-[140px] flex-col gap-1">
+                <Label htmlFor="ailog-status" className="text-[11px] font-medium text-muted-foreground">
+                  结果
+                </Label>
+                <Select
+                  value={status === '' ? ALL : status}
+                  onValueChange={(v) => setStatus(v === ALL ? '' : v)}
+                >
+                  <SelectTrigger id="ailog-status" aria-label="结果">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_FILTERS.map((s) => (
+                      <SelectItem key={s.value} value={s.value === '' ? ALL : s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <SearchField
+                value={q}
+                onChange={setQ}
+                placeholder="搜索模型 / 上游 / 状态 / 错误"
+                className="max-w-[360px]"
+              />
+              <span className="ml-auto self-center text-[12px] text-muted-foreground">
+                点击行查看请求与响应全文
+              </span>
+            </div>
+          }
+          footer={
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
+              <span>已加载 {rows.length} 条（按时间新→旧）</span>
+              <div className="flex items-center gap-2">
+                {logs.hasNextPage ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={logs.isFetchingNextPage}
+                    onClick={() => void logs.fetchNextPage()}
+                  >
+                    {logs.isFetchingNextPage ? '加载中…' : '加载更多'}
+                  </Button>
+                ) : (
+                  rows.length > 0 && <span>已到末尾</span>
+                )}
+              </div>
+            </div>
+          }
         />
       )}
-
-      <div className="mt-1.5 flex justify-center gap-2">
-        {logs.hasNextPage && (
-          <Button
-            variant="outline"
-            disabled={logs.isFetchingNextPage}
-            onClick={() => void logs.fetchNextPage()}
-          >
-            {logs.isFetchingNextPage ? '加载中…' : '加载更多'}
-          </Button>
-        )}
-        {!logs.hasNextPage && rows.length > 0 && (
-          <span className="text-[13px] text-muted-foreground">已到末尾（{rows.length} 条）</span>
-        )}
-      </div>
 
       <AILogDetailDialog id={openId} onClose={() => setOpenId(null)} tz={tz} />
     </>

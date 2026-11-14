@@ -2,7 +2,7 @@
 // - 三个开关（启用/演练/群内展示）乐观更新失败回滚；
 // - 处罚方式 Select + `实际执行` 行 + 防错提示（称呼语时长用 muteOptLabel）；
 // - 补全历史入群时间（成功 toast 用服务端 note）；危险区移除该群。
-import { FolderOpen } from 'lucide-react'
+import { FolderOpen, Users } from 'lucide-react'
 import { errorStatus } from '../api/client'
 import { useMiniState } from '../api/hooks'
 import { useChatMutation, useOptimisticMiniMutation } from '../api/mutations'
@@ -117,6 +117,18 @@ export function ChatDetailPage({ botId, chatId }: { botId: number; chatId: numbe
 
   return (
     <div data-testid="chat-detail-page">
+      <div className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+          <Users className="size-5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-semibold">{chat.title || chat.chat_id}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {bot ? bot.label : `bot ${botId}`} · 实际处置 {effectivePunish}
+          </p>
+        </div>
+        <ChatStatusBadge chat={chat} />
+      </div>
       <SectionCard>
         <ListRow
           primary={

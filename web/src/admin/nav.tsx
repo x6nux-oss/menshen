@@ -32,6 +32,7 @@ export function AdminNavProvider({ children }: { children: ReactNode }) {
     if (url === current) return
     if (replace) history.replaceState(null, '', url)
     else history.pushState(null, '', url)
+    document.scrollingElement?.scrollTo(0, 0)
   }, [])
 
   const value = useMemo<AdminNav>(() => ({ route, go }), [route, go])

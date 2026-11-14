@@ -1,14 +1,22 @@
-// 记录：判定记录与申诉两个分段，服务端分页 + 搜索。
-import { useState } from 'react'
-import { Button, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsList, TabsTrigger } from '../../components/ui'
+// 记录：判定记录与申诉两个分段，服务端分页 + 搜索；筛选写入 URL 便于刷新/分享。
+import {
+  Button,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from '../../components/ui'
 import { useAppeals, useLogs, useMiniState } from '../../api/hooks'
 import { actionLabel, apAI, displayTz, fmtTS, kindLabel } from '../../lib/format'
 import { appealStatusInfo, verdictInfo } from '../../lib/status'
 import { SearchField } from '../../components/mobile'
-import { DataTable, PageHeader, StatusBadge, Toolbar } from '../components'
+import { PageHeader, StatusBadge } from '../components'
+import { DataTable } from '../data-table'
 import { useAdminNav, useDebouncedValue } from '../nav'
 import type { Column } from '../components'
 import type { AppealRow, LogRow } from '../../api/types'
+import { FilterChips } from './list-tools'
+import { useSearchHotkey } from './use-search-hotkey'
+import { choiceParam, intParam, textParam, useUrlFilter } from './use-url-filters'
 
 const PAGE_SIZE = 20
 
@@ -18,237 +26,362 @@ const LOG_FILTERS = [
   { value: 'ad', label: '广告' },
   { value: 'clean', label: '正常' },
   { value: 'skipped', label: '未送检' },
-]
+] as const
+
+const APPEAL_FILTERS = [
+  { value: 'open', label: '未结' },
+  { value: 'all', label: '全部' },
+] as const
+
+const TABS = ['logs', 'appeals'] as const
+const LOG_VALUES = LOG_FILTERS.map((item) => item.value)
+const APPEAL_VALUES = APPEAL_FILTERS.map((item) => item.value)
+const TAB_PARAM = choiceParam(TABS)
+const LOG_FILTER_PARAM = choiceParam(LOG_VALUES)
+const APPEAL_FILTER_PARAM = choiceParam(APPEAL_VALUES)
+const SEARCH_PARAM = textParam()
+const PAGE_PARAM = intParam(1)
 
 export function RecordsView() {
   const state = useMiniState(true)
   const nav = useAdminNav()
-  const [seg, setSeg] = useState<'logs' | 'appeals'>('logs')
-  const [logFilter, setLogFilter] = useState('deleted')
-  const [appealFilter, setAppealFilter] = useState('open')
-  const [q, setQ] = useState('')
-  const [logPage, setLogPage] = useState(1)
-  const [appealPage, setAppealPage] = useState(1)
+  const [tab, setTab] = useUrlFilter<(typeof TABS)[number]>('tab', 'logs', TAB_PARAM)
+  const [logFilter, setLogFilter] = useUrlFilter<(typeof LOG_VALUES)[number]>(
+    'verdict',
+    'deleted',
+    LOG_FILTER_PARAM,
+  )
+  const [appealFilter, setAppealFilter] = useUrlFilter<(typeof APPEAL_VALUES)[number]>(
+    'appeal',
+    'open',
+    APPEAL_FILTER_PARAM,
+  )
+  const [q, setQ] = useUrlFilter('q', '', SEARCH_PARAM)
+  const [logPage, setLogPage] = useUrlFilter('page', 1, PAGE_PARAM)
+  const [appealPage, setAppealPage] = useUrlFilter('apage', 1, PAGE_PARAM)
   const debouncedQ = useDebouncedValue(q)
+  const searchRef = useSearchHotkey<HTMLDivElement>()
 
-  const logs = useLogs({ filter: logFilter, q: debouncedQ, page: logPage, enabled: seg === 'logs' })
-  const appeals = useAppeals({ filter: appealFilter, page: appealPage, enabled: seg === 'appeals' })
+  const logs = useLogs({
+    filter: logFilter,
+    q: debouncedQ,
+    page: logPage,
+    enabled: tab === 'logs',
+  })
+  const appeals = useAppeals({ filter: appealFilter, page: appealPage, enabled: tab === 'appeals' })
   const tz = state.data ? displayTz(state.data) : undefined
+  const openAppeals = state.data?.todo.open_appeals ?? 0
+
+  const logRows = logs.data?.logs ?? []
+  const appealRows = appeals.data?.appeals ?? []
+  const logTotal = logs.data?.total ?? 0
+  const appealTotal = appeals.data?.total ?? 0
 
   return (
     <>
       <PageHeader
         title="记录"
         subtitle={
-          seg === 'logs'
-            ? `判定记录，共 ${logs.data?.total ?? 0} 条`
-            : `申诉，共 ${appeals.data?.total ?? 0} 条（未结 ${state.data?.todo.open_appeals ?? 0}）`
+          tab === 'logs'
+            ? `判定记录 ${logTotal} 条 · 按处置结果筛选并下钻到单条判定`
+            : `申诉 ${appealTotal} 条 · 未结 ${openAppeals} 条`
+        }
+        actions={
+          <Tabs value={tab} onValueChange={(next) => setTab(next as (typeof TABS)[number])}>
+            <TabsList className="h-9">
+              <TabsTrigger value="logs" className="px-3.5">
+                判定记录
+              </TabsTrigger>
+              <TabsTrigger value="appeals" className="px-3.5">
+                申诉
+                {openAppeals > 0 && (
+                  <span className="ml-1.5 rounded bg-warning/20 px-1 text-[11px] tabular-nums text-foreground">
+                    {openAppeals}
+                  </span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         }
       />
-      <Tabs value={seg} onValueChange={(next) => setSeg(next as 'logs' | 'appeals')} className="mb-4">
-        <TabsList>
-          <TabsTrigger value="logs">判定记录</TabsTrigger>
-          <TabsTrigger value="appeals">申诉</TabsTrigger>
-        </TabsList>
-      </Tabs>
 
-      <Toolbar>
-        {seg === 'logs' ? (
-          <>
-            <div className="flex min-w-[150px] flex-col gap-1">
-              <Label htmlFor="rec-log-filter">判定</Label>
-              <Select
+      {tab === 'logs' ? (
+        <DataTable
+          loading={logs.isPending}
+          rows={logRows}
+          rowKey={(row) => row.id}
+          onRowClick={(row) => nav.go({ k: 'log', id: row.id })}
+          empty={
+            <span className="text-[13px] text-muted-foreground">
+              {q || logFilter !== 'deleted' ? '没有匹配的判定记录。' : '还没有判定记录。'}
+            </span>
+          }
+          columns={logColumns(tz)}
+          toolbar={
+            <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+              <FilterChips
+                ariaLabel="按判定结果筛选"
                 value={logFilter}
-                onValueChange={(v) => {
-                  setLogFilter(v)
+                onChange={(value) => {
+                  setLogFilter(value)
                   setLogPage(1)
                 }}
-              >
-                <SelectTrigger id="rec-log-filter" aria-label="判定">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LOG_FILTERS.map((f) => (
-                    <SelectItem key={f.value} value={f.value}>
-                      {f.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={LOG_FILTERS.map((item) => ({ ...item }))}
+              />
+              <div ref={searchRef} className="w-full max-w-[320px]">
+                <SearchField
+                  value={q}
+                  onChange={(value) => {
+                    setQ(value)
+                    setLogPage(1)
+                  }}
+                  placeholder="搜索正文 / 用户 id"
+                  ariaLabel="搜索判定记录"
+                />
+              </div>
             </div>
-            <SearchField
-              value={q}
-              onChange={(v) => {
-                setQ(v)
-                setLogPage(1)
-              }}
-              placeholder="搜索正文 / 用户 id"
-              className="max-w-[320px]"
+          }
+          footer={
+            <Pager
+              page={logPage}
+              total={logTotal}
+              loading={logs.isFetching}
+              onChange={setLogPage}
+              unit="条记录"
             />
-          </>
-        ) : (
-          <div className="flex min-w-[150px] flex-col gap-1">
-            <Label htmlFor="rec-appeal-filter">状态</Label>
-            <Select
-              value={appealFilter}
-              onValueChange={(v) => {
-                setAppealFilter(v)
-                setAppealPage(1)
-              }}
-            >
-              <SelectTrigger id="rec-appeal-filter" aria-label="状态">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="open">未结</SelectItem>
-                <SelectItem value="all">全部</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-      </Toolbar>
-
-      {seg === 'logs' ? (
-        <>
-          <LogTable rows={logs.data?.logs ?? []} loading={logs.isPending} tz={tz} onOpen={(id) => nav.go({ k: 'log', id })} />
-          <Pager
-            page={logPage}
-            total={logs.data?.total ?? 0}
-            loading={logs.isFetching}
-            onChange={setLogPage}
-          />
-        </>
+          }
+        />
       ) : (
-        <>
-          <AppealTable
-            rows={appeals.data?.appeals ?? []}
-            loading={appeals.isPending}
-            tz={tz}
-            onOpen={(id) => nav.go({ k: 'appeal', id })}
-          />
-          <Pager
-            page={appealPage}
-            total={appeals.data?.total ?? 0}
-            loading={appeals.isFetching}
-            onChange={setAppealPage}
-          />
-        </>
+        <DataTable
+          loading={appeals.isPending}
+          rows={appealRows}
+          rowKey={(row) => row.id}
+          onRowClick={(row) => nav.go({ k: 'appeal', id: row.id })}
+          empty={
+            <span className="text-[13px] text-muted-foreground">
+              {appealFilter === 'open' ? '没有未结申诉。' : '还没有申诉。'}
+            </span>
+          }
+          columns={appealColumns(tz)}
+          toolbar={
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <FilterChips
+                ariaLabel="按申诉状态筛选"
+                value={appealFilter}
+                onChange={(value) => {
+                  setAppealFilter(value)
+                  setAppealPage(1)
+                }}
+                options={APPEAL_FILTERS.map((item) => ({ ...item }))}
+              />
+              <p className="ml-auto self-center text-[11.5px] text-muted-foreground">
+                点击行查看申诉陈述与人工处置
+              </p>
+            </div>
+          }
+          footer={
+            <Pager
+              page={appealPage}
+              total={appealTotal}
+              loading={appeals.isFetching}
+              onChange={setAppealPage}
+              unit="条申诉"
+            />
+          }
+        />
       )}
     </>
   )
 }
 
-function LogTable({
-  rows,
-  loading,
-  tz,
-  onOpen,
-}: {
-  rows: LogRow[]
-  loading: boolean
-  tz?: string
-  onOpen: (id: number) => void
-}) {
-  const columns: Column<LogRow>[] = [
-    { key: 'id', header: '#', width: 70, render: (row) => row.id },
-    { key: 'time', header: '时间', width: 130, render: (row) => fmtTS(row.created_at, tz) },
-    { key: 'verdict', header: '判定', width: 90, render: (row) => <StatusBadge info={verdictInfo(row.verdict)} /> },
-    { key: 'action', header: '处置', width: 120, render: (row) => actionLabel(row.action) },
-    { key: 'kind', header: '类型', width: 110, render: (row) => kindLabel(row.kind) },
-    { key: 'user', header: '用户', width: 110, render: (row) => `uid ${row.user_id}` },
+function logColumns(tz?: string): Column<LogRow>[] {
+  return [
+    {
+      key: 'id',
+      header: '#',
+      width: 72,
+      render: (row) => (
+        <span className="font-mono text-[12px] text-muted-foreground tabular-nums">{row.id}</span>
+      ),
+    },
+    {
+      key: 'time',
+      header: '时间',
+      width: 120,
+      render: (row) => (
+        <span className="font-mono text-[12px] tabular-nums">{fmtTS(row.created_at, tz)}</span>
+      ),
+    },
+    {
+      key: 'verdict',
+      header: '判定',
+      width: 90,
+      render: (row) => <StatusBadge info={verdictInfo(row.verdict)} />,
+    },
+    {
+      key: 'action',
+      header: '处置',
+      width: 130,
+      render: (row) => (
+        <span className="text-[13px]">{actionLabel(row.action)}</span>
+      ),
+    },
+    {
+      key: 'kind',
+      header: '类型',
+      width: 100,
+      render: (row) => (
+        <span className="text-[12.5px] text-muted-foreground">{kindLabel(row.kind)}</span>
+      ),
+    },
+    {
+      key: 'user',
+      header: '用户',
+      width: 100,
+      render: (row) => (
+        <span className="font-mono text-[12px] tabular-nums">{row.user_id}</span>
+      ),
+    },
     {
       key: 'text',
-      header: '正文',
+      header: '正文 / 判定理由',
       render: (row) => (
-        <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] text-muted-foreground">
-          {row.text || row.reason || '—'}
+        <div className="min-w-0">
+          <p className="line-clamp-1 text-[13px]">{row.text || row.reason || '—'}</p>
+          {row.reason && row.text && (
+            <p className="line-clamp-1 text-[11.5px] text-muted-foreground">{row.reason}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'cost',
+      header: '开销',
+      width: 90,
+      align: 'right',
+      render: (row) => (
+        <span className="font-mono text-[12px] text-muted-foreground tabular-nums">
+          {row.cost_text || '—'}
         </span>
       ),
     },
-    { key: 'cost', header: '开销', width: 90, align: 'right', render: (row) => row.cost_text || '—' },
   ]
-  return (
-    <DataTable
-      loading={loading}
-      rows={rows}
-      rowKey={(row) => row.id}
-      onRowClick={(row) => onOpen(row.id)}
-      empty={<span className="text-[13px] text-muted-foreground">没有匹配的记录。</span>}
-      columns={columns}
-    />
-  )
 }
 
-function AppealTable({
-  rows,
-  loading,
-  tz,
-  onOpen,
-}: {
-  rows: AppealRow[]
-  loading: boolean
-  tz?: string
-  onOpen: (id: number) => void
-}) {
-  const columns: Column<AppealRow>[] = [
-    { key: 'id', header: '#', width: 70, render: (row) => row.id },
-    { key: 'time', header: '提交时间', width: 130, render: (row) => fmtTS(row.created_at, tz) },
-    { key: 'user', header: '用户', width: 110, render: (row) => `uid ${row.user_id}` },
-    { key: 'status', header: '状态', width: 100, render: (row) => <StatusBadge info={appealStatusInfo(row.status)} /> },
-    { key: 'ai', header: 'AI 结论', render: (row) => apAI(row.ai_result) },
+function appealColumns(tz?: string): Column<AppealRow>[] {
+  return [
+    {
+      key: 'id',
+      header: '#',
+      width: 72,
+      render: (row) => (
+        <span className="font-mono text-[12px] text-muted-foreground tabular-nums">{row.id}</span>
+      ),
+    },
+    {
+      key: 'time',
+      header: '提交时间',
+      width: 120,
+      render: (row) => (
+        <span className="font-mono text-[12px] tabular-nums">{fmtTS(row.created_at, tz)}</span>
+      ),
+    },
+    {
+      key: 'user',
+      header: '用户',
+      width: 100,
+      render: (row) => (
+        <span className="font-mono text-[12px] tabular-nums">{row.user_id}</span>
+      ),
+    },
+    {
+      key: 'status',
+      header: '状态',
+      width: 100,
+      render: (row) => <StatusBadge info={appealStatusInfo(row.status)} />,
+    },
+    {
+      key: 'ai',
+      header: 'AI 结论',
+      width: 110,
+      render: (row) => <span className="text-[13px]">{apAI(row.ai_result)}</span>,
+    },
     {
       key: 'reason',
-      header: 'AI 理由',
+      header: 'AI 理由 / 申诉',
       render: (row) => (
-        <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] text-muted-foreground">
-          {row.ai_reason || '—'}
+        <div className="min-w-0">
+          <p className="line-clamp-1 text-[13px]">{row.ai_reason || '—'}</p>
+          {row.statement && (
+            <p className="line-clamp-1 text-[11.5px] text-muted-foreground">{row.statement}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'web',
+      header: '网页尝试',
+      width: 90,
+      align: 'right',
+      render: (row) => (
+        <span className="tabular-nums text-muted-foreground">{row.web_attempts}</span>
+      ),
+    },
+    {
+      key: 'code',
+      header: '解禁码',
+      width: 90,
+      render: (row) => (
+        <span className={row.has_code ? 'text-[13px]' : 'text-[13px] text-muted-foreground'}>
+          {row.has_code ? '已签发' : '—'}
         </span>
       ),
     },
-    { key: 'web', header: '网页尝试', width: 90, align: 'right', render: (row) => row.web_attempts },
-    { key: 'code', header: '解禁码', width: 90, render: (row) => (row.has_code ? '已签发' : '—') },
   ]
-  return (
-    <DataTable
-      loading={loading}
-      rows={rows}
-      rowKey={(row) => row.id}
-      onRowClick={(row) => onOpen(row.id)}
-      empty={<span className="text-[13px] text-muted-foreground">没有匹配的申诉。</span>}
-      columns={columns}
-    />
-  )
 }
 
-/** Pager 记录分页：上一页/下一页 + 页码信息。 */
 function Pager({
   page,
   total,
   loading,
   onChange,
+  unit,
 }: {
   page: number
   total: number
   loading: boolean
   onChange: (page: number) => void
+  unit: string
 }) {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const to = Math.min(total, page * PAGE_SIZE)
   return (
-    <div className="mt-4 flex items-center gap-4">
-      <Button size="sm" variant="outline" disabled={page <= 1 || loading} onClick={() => onChange(page - 1)}>
-        上一页
-      </Button>
-      <span className="text-[13px] text-muted-foreground">
-        第 {page} / {pages} 页
+    <div className="flex flex-wrap items-center justify-between gap-3 text-[12px] text-muted-foreground">
+      <span>
+        {total === 0 ? `0 ${unit}` : `${from}–${to} / 共 ${total} ${unit}`}
       </span>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={page >= pages || loading}
-        onClick={() => onChange(page + 1)}
-      >
-        下一页
-      </Button>
+      <div className="flex items-center gap-1.5">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={page <= 1 || loading}
+          onClick={() => onChange(page - 1)}
+        >
+          上一页
+        </Button>
+        <span className="min-w-14 text-center tabular-nums">
+          {page} / {pages}
+        </span>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={page >= pages || loading}
+          onClick={() => onChange(page + 1)}
+        >
+          下一页
+        </Button>
+      </div>
     </div>
   )
 }

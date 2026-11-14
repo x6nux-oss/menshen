@@ -5,24 +5,13 @@ import type { ComponentProps } from 'react'
 import { isValidElement } from 'react'
 import { cn } from '../../lib/utils'
 
-/**
- * 按钮样式变体。
- *
- * **触控目标**：视觉高度默认 h-9（36px）、`sm` 是 h-8（32px），而 WCAG 2.5.8 要求
- * 至少 24×24、iOS HIG 建议 44×44。移动端详情页的底部操作条要在一行放下 6 个按钮，
- * 做不到每个 44px。所以采用**视觉不变、热区撑开**：`.tap-44` 用伪元素把可点区域
- * 扩到至少 44×44（视觉尺寸不变，不挤占布局）。这不是取巧 —— WCAG 2.5.8 明确
- * 允许「目标虽小，但有效点击区域足够大」。
- *
- * focus-visible 环是硬要求（无障碍）；disabled 用 opacity + pointer-events。
- */
 const buttonVariants = cva(
-  'tap-44 inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*=size-])]:size-4',
+  'tap-44 inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[background-color,color,border-color,box-shadow] duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*=size-])]:size-4',
   {
     variants: {
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-primary/90',
-        outline: 'border border-border bg-card hover:bg-accent hover:text-accent-foreground',
+        outline: 'border border-input bg-card hover:border-primary/40 hover:bg-accent hover:text-accent-foreground',
         secondary: 'bg-muted text-foreground hover:bg-accent',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
@@ -30,9 +19,9 @@ const buttonVariants = cva(
       },
       size: {
         sm: 'h-8 px-2.5 text-[0.8rem]',
-        default: 'h-9 px-3',
+        default: 'h-10 px-4',
         lg: 'h-11 px-4 text-base',
-        icon: 'size-9',
+        icon: 'size-10',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },
