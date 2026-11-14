@@ -17,22 +17,22 @@ go vet ./...
 
 这三项在 CI 上是打包前的门槛（`.github/workflows/docker.yml`）。
 
-## 前端（web/：Mini App + 桌面端管理面板）
+## 前端（web/：Mini App、管理面板与公开页）
 
-`web/` 是一个 React + MUI 工程，产出两个互相独立的界面，由 Go 分别托管：
-**Telegram Mini App**（`/miniapp`，`vite.config.ts`）与**桌面端管理面板**
-（`/admin`，`vite.admin.config.ts`）。两者只共用数据层（`web/src/api`、`web/src/lib`）
-与通用组件（`web/src/ui`）；页面与外壳各写一份。需要 Node ≥ 22.12（Vite 8 的下限）：
+`web/` 使用 React、Tailwind CSS 和 Base UI，由 rsbuild 构建，Go 托管三个独立入口：
+**Telegram Mini App**（`/miniapp`）、**桌面端管理面板**（`/admin`）与
+**公开页**（`/_w/*`）。三者共用 `web/src/components` 与设计 token，管理端共用
+`web/src/api`、`web/src/lib` 数据和工具层；页面与外壳各自装配。需要 Node ≥ 22.12：
 
 ```bash
 npm --prefix web install          # 安装依赖
 npm --prefix web run dev          # Mini App 开发服务器；/miniapp/api 代理到 127.0.0.1:8081
 VITE_MOCK=1 npm --prefix web run dev   # 不连后端：MSW 在浏览器里 mock /miniapp/api
-npm --prefix web run dev:admin    # 管理面板开发服务器（http://localhost:5173/admin/）
+npm --prefix web run dev:admin    # 管理面板开发服务器（默认 http://localhost:3000/admin/）
 npm --prefix web run typecheck    # tsc -b
 npm --prefix web run test         # vitest run
 npm --prefix web run lint         # oxlint
-npm --prefix web run build        # tsc -b && 两次 vite build，产物都输出到 internal/panel/webdist/
+npm --prefix web run build        # tsc -b && 两次 rsbuild build，产物都输出到 internal/panel/webdist/
 ```
 
 （`VITE_MOCK=1` 只 mock 接口；页面仍要能读到 `window.Telegram.WebApp` 才过得了
@@ -40,16 +40,16 @@ npm --prefix web run build        # tsc -b && 两次 vite build，产物都输�
 管理面板不吃 SDK，`dev:admin` 直接开 `/admin/`，会话过期时页面给重新获取
 登录链接的指引。）
 
-- **两个入口、两次构建**：`npm run build` 先用 `vite.config.ts`（base `/miniapp/`）
-  构建 `index.html`（Mini App）与 `public.html`（公开页），再用 `vite.admin.config.ts`
-  （base `/admin/`）构建 `admin.html`（管理面板）。两次产物都落在
-  `internal/panel/webdist/`，所以后者 `emptyOutDir: false` —— 顺序不能反，否则
-  第二次构建会把第一次的 `index.html` 清掉。发现目录共用一个 `assets/`，
-  但引用前缀不同（`/miniapp/assets/*` vs `/admin/assets/*`），互不影响。
+- **三个入口、两次构建**：`npm run build` 先用 `rsbuild.config.ts`
+  构建 `index.html`（Mini App）与 `public.html`（公开页），再用 `rsbuild.admin.config.ts`
+  构建 `admin.html`（管理面板）。两次产物都落在 `internal/panel/webdist/`，
+  前者 `cleanDistPath: true`、后者 `false`，顺序不能反。
+  共用一个 `assets/` 目录，但资源前缀分别是 `/miniapp/` 与 `/admin/`。
+  开发服务器用 `server.base` 设置对应基路径；开发产物目录在 `node_modules` 下，
+  不会清空 Go 嵌入目录。若默认端口被占用，以终端打印的地址为准。
 - **Telegram SDK 自托管**：`web/public/telegram-web-app.js`（2026-10-02 取自
   telegram.org 的官方脚本，sha256 `3549138a7934039fe7dfd1291a4ee739bd2b705a614308053a8b08a87d85c451`）
-  随产物发布到 `/miniapp/telegram-web-app.js`，`index.html` 用根绝对路径
-  `/telegram-web-app.js` 引用（public 资源交给 Vite 按 base 重写）。不要改回 CDN
+  随产物发布到 `/miniapp/telegram-web-app.js`，`index.html` 直接引用这个路径。不要改回 CDN
   外链——外链一旦拿不到，Mini App 就停在引导页。升级 SDK：替换该文件、更新此处的
   sha256，并重跑前端测试与 Go 托管测试。管理面板不加载它。
 - **构建产物不入库、默认嵌入**（`internal/panel/webdist/` 只提交一个 `.gitkeep` 占位；

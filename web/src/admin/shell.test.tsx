@@ -4,7 +4,8 @@
 //   1. 主管理员看到全部侧栏项（含 6 个管理项）；
 //   2. 次级管理员只看得到 non-mainOnly 的管理项（上游/模型/规则/运行日志/全局设置不出现）；
 //   3. 当前项标 aria-current="page"（无障碍；旧壳用 MUI selected，新壳没有那个类名）。
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
@@ -85,5 +86,20 @@ describe('AdminShell 侧栏', () => {
     renderShell(true)
     const logout = await screen.findByRole('link', { name: '退出登录' })
     expect(logout).toHaveAttribute('href', '/admin/logout')
+  })
+
+  it.each([true, false])('导航抽屉保留权限、跳转上下文并在选中后关闭（主管=%s）', async (main) => {
+    renderShell(main)
+    const trigger = await screen.findByRole('button', { name: '打开导航' })
+    await userEvent.click(trigger)
+    const drawer = await screen.findByRole('dialog', { name: '导航' })
+    expect(within(drawer).getByRole('button', { name: '名单管理' })).toBeInTheDocument()
+    expect(within(drawer).queryByRole('button', { name: '模型定价' }) !== null).toBe(main)
+
+    await userEvent.click(within(drawer).getByRole('button', { name: '机器人' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '导航' })).not.toBeInTheDocument())
+    expect(location.pathname).toBe('/admin/bots')
+    expect(location.search).toBe('?bot=42')
+    expect(trigger).toHaveFocus()
   })
 })

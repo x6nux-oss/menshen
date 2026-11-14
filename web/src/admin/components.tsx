@@ -44,7 +44,7 @@ export function PageHeader({
   actions?: ReactNode
 }) {
   return (
-    <div className="mb-4 flex items-start gap-4">
+    <div className="mb-4 flex flex-wrap items-start gap-4">
       <div className="min-w-0">
         <h1 className="text-xl leading-tight font-bold">{title}</h1>
         {subtitle !== undefined && (
@@ -52,7 +52,7 @@ export function PageHeader({
         )}
       </div>
       {actions !== undefined && (
-        <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>
+        <div className="ml-auto flex max-w-full flex-wrap items-center gap-2">{actions}</div>
       )}
     </div>
   )

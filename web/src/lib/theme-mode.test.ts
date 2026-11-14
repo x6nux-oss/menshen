@@ -4,22 +4,42 @@ import {
   resolveThemeMode,
   setStoredTheme,
   storedTheme,
+  subscribeResolvedTheme,
   subscribeThemeChoice,
   systemTheme,
 } from './theme-mode'
 
 /** stubMatchMedia 让 systemTheme 读到指定偏好。 */
 function stubSystem(dark: boolean) {
+  let current = dark
+  const listeners = new Set<(event: MediaQueryListEvent) => void>()
   window.matchMedia = ((q: string) => ({
-    matches: dark,
+    get matches() {
+      return current
+    },
     media: q,
     onchange: null,
     addListener: () => {},
     removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
+    addEventListener: (_event: string, listener: (event: MediaQueryListEvent) => void) => {
+      listeners.add(listener)
+    },
+    removeEventListener: (_event: string, listener: (event: MediaQueryListEvent) => void) => {
+      listeners.delete(listener)
+    },
     dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia
+  return {
+    set(next: boolean) {
+      current = next
+      for (const listener of listeners) {
+        listener({
+          matches: current,
+          media: '(prefers-color-scheme: dark)',
+        } as MediaQueryListEvent)
+      }
+    },
+  }
 }
 
 describe('theme-mode', () => {
@@ -75,5 +95,20 @@ describe('theme-mode', () => {
     setStoredTheme('light')
     // 取消订阅后不再收到
     expect(seen).toEqual(['dark', null])
+  })
+
+  it('subscribeResolvedTheme：显式选择优先，恢复系统后重新跟随', () => {
+    const system = stubSystem(false)
+    const seen: Array<'light' | 'dark'> = []
+    const off = subscribeResolvedTheme((mode) => seen.push(mode))
+
+    setStoredTheme('dark')
+    system.set(true)
+    system.set(false)
+    setStoredTheme(null)
+    system.set(true)
+
+    expect(seen).toEqual(['dark', 'dark', 'dark', 'light', 'dark'])
+    off()
   })
 })

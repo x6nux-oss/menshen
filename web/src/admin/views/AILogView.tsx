@@ -81,7 +81,7 @@ export function AILogView() {
     { key: 'model', header: '模型', width: 220, render: (row) => <MonoText>{row.model}</MonoText> },
     { key: 'upstream', header: '上游', width: 120, render: (row) => row.upstream || '—' },
     { key: 'status', header: '状态', width: 90, render: (row) => <StatusBadge info={aiStatusInfo(row.status)} /> },
-    { key: 'latency', header: '耗时', width: 90, align: 'right', render: (row) => `${row.latency_ms} ms` },
+    { key: 'latency_ms', header: '耗时', width: 90, align: 'right', render: (row) => `${row.latency_ms} ms` },
     { key: 'usage', header: '用量（入→出）', width: 170, render: (row) => <MonoText>{usageText(row)}</MonoText> },
     { key: 'cost', header: '开销', width: 100, align: 'right', render: (row) => row.cost_text || '—' },
   ]
@@ -135,7 +135,7 @@ export function AILogView() {
           loading={logs.isPending}
           rows={rows}
           rowKey={(row) => row.id}
-          sortable={['status', 'latency']}
+          sortable={['status', 'latency_ms']}
           onRowClick={(row) => setOpenId(row.id)}
           empty={<span className="text-[13px] text-muted-foreground">没有匹配的调用记录。</span>}
           columns={columns}

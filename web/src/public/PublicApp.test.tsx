@@ -1,13 +1,49 @@
 // 公开网页（_w）行为测试：申诉验证页渲染处罚依据与失效态；原文查看页
 // 门槛凭据 → 内容；申诉详情页资料渲染。
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { server, startTestServer } from '../test/server'
 import type { AppealData, AppealDossierView, JoinVerifyData, LogRecordView } from './api'
 import { PublicApp } from './PublicApp'
 
 startTestServer()
+
+function mockSystemTheme(initial: 'light' | 'dark') {
+  let dark = initial === 'dark'
+  const listeners = new Set<(event: MediaQueryListEvent) => void>()
+  const media = {
+    get matches() {
+      return dark
+    },
+    media: '(prefers-color-scheme: dark)',
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: (_event: string, listener: (event: MediaQueryListEvent) => void) => {
+      listeners.add(listener)
+    },
+    removeEventListener: (_event: string, listener: (event: MediaQueryListEvent) => void) => {
+      listeners.delete(listener)
+    },
+    dispatchEvent: () => false,
+  }
+  vi.stubGlobal('matchMedia', () => media)
+  return {
+    set(next: 'light' | 'dark') {
+      dark = next === 'dark'
+      for (const listener of listeners) {
+        listener({ matches: dark, media: media.media } as MediaQueryListEvent)
+      }
+    },
+  }
+}
+
+afterEach(() => {
+  localStorage.clear()
+  document.documentElement.classList.remove('dark')
+  vi.unstubAllGlobals()
+})
 
 /** at 设定当前路径：PublicApp 挂载时按 location.pathname 解析路由。 */
 function at(path: string) {
@@ -391,5 +427,36 @@ describe('PublicApp · 申诉详情响应式列数', () => {
     expect(screen.getByTestId('appeal-main')).toBeInTheDocument()
     expect(screen.getByTestId('appeal-profile')).toBeInTheDocument()
     expect(screen.getByTestId('appeal-activity')).toBeInTheDocument()
+  })
+})
+
+describe('PublicApp · 主题优先级', () => {
+  it('系统主题变化不覆盖用户显式选择', () => {
+    const system = mockSystemTheme('light')
+    localStorage.setItem('menshen-theme', 'dark')
+    at('/_w/nope')
+    render(<PublicApp />)
+
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    act(() => system.set('light'))
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+  })
+
+  it('回到跟随系统后与当前系统主题保持一致', () => {
+    const system = mockSystemTheme('dark')
+    at('/_w/nope')
+    render(<PublicApp />)
+
+    const toggle = screen.getByRole('button', { name: '主题：跟随系统' })
+    fireEvent.click(toggle)
+    fireEvent.click(toggle)
+    expect(localStorage.getItem('menshen-theme')).toBe('dark')
+
+    fireEvent.click(toggle)
+    expect(localStorage.getItem('menshen-theme')).toBeNull()
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+
+    act(() => system.set('light'))
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
   })
 })

@@ -2,6 +2,7 @@
 // **结构契约**（类名、role、可交互性）；真机观感由组件预览页人工验收。
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import {
   Avatar,
@@ -190,6 +191,79 @@ describe('Select', () => {
     )
     await userEvent.click(screen.getByRole('combobox', { name: '渠道' }))
     await userEvent.click(await screen.findByRole('option', { name: '乙' }))
+    expect(onValueChange).toHaveBeenCalledWith('b')
+  })
+
+  it('初始选中项显示选项文案', () => {
+    const options = [
+      { value: 'a', label: '选项甲' },
+      { value: 'b', label: '选项乙' },
+    ]
+    render(
+      <Select value="b">
+        <SelectTrigger aria-label="渠道">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </>
+        </SelectContent>
+      </Select>,
+    )
+    expect(screen.getByRole('combobox', { name: '渠道' })).toHaveTextContent('选项乙')
+  })
+
+  it('显式 items 覆盖从子项派生的文案', () => {
+    render(
+      <Select value="b" items={{ b: '外部文案' }}>
+        <SelectTrigger aria-label="渠道">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="b">子项文案</SelectItem>
+        </SelectContent>
+      </Select>,
+    )
+    expect(screen.getByRole('combobox', { name: '渠道' })).toHaveTextContent('外部文案')
+  })
+
+  it('切换后显示新文案并保留回调值', async () => {
+    const onValueChange = vi.fn()
+    function Harness() {
+      const [currentValue, setCurrentValue] = useState('a')
+      return (
+        <>
+          <Select
+            value={currentValue}
+            onValueChange={(nextValue) => {
+              setCurrentValue(nextValue)
+              onValueChange(nextValue)
+            }}
+          >
+            <SelectTrigger aria-label="渠道">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="a">选项甲</SelectItem>
+              <SelectItem value="b">选项乙</SelectItem>
+            </SelectContent>
+          </Select>
+          <output data-testid="request-value">{currentValue}</output>
+        </>
+      )
+    }
+
+    render(<Harness />)
+    await userEvent.click(screen.getByRole('combobox', { name: '渠道' }))
+    await userEvent.click(await screen.findByRole('option', { name: '选项乙' }))
+
+    expect(screen.getByRole('combobox', { name: '渠道' })).toHaveTextContent('选项乙')
+    expect(screen.getByTestId('request-value')).toHaveTextContent('b')
     expect(onValueChange).toHaveBeenCalledWith('b')
   })
 })

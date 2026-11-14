@@ -1,6 +1,6 @@
 // AI 调用流水页的契约测试：表头、行渲染、状态筛选、非主管理员不可见。
 // api 用 spy 替身，数据取 mocks/fixtures（与 Mini App 的 AI 流水页共用同一份）。
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -57,6 +57,24 @@ describe('AILogView', () => {
     expect(screen.getAllByText('成功').length).toBeGreaterThanOrEqual(1)
     // 失败行的 status 是后端给的阶段名（如「首字超时」），原样展示
     expect(screen.getAllByText(mockAILogs[1].status).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('耗时按接口的毫秒数值降序和升序排列', async () => {
+    renderView()
+    await screen.findByText(mockAILogs[0].model)
+    const latencyColumn = screen.getByRole('columnheader', { name: /耗时/ })
+    const latencyButton = within(latencyColumn).getByRole('button')
+    const latencies = () => screen.getAllByRole('row').slice(1).map((row) =>
+      within(row).getAllByRole('cell')[4].textContent,
+    )
+
+    await userEvent.click(latencyButton)
+    expect(latencyColumn).toHaveAttribute('aria-sort', 'descending')
+    expect(latencies()).toEqual(['15003 ms', '812 ms'])
+
+    await userEvent.click(latencyButton)
+    expect(latencyColumn).toHaveAttribute('aria-sort', 'ascending')
+    expect(latencies()).toEqual(['812 ms', '15003 ms'])
   })
 
   it('切换结果为「失败」时请求带 status=err', async () => {

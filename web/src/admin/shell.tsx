@@ -5,11 +5,13 @@
 //
 // 侧栏与顶栏用玻璃（设计文档 §4.4：玻璃只给「浮起」的元素 —— 内容从下面滚过、
 // 背后有东西可透的面板）；表格与长列表不用玻璃。
+import { Menu } from 'lucide-react'
+import { useState } from 'react'
 import { useMiniState } from '../api/hooks'
 import { ApiError } from '../api/client'
 import { ErrorState, ThemeToggle } from '../components/feedback'
 import { GlassPanel, GlassToolbar } from '../components/glass'
-import { Button, Skeleton } from '../components/ui'
+import { Button, Sheet, SheetContent, SheetTitle, SheetTrigger, Skeleton } from '../components/ui'
 import { cn } from '../lib/utils'
 import { meLabel } from '../lib/format'
 import { PageHeader } from './components'
@@ -138,72 +140,95 @@ function NavItem({
 
 function Layout({ main, identityLabel }: { main: boolean; identityLabel: string }) {
   const { route, go } = useAdminNav()
+  const [menuOpen, setMenuOpen] = useState(false)
   const section = sectionOf(route)
   const isDetail = route.k !== section
 
+  function navigate(next: AdminRoute) {
+    go(next)
+    setMenuOpen(false)
+  }
+
+  const navigation = (
+    <>
+      <div className="px-4 py-5">
+        <p className="text-lg font-bold leading-6">🛡 门神</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{identityLabel}</p>
+      </div>
+
+      <nav className="flex flex-col gap-0.5 px-2" aria-label="主导航">
+        {PRIMARY.map((item) => (
+          <NavItem
+            key={item.section}
+            label={item.label}
+            active={section === item.section && !isDetail}
+            onClick={() => navigate(sectionRoute(item.section))}
+          />
+        ))}
+      </nav>
+
+      <p className="px-4 pb-1 pt-4 text-xs text-muted-foreground">管理</p>
+      <nav className="flex flex-col gap-0.5 px-2" aria-label="管理导航">
+        {MANAGE.filter((item) => main || !item.mainOnly).map((item) => (
+          <NavItem
+            key={item.section}
+            label={item.label}
+            active={section === item.section}
+            onClick={() => navigate(sectionRoute(item.section))}
+          />
+        ))}
+      </nav>
+
+      <div className="mt-auto px-4 py-4">
+        <Button variant="outline" size="sm" asChild className="w-full">
+          <a href="/admin/logout">退出登录</a>
+        </Button>
+        <p className="mt-2 text-[11.5px] leading-relaxed text-muted-foreground">
+          会话 12 小时有效，过期请回 Telegram 重新获取链接。
+        </p>
+      </div>
+    </>
+  )
+
   return (
-    <div className="flex min-h-dvh bg-background text-foreground">
+    <div className="flex min-h-dvh text-foreground">
       {/* 侧栏：玻璃面板 + 粘在视口高度，独立于内容区滚动。 */}
-      <aside className={cn(SIDEBAR_CLASS, 'shrink-0 p-2')}>
-        <GlassPanel className="sticky top-2 flex h-[calc(100dvh-1rem)] flex-col rounded-xl p-0">
-          <div className="px-4 py-5">
-            <p className="text-lg font-bold leading-6">🛡 门神</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{identityLabel}</p>
-          </div>
-
-          <nav className="flex flex-col gap-0.5 px-2" aria-label="主导航">
-            {PRIMARY.map((item) => (
-              <NavItem
-                key={item.section}
-                label={item.label}
-                active={section === item.section && !isDetail}
-                onClick={() => go(sectionRoute(item.section))}
-              />
-            ))}
-          </nav>
-
-          <p className="px-4 pb-1 pt-4 text-xs text-muted-foreground">管理</p>
-          <nav className="flex flex-col gap-0.5 px-2" aria-label="管理导航">
-            {MANAGE.filter((item) => main || !item.mainOnly).map((item) => (
-              <NavItem
-                key={item.section}
-                label={item.label}
-                active={section === item.section}
-                onClick={() => go(sectionRoute(item.section))}
-              />
-            ))}
-          </nav>
-
-          <div className="mt-auto px-4 py-4">
-            <Button variant="outline" size="sm" asChild className="w-full">
-              <a href="/admin/logout">退出登录</a>
-            </Button>
-            <p className="mt-2 text-[11.5px] leading-relaxed text-muted-foreground">
-              会话 12 小时有效，过期请回 Telegram 重新获取链接。
-            </p>
-          </div>
+      <aside className={cn(SIDEBAR_CLASS, 'hidden shrink-0 p-2 md:block')}>
+        <GlassPanel className="sticky top-2 flex h-[calc(100dvh-1rem)] flex-col overflow-y-auto rounded-xl p-0">
+          {navigation}
         </GlassPanel>
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="sticky top-0 z-10">
-          <GlassToolbar className="flex items-center gap-3 rounded-none px-6 py-2.5">
+          <GlassToolbar className="flex items-center gap-2 rounded-none px-3 py-2.5 sm:gap-3 sm:px-6">
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+              <SheetTrigger render={
+                <Button variant="ghost" size="icon" aria-label="打开导航" className="md:hidden">
+                  <Menu className="size-5" aria-hidden />
+                </Button>
+              } />
+              <SheetContent side="left" aria-modal="true" className="flex w-72 flex-col p-0">
+                <SheetTitle className="sr-only">导航</SheetTitle>
+                {navigation}
+              </SheetContent>
+            </Sheet>
             {isDetail && (
               <Button variant="ghost" size="sm" onClick={() => go(sectionRoute(section), true)}>
                 ← 返回
               </Button>
             )}
-            <h1 className="text-[17px] font-bold">
+            <h1 className="min-w-0 flex-1 truncate text-[17px] font-bold">
               {DETAIL_TITLES[route.k] ?? SECTION_TITLES[section]}
             </h1>
-            <span className="ml-auto text-[13px] text-muted-foreground">
+            <span className="ml-auto hidden text-[13px] text-muted-foreground lg:block">
               {SECTION_TITLES[section]}
             </span>
             {/* 主题切换：三态循环（跟随系统 → 亮 → 暗）。与公开页共用同一个组件。 */}
             <ThemeToggle />
           </GlassToolbar>
         </div>
-        <div className="flex-1 px-6 py-6">
+        <div className="flex-1 px-4 py-5 sm:px-6 sm:py-6">
           <div className="mx-auto max-w-[1360px]">{renderRoute(route, main)}</div>
         </div>
       </main>
@@ -300,7 +325,7 @@ function LoginRequired({ onRetry }: { onRetry: () => void }) {
 function ShellSkeleton() {
   return (
     <div className="flex min-h-dvh">
-      <div className={cn(SIDEBAR_CLASS, 'shrink-0 border-r border-border p-4')}>
+      <div className={cn(SIDEBAR_CLASS, 'hidden shrink-0 border-r border-border p-4 md:block')}>
         <Skeleton className="mb-3 h-7 w-24" />
         {Array.from({ length: 6 }, (_, i) => (
           <Skeleton key={i} className="mb-1 h-7 w-full" />

@@ -52,6 +52,16 @@ export function subscribeThemeChoice(cb: (mode: ThemeMode | null) => void): () =
 
 const choiceListeners = new Set<(mode: ThemeMode | null) => void>()
 
+export function subscribeResolvedTheme(cb: (mode: ThemeMode) => void): () => void {
+  const notify = () => cb(resolveThemeMode())
+  const offChoice = subscribeThemeChoice(notify)
+  const offSystem = subscribeSystemTheme(notify)
+  return () => {
+    offChoice()
+    offSystem()
+  }
+}
+
 /**
  * subscribeSystemTheme 订阅系统偏好变化。返回值变化时回调；
  * 用户已显式选择时回调值仍会给出系统值，由调用方决定是否采用。

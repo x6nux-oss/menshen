@@ -7,7 +7,7 @@
 // 不再需要 MUI 的 ThemeProvider / CssBaseline。
 import { useEffect, useMemo, useState } from 'react'
 import { ErrorBoundary, ThemeToggle } from '../components/feedback'
-import { applyThemeMode, resolveThemeMode, subscribeSystemTheme, subscribeThemeChoice } from '../lib/theme-mode'
+import { applyThemeMode, resolveThemeMode, subscribeResolvedTheme } from '../lib/theme-mode'
 import { parseRoute } from './api'
 import { InvalidState } from './InvalidState'
 import { AppealDemoPage } from './pages/AppealDemoPage'
@@ -32,18 +32,7 @@ export function PublicApp() {
     applyThemeMode(dark ? 'dark' : 'light')
   }, [dark])
 
-  // 订阅系统偏好只建一次；重复订阅会在每次主题变化时重建监听。
-  useEffect(() => subscribeSystemTheme((mode) => setDark(mode === 'dark')), [])
-
-  // 标题栏的 ThemeToggle 直接改 localStorage 与 DOM，不经过这里的 state。
-  // 不同步的话，下一次系统主题变化会把用户的选择覆盖掉。
-  useEffect(
-    () =>
-      subscribeThemeChoice((mode) => {
-        if (mode !== null) setDark(mode === 'dark')
-      }),
-    [],
-  )
+  useEffect(() => subscribeResolvedTheme((mode) => setDark(mode === 'dark')), [])
 
   const width = (route !== null && CONTAINER_WIDTH[route.kind]) || 'max-w-[640px]'
 

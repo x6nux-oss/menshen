@@ -1,9 +1,16 @@
 import { Select as BaseSelect } from '@base-ui/react/select'
 import { Check, ChevronDown } from 'lucide-react'
-import type { ComponentProps } from 'react'
+import { Children, isValidElement } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { cn } from '../../lib/utils'
 
 type BaseSelectRootProps = ComponentProps<typeof BaseSelect.Root>
+type SelectItems = BaseSelectRootProps['items']
+
+interface DerivedSelectItem {
+  label: ReactNode
+  value: unknown
+}
 
 export interface SelectProps
   extends Omit<BaseSelectRootProps, 'onValueChange' | 'children'> {
@@ -17,7 +24,9 @@ export interface SelectProps
  * 组合式 API：`Select` + `SelectTrigger` + `SelectValue` + `SelectContent` + `SelectItem`。
  * 无可见标签时给 `SelectTrigger` 传 `aria-label`。
  */
-export function Select({ onValueChange, children, ...props }: SelectProps) {
+export function Select({ onValueChange, children, items, ...props }: SelectProps) {
+  const derivedItems = items === undefined ? selectItemsFrom(children) : []
+
   return (
     <BaseSelect.Root
       onValueChange={
@@ -25,11 +34,26 @@ export function Select({ onValueChange, children, ...props }: SelectProps) {
           ? undefined
           : (value) => onValueChange(String(value ?? ''))
       }
+      items={items ?? (derivedItems.length > 0 ? (derivedItems as SelectItems) : undefined)}
       {...(props as ComponentProps<typeof BaseSelect.Root>)}
     >
       {children}
     </BaseSelect.Root>
   )
+}
+
+function selectItemsFrom(children: SelectProps['children']): DerivedSelectItem[] {
+  if (typeof children === 'function') return []
+  return Children.toArray(children).flatMap((child) => {
+    if (!isValidElement(child)) return []
+    const childProps = child.props as { value?: unknown; children?: ReactNode }
+    if (child.type === SelectItem) {
+      return childProps.value === undefined || childProps.value === null
+        ? []
+        : [{ label: childProps.children, value: childProps.value }]
+    }
+    return selectItemsFrom(childProps.children)
+  })
 }
 
 export function SelectTrigger({
