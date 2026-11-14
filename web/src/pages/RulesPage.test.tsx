@@ -570,7 +570,8 @@ describe('RuleDetailPage', () => {
     renderPage(<RuleDetailPage id={1} />)
 
     const enforceSwitch = await screen.findByRole('switch', { name: '强制' })
-    expect(enforceSwitch).toBeDisabled()
+    // Base UI 的 Switch 是 span（非原生表单元素），禁用态走 aria-disabled。
+    expect(enforceSwitch).toHaveAttribute('aria-disabled', 'true')
     expect(screen.getByText(/先修净误封/)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '重新跑全库测试' }))
@@ -584,7 +585,7 @@ describe('RuleDetailPage', () => {
     expect(screen.getByText('（mock）正常消息被误匹配。')).toBeInTheDocument()
     expect(screen.getByText('误封')).toBeInTheDocument()
     // 规则仍有 fp：测试完仍不允许开启强制
-    expect(screen.getByRole('switch', { name: '强制' })).toBeDisabled()
+    expect(screen.getByRole('switch', { name: '强制' })).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('详情展示最近测试覆盖率与落库的按类型细分', async () => {

@@ -5,28 +5,28 @@
 //   改名抽屉、危险区删除（ActionSheet 写明对象与后果）；
 // - `测试连通`：upstream {action:'test'} 发一次最小请求，结果行内
 //   展示延迟/模型或可读错误，pending 时禁用自身按钮、不阻塞其他操作。
-import NetworkCheckOutlined from '@mui/icons-material/NetworkCheckOutlined'
-import { Box, Button, TextField, Typography } from '@mui/material'
+import { PlugZap } from 'lucide-react'
 import { useState } from 'react'
 import { errorStatus } from '../api/client'
 import { useMiniState } from '../api/hooks'
 import { useOptimisticMiniMutation, useUpstreamMutation } from '../api/mutations'
 import type { State, UpstreamKind, UpstreamTestResp } from '../api/types'
-import { useNav } from '../nav'
+import { EmptyState, ErrorState, Skeletons, useToast } from '../components/feedback'
 import {
-  Badge,
-  EmptyState,
-  ErrorState,
   FormDrawer,
   ListRow,
   SectionCard,
   Segmented,
   SettingRow,
-  Skeletons,
   SwitchRow,
   useConfirm,
-  useToast,
-} from '../ui'
+} from '../components/mobile'
+import { Badge } from '../components/ui'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Spinner } from '../components/ui/spinner'
+import { useNav } from '../nav'
 
 /** KIND_OPTIONS 是渠道类型选择项；顺序与后端 upstream.Kind 一致。 */
 const KIND_OPTIONS: { value: UpstreamKind; label: string }[] = [
@@ -79,17 +79,15 @@ function KindSwitch({
 }) {
   return (
     <>
-      <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 0.5 }}>渠道类型</Typography>
+      <p className="mb-1 text-[13px] text-muted-foreground">渠道类型</p>
       <Segmented
         value={value}
         onChange={(v) => onChange(v as UpstreamKind)}
         options={KIND_OPTIONS}
         ariaLabel="渠道类型"
-        sx={{ flexWrap: 'wrap', rowGap: 0.75 }}
+        className="flex-wrap gap-y-1.5"
       />
-      <Typography sx={{ mt: 0.75, fontSize: 12, color: 'text.secondary', lineHeight: 1.6 }}>
-        {KIND_HINT[value]}
-      </Typography>
+      <p className="mt-1.5 text-[12px] leading-[1.6] text-muted-foreground">{KIND_HINT[value]}</p>
     </>
   )
 }
@@ -159,17 +157,12 @@ export function UpstreamsPage() {
   }
 
   return (
-    <Box data-testid="upstreams-page">
-      <SectionCard
-        title="渠道"
-        footer={
-          <ListRow primary="＋ 添加渠道" chevron onClick={openAdd} />
-        }
-      >
+    <div data-testid="upstreams-page">
+      <SectionCard title="渠道" footer={<ListRow primary="＋ 添加渠道" chevron onClick={openAdd} />}>
         {upstreams.length === 0 ? (
-          <Typography sx={{ px: 2, py: 1.5, fontSize: 13, color: 'text.secondary' }}>
+          <p className="px-4 py-3 text-[13px] text-muted-foreground">
             （还没有上游）先添加一个 API 渠道，再到「模型定价」登记模型。
-          </Typography>
+          </p>
         ) : (
           upstreams.map((u) => (
             <ListRow
@@ -193,39 +186,50 @@ export function UpstreamsPage() {
         submitDisabled={name.trim() === '' || baseURL.trim() === ''}
         onSubmit={submitAdd}
       >
-        <TextField
-          fullWidth
-          size="small"
-          label="名称（模型名前缀）"
-          placeholder="如 demo（不含 / 和 :）"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-        <Box sx={{ mt: 1.5 }}>
+        <div>
+          <Label htmlFor="upstream-name" className="mb-1 block">
+            名称（模型名前缀）
+          </Label>
+          <Input
+            id="upstream-name"
+            placeholder="如 demo（不含 / 和 :）"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </div>
+
+        <div className="mt-3">
           <KindSwitch value={kind} onChange={changeAddKind} />
-        </Box>
-        <TextField
-          fullWidth
-          size="small"
-          label="base_url"
-          placeholder="https://api.example.com"
-          value={baseURL}
-          onChange={(event) => setBaseURL(event.target.value)}
-          sx={{ mt: 1.5 }}
-        />
-        <TextField
-          fullWidth
-          size="small"
-          label="api_key"
-          value={apiKey}
-          onChange={(event) => setAPIKey(event.target.value)}
-          sx={{ mt: 1.5 }}
-        />
-        <Box sx={{ mt: 1 }}>
+        </div>
+
+        <div className="mt-3">
+          <Label htmlFor="upstream-base-url" className="mb-1 block">
+            base_url
+          </Label>
+          <Input
+            id="upstream-base-url"
+            placeholder="https://api.example.com"
+            value={baseURL}
+            onChange={(event) => setBaseURL(event.target.value)}
+          />
+        </div>
+
+        <div className="mt-3">
+          <Label htmlFor="upstream-api-key" className="mb-1 block">
+            api_key
+          </Label>
+          <Input
+            id="upstream-api-key"
+            value={apiKey}
+            onChange={(event) => setAPIKey(event.target.value)}
+          />
+        </div>
+
+        <div className="mt-2">
           {isChatOnly(kind) ? (
-            <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
+            <p className="text-[13px] leading-[1.6] text-muted-foreground">
               该类型是对话协议，固定用于复判与形态总结。
-            </Typography>
+            </p>
           ) : (
             <>
               <SwitchRow
@@ -241,9 +245,9 @@ export function UpstreamsPage() {
             </>
           )}
           <SwitchRow primary="启用" checked={enabled} onChange={setEnabled} />
-        </Box>
+        </div>
       </FormDrawer>
-    </Box>
+    </div>
   )
 }
 
@@ -395,7 +399,7 @@ export function UpstreamDetailPage({ id }: { id: number }) {
   }
 
   return (
-    <Box data-testid="upstream-detail-page">
+    <div data-testid="upstream-detail-page">
       <SectionCard>
         <ListRow
           primary={upstream.name}
@@ -429,31 +433,22 @@ export function UpstreamDetailPage({ id }: { id: number }) {
           value="编辑"
           onClick={openEdit}
         />
-        <Box sx={{ px: 2, py: 1.5 }}>
-          <Button
-            fullWidth
-            variant="outlined"
-            startIcon={<NetworkCheckOutlined />}
-            loading={testMut.isPending}
-            disabled={testMut.isPending}
-            onClick={runTest}
-          >
+        <div className="px-4 py-3">
+          <Button variant="outline" className="h-11 w-full" disabled={testMut.isPending} onClick={runTest}>
+            {testMut.isPending ? <Spinner /> : <PlugZap aria-hidden />}
             测试连通
           </Button>
           {testResult && (
-            <Typography
+            <p
               data-testid="upstream-test-result"
-              sx={{
-                mt: 1,
-                fontSize: 13,
-                lineHeight: 1.6,
-                color: testResult.ok ? 'success.main' : 'error.main',
-              }}
+              className={`mt-2 text-[13px] leading-[1.6] ${
+                testResult.ok ? 'text-success' : 'text-destructive'
+              }`}
             >
               {testResult.text}
-            </Typography>
+            </p>
           )}
-        </Box>
+        </div>
       </SectionCard>
 
       <SectionCard title="危险区">
@@ -462,7 +457,7 @@ export function UpstreamDetailPage({ id }: { id: number }) {
           secondary="删除前需先移除它名下的模型；此操作不可恢复"
           disabled={removeMut.isPending}
           onClick={() => void removeUpstream()}
-          sx={{ color: 'error.main' }}
+          className="text-destructive"
         />
       </SectionCard>
 
@@ -475,29 +470,39 @@ export function UpstreamDetailPage({ id }: { id: number }) {
         onSubmit={submitEdit}
       >
         <KindSwitch value={kindDraft} onChange={changeEditKind} />
-        <TextField
-          fullWidth
-          size="small"
-          label="base_url（留空 = 不改）"
-          value={baseDraft}
-          onChange={(event) => setBaseDraft(event.target.value)}
-          sx={{ mt: 1.5 }}
-        />
-        <TextField
-          fullWidth
-          size="small"
-          label="api_key（留空 = 不改）"
-          placeholder="留空 = 不改"
-          value={keyDraft}
-          onChange={(event) => setKeyDraft(event.target.value)}
-          helperText={`当前：${upstream.api_key || '未设置'}`}
-          sx={{ mt: 1.5 }}
-        />
-        <Box sx={{ mt: 1 }}>
+
+        <div className="mt-3">
+          <Label htmlFor="edit-base-url" className="mb-1 block">
+            base_url（留空 = 不改）
+          </Label>
+          <Input
+            id="edit-base-url"
+            value={baseDraft}
+            onChange={(event) => setBaseDraft(event.target.value)}
+          />
+        </div>
+
+        <div className="mt-3">
+          <Label htmlFor="edit-api-key" className="mb-1 block">
+            api_key（留空 = 不改）
+          </Label>
+          <Input
+            id="edit-api-key"
+            placeholder="留空 = 不改"
+            value={keyDraft}
+            onChange={(event) => setKeyDraft(event.target.value)}
+            aria-describedby="edit-api-key-hint"
+          />
+          <p id="edit-api-key-hint" className="mt-1 text-[12px] text-muted-foreground">
+            当前：{upstream.api_key || '未设置'}
+          </p>
+        </div>
+
+        <div className="mt-2">
           {isChatOnly(kindDraft) ? (
-            <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
+            <p className="text-[13px] leading-[1.6] text-muted-foreground">
               该类型是对话协议，固定用于复判与形态总结。
-            </Typography>
+            </p>
           ) : (
             <>
               <SwitchRow
@@ -512,7 +517,7 @@ export function UpstreamDetailPage({ id }: { id: number }) {
               />
             </>
           )}
-        </Box>
+        </div>
       </FormDrawer>
 
       <FormDrawer
@@ -524,17 +529,18 @@ export function UpstreamDetailPage({ id }: { id: number }) {
         submitDisabled={nameDraft.trim() === ''}
         onSubmit={submitRename}
       >
-        <TextField
-          fullWidth
-          size="small"
-          label="名称"
+        <Label htmlFor="rename-upstream" className="mb-1 block">
+          名称
+        </Label>
+        <Input
+          id="rename-upstream"
           value={nameDraft}
           onChange={(event) => setNameDraft(event.target.value)}
         />
-        <Typography sx={{ mt: 1, fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
+        <p className="mt-2 text-[13px] leading-[1.6] text-muted-foreground">
           名称是模型名前缀（上游名/模型 ID），改名会同步更新引用它的模型。
-        </Typography>
+        </p>
       </FormDrawer>
-    </Box>
+    </div>
   )
 }

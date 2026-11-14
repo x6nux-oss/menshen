@@ -1,18 +1,17 @@
 // 用户资料页：
 // 资料卡 + 分段（只看被处置过的，默认 / 全部判定记录）+ 无限滚动记录列表。
 // 数据来自 user op（每页都带完整资料字段），默认 filter=act，hasMore 用 shown 判断。
-import { Box } from '@mui/material'
 import { useState } from 'react'
 import { errorStatus } from '../api/client'
 import { useInfiniteUserLogs, useMiniState } from '../api/hooks'
 import type { UserDossier, UserLogRow } from '../api/types'
+import { EmptyState, ErrorState, Skeletons } from '../components/feedback'
+import { ChatRef, ListRow, SectionCard, Segmented } from '../components/mobile'
+import { Badge } from '../components/ui'
 import { actionLabel, displayTz, fmtTS } from '../lib/format'
 import { verdictInfo } from '../lib/status'
 import { useNav } from '../nav'
-import { Badge, ChatRef, EmptyState, ErrorState, ListRow, SectionCard, Segmented, Skeletons } from '../ui'
 import { InfiniteFooter, InfoRow, ListLoading } from './shared'
-
-const MONO = 'ui-monospace, Menlo, monospace'
 
 export function UserPage({ id }: { id: number }) {
   const nav = useNav()
@@ -31,14 +30,12 @@ export function UserPage({ id }: { id: number }) {
   const tz = state.data ? displayTz(state.data) : undefined
 
   return (
-    <Box data-testid="user-page">
+    <div data-testid="user-page">
       <SectionCard title="用户资料">
         {profile && (
           <>
             <InfoRow label="用户 ID">
-              <Box component="span" sx={{ fontFamily: MONO }}>
-                {profile.user_id}
-              </Box>
+              <span className="font-mono">{profile.user_id}</span>
             </InfoRow>
             {profile.username !== '' && <InfoRow label="用户名">@{profile.username}</InfoRow>}
             <InfoRow label="昵称">{profile.name !== '' ? profile.name : '（查不到）'}</InfoRow>
@@ -57,7 +54,7 @@ export function UserPage({ id }: { id: number }) {
         )}
       </SectionCard>
 
-      <Box sx={{ mb: 1 }}>
+      <div className="mb-2">
         <Segmented
           value={filter}
           onChange={(next) => setFilter(next === 'all' ? 'all' : 'act')}
@@ -67,7 +64,7 @@ export function UserPage({ id }: { id: number }) {
           ]}
           ariaLabel="用户记录筛选"
         />
-      </Box>
+      </div>
 
       {rows.length === 0 ? (
         user.isPlaceholderData || user.isFetching ? (
@@ -102,7 +99,7 @@ export function UserPage({ id }: { id: number }) {
           />
         </>
       )}
-    </Box>
+    </div>
   )
 }
 
@@ -120,24 +117,20 @@ function UserLogListRow({
   return (
     <ListRow
       primary={
-        <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-          <Box component="span" sx={{ fontFamily: MONO, fontSize: 14 }}>
+        <span className="flex flex-wrap items-center gap-1">
+          <span className="font-mono text-sm">
             #{log.id} · {fmtTS(log.created_at, tz)}
-          </Box>
+          </span>
           <Badge tone={verdict.tone}>{verdict.label}</Badge>
           <Badge>{actionLabel(log.action)}</Badge>
-        </Box>
+        </span>
       }
       secondary={
-        <Box component="span" sx={{ display: 'block' }}>
+        <span className="block">
           群 <ChatRef name={log.chat} url={log.chat_url} fallback={log.chat_id} /> ·{' '}
           {Math.round(log.confidence * 100)}%
-          {log.text !== '' && (
-            <Box component="span" sx={{ display: 'block' }}>
-              {log.text.slice(0, 50)}
-            </Box>
-          )}
-        </Box>
+          {log.text !== '' && <span className="block">{log.text.slice(0, 50)}</span>}
+        </span>
       }
       chevron
       onClick={onOpen}

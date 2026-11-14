@@ -1,0 +1,2 @@
+/* Phase 0 的 rsbuild 配置 import 本文件；真正的入口在 styles/index.css。 */
+@import "./src/styles/index.css";

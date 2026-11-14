@@ -1,4 +1,4 @@
-# 前端构建阶段：Vite 产物输出到 ../internal/panel/webdist（相对 web/），
+# 前端构建阶段：rsbuild 产物输出到 ../internal/panel/webdist（相对 web/），
 # 也就是镜像里的 /internal/panel/webdist，供下面的 Go 阶段 go:embed。
 # 前端产物与目标架构无关，固定跑构建机的原生架构，避免 QEMU 模拟。
 # 依赖一律在容器里 npm ci（宿主机的 web/node_modules 已由 .dockerignore 排除）。
@@ -8,10 +8,9 @@ COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY web/ ./
 RUN npm run build
-# 半成品构建尽早失败：两个入口页缺一不可——index.html 是 Mini App，
-# admin.html 是桌面端管理面板（npm run build 会依次构建两者）。
 RUN test -f /internal/panel/webdist/index.html
 RUN test -f /internal/panel/webdist/admin.html
+RUN test -f /internal/panel/webdist/public.html
 
 # 构建阶段固定跑在构建机的原生架构上，靠 GOOS/GOARCH 交叉编译出目标架构：
 # 纯 Go 交叉编译只要几秒，而让 arm64 走 QEMU 模拟整个 go build 要慢十几倍。

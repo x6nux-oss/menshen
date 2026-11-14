@@ -40,8 +40,8 @@ describe("AILogPage", () => {
     );
     renderPage(<AILogPage />);
 
-    fireEvent.click(await screen.findByTestId("ailog-status-err"));
-    fireEvent.click(screen.getByTestId("ailog-status-ok"));
+    fireEvent.click(await screen.findByRole("button", { name: "失败" }));
+    fireEvent.click(screen.getByRole("button", { name: "成功" }));
     await waitFor(() => expect(bodies.length).toBeGreaterThanOrEqual(2));
     expect(bodies.at(-1)?.status).toBe("ok");
     expect(bodies.at(-2)?.status).toBe("err");

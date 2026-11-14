@@ -2,8 +2,12 @@
 //
 // 仅测试用（服务端 captcha_demo=1 才可用）。只显示各家的 site key；
 // 校验走服务端与入群验证同一条路径，所以这里通过即代表那条路也通。
-import { Box, CircularProgress, Typography } from '@mui/material'
+//
+// Phase 4：展示层换到新设计系统（Tailwind + components/ui）。
+// **验证链路一字未动** —— mountCaptcha / collectSignals / postJSON 的调用、
+// 回调签名、验证码容器的 ref 与 data-testid 全部保持原样（CSP 与安全边界）。
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Spinner } from '../../components/ui'
 import { getJSON, postJSON } from '../api'
 import type { CaptchaDemoData, CaptchaDemoProvider, WebRoute } from '../api'
 import { mountCaptcha } from '../captcha'
@@ -40,17 +44,15 @@ export function CaptchaDemoPage({ route }: { route: WebRoute }) {
     return <InvalidState message="演示页未配置任何验证方式（服务端 captcha_demo_keys 为空）。" />
 
   return (
-    <Box data-testid="captcha-demo">
-      <Typography sx={{ fontSize: 20, fontWeight: 700, mb: 0.5 }}>
-        人机验证测试台
-      </Typography>
-      <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 2 }}>
+    <div data-testid="captcha-demo">
+      <h1 className="mb-1 text-xl font-bold">人机验证测试台</h1>
+      <p className="mb-4 text-[13px] text-muted-foreground">
         逐个完成下方验证，通过后服务端会向对应提供方核对并返回结果。
-      </Typography>
+      </p>
       {data.providers.map((p) => (
         <ProviderCard key={p.provider} route={route} p={p} />
       ))}
-    </Box>
+    </div>
   )
 }
 
@@ -82,30 +84,26 @@ function ProviderCard({ route, p }: { route: WebRoute; p: CaptchaDemoProvider })
   )
 
   return (
-    <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2, mb: 2 }}>
-      <Typography sx={{ fontSize: 15, fontWeight: 700 }}>
-        {PROVIDER_LABEL[p.provider] ?? p.provider}
-      </Typography>
+    <div className="mb-4 rounded-lg bg-card p-4 text-card-foreground">
+      <p className="text-[15px] font-bold">{PROVIDER_LABEL[p.provider] ?? p.provider}</p>
       <CaptchaWidget p={p} onToken={submit} />
-      <Typography sx={{ fontSize: 12, color: 'text.secondary', wordBreak: 'break-all' }}>
+      <p className="text-[12px] break-all text-muted-foreground">
         site key：{p.sitekey}
         {p.endpoint ? ` · 端点：${p.endpoint}` : ''}
-      </Typography>
+      </p>
       {submitting && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-          <CircularProgress size={14} />
-          <Typography sx={{ fontSize: 13 }}>正在校验…</Typography>
-        </Box>
+        <div className="mt-2 flex items-center gap-2">
+          <Spinner size={14} />
+          <span className="text-[13px]">正在校验…</span>
+        </div>
       )}
       {result && (
-        <Typography
-          sx={{ fontSize: 13.5, mt: 1, color: result.ok ? 'success.main' : 'error.main' }}
-        >
+        <p className={result.ok ? 'mt-2 text-[13.5px] text-success' : 'mt-2 text-[13.5px] text-destructive'}>
           {result.ok ? '✅ ' : '❌ '}
           {result.msg}
-        </Typography>
+        </p>
       )}
-    </Box>
+    </div>
   )
 }
 
@@ -127,13 +125,13 @@ function CaptchaWidget({
       onToken,
     })
   }, [p.provider, p.sitekey, p.endpoint, onToken])
-  return <Box ref={ref} data-testid={`captcha-${p.provider}`} sx={{ my: 1.5 }} />
+  return <div ref={ref} data-testid={`captcha-${p.provider}`} className="my-3" />
 }
 
 function Placeholder() {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-      <CircularProgress size={22} />
-    </Box>
+    <div className="flex justify-center py-16">
+      <Spinner size={22} />
+    </div>
   )
 }

@@ -2,16 +2,17 @@
 // 截到 300 字且不含解禁码/兑换/网页验证记录，详情必须单独请求、完整展示。
 // 底部操作栏按状态渲染：未结状态显示人工解除/驳回；
 // web/noweb 追加签发解禁码，web/noweb/ai 追加重跑 AI 复核。操作走 appealact。
-import { Box, Button, Typography } from '@mui/material'
 import { errorStatus } from '../api/client'
 import { useAppeal, useMiniState } from '../api/hooks'
 import { useAppealactMutation } from '../api/mutations'
+import { ErrorState, Skeletons, useToast } from '../components/feedback'
+import { ChatRef, SectionCard, useConfirm } from '../components/mobile'
+import { Badge, Button } from '../components/ui'
 import { apAI, displayTz, fmtTS } from '../lib/format'
 import { appealStatusInfo } from '../lib/status'
 import { useNav } from '../nav'
 import { openLink } from '../telegram'
-import { Badge, ChatRef, ErrorState, SectionCard, Skeletons, useConfirm, useToast } from '../ui'
-import { COMPACT_BTN_SX, InfoRow, UserLink } from './shared'
+import { COMPACT_BTN, InfoRow, UserLink } from './shared'
 import { useBarReserve } from './useBarReserve'
 
 /** 未结状态集合。 */
@@ -19,7 +20,6 @@ const OPEN_STATUSES = ['statement', 'ai', 'web', 'noweb', 'code']
 
 /** 底部操作栏兜底高度（4 按钮 + 说明）；有 ResizeObserver 时以实测为准。 */
 const BAR_FALLBACK = 170
-const MONO = 'ui-monospace, Menlo, monospace'
 
 export function AppealDetailPage({ id }: { id: number }) {
   const nav = useNav()
@@ -76,10 +76,10 @@ export function AppealDetailPage({ id }: { id: number }) {
   }
 
   return (
-    <Box
+    <div
       data-testid="appeal-detail-page"
       data-reserved={reserved}
-      sx={{ pb: open ? `calc(${reserved}px + env(safe-area-inset-bottom))` : 0 }}
+      style={{ paddingBottom: open ? `calc(${reserved}px + env(safe-area-inset-bottom))` : 0 }}
     >
       <SectionCard>
         <InfoRow label="状态">
@@ -90,25 +90,25 @@ export function AppealDetailPage({ id }: { id: number }) {
           {` / ${bot ? bot.label : a.bot_id}`}
         </InfoRow>
         <InfoRow label="提交 / 更新">
-          <Box component="span" sx={{ fontFamily: MONO }}>
+          <span className="font-mono">
             {fmtTS(a.created_at, tz)} / {fmtTS(a.updated_at, tz)}
-          </Box>
+          </span>
         </InfoRow>
       </SectionCard>
 
       <SectionCard title="申诉理由">
-        <Box sx={{ px: 2, py: 1.5 }}>
+        <div className="px-4 py-3">
           {a.statement !== '' ? (
-            <Typography
+            <p
               data-testid="appeal-statement"
-              sx={{ fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+              className="text-sm leading-[1.7] break-words whitespace-pre-wrap"
             >
               {a.statement}
-            </Typography>
+            </p>
           ) : (
-            <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>（未填写）</Typography>
+            <p className="text-sm text-muted-foreground">（未填写）</p>
           )}
-        </Box>
+        </div>
       </SectionCard>
 
       <SectionCard title="AI 复核">
@@ -120,9 +120,7 @@ export function AppealDetailPage({ id }: { id: number }) {
         </InfoRow>
         {a.ai_reason !== '' && (
           <InfoRow label="理由">
-            <Box component="span" sx={{ whiteSpace: 'pre-wrap' }}>
-              {a.ai_reason}
-            </Box>
+            <span className="whitespace-pre-wrap">{a.ai_reason}</span>
           </InfoRow>
         )}
         <InfoRow label="网页验证">
@@ -134,9 +132,7 @@ export function AppealDetailPage({ id }: { id: number }) {
       <SectionCard title="解禁码">
         <InfoRow label="解禁码">
           {a.code !== '' ? (
-            <Box component="span" sx={{ fontFamily: MONO }}>
-              {a.code}
-            </Box>
+            <span className="font-mono">{a.code}</span>
           ) : a.has_code ? (
             '已签发'
           ) : (
@@ -154,101 +150,88 @@ export function AppealDetailPage({ id }: { id: number }) {
 
       <SectionCard title="兑换记录">
         {a.redeems.length === 0 ? (
-          <Typography sx={{ px: 2, py: 1.5, fontSize: 14, color: 'text.secondary' }}>
-            暂无兑换
-          </Typography>
+          <p className="px-4 py-3 text-sm text-muted-foreground">暂无兑换</p>
         ) : (
           a.redeems.map((redeem, index) => (
             <InfoRow key={`${redeem.chat_id}-${redeem.at}-${index}`} label={`兑换 ${index + 1}`}>
-              <Box component="span" sx={{ fontFamily: MONO }}>
+              <span className="font-mono">
                 群 <ChatRef name={redeem.chat} url={redeem.chat_url} fallback={redeem.chat_id} /> ·
                 uid {redeem.by_uid} · {fmtTS(redeem.at, tz)}
-              </Box>
+              </span>
             </InfoRow>
           ))
         )}
       </SectionCard>
 
       {a.detail_url !== '' && (
-        <Box sx={{ px: 2, mb: 1.5 }}>
-          <Button fullWidth variant="outlined" onClick={() => openLink(a.detail_url)}>
+        <div className="mb-3 px-4">
+          <Button variant="outline" className="w-full" onClick={() => openLink(a.detail_url)}>
             打开申诉详情页
           </Button>
-        </Box>
+        </div>
       )}
 
       {open ? (
-        <Box
+        // 纯色底 + 上边框，不用玻璃：这是压在长内容上的固定操作条，
+        // 玻璃会让下面的正文透上来，按钮与文字互相干扰。
+        <div
           ref={barRef}
           data-testid="appeal-action-bar"
-          sx={{
-            position: 'fixed',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            px: 1.25,
-            pt: 0.75,
-            pb: 'calc(6px + env(safe-area-inset-bottom))',
-            bgcolor: 'background.paper',
-            borderTop: '1px solid',
-            borderColor: 'divider',
-            zIndex: (theme) => theme.zIndex.appBar,
-          }}
+          className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-2.5 pt-1.5 pb-[calc(6px+env(safe-area-inset-bottom))]"
         >
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+          <div className="flex flex-wrap gap-1.5">
             <Button
-              size="small"
-              variant="outlined"
+              variant="outline"
+              size="sm"
               disabled={act.isPending}
               onClick={() => void approve()}
-              sx={COMPACT_BTN_SX}
+              className={COMPACT_BTN}
             >
               人工解除
             </Button>
             <Button
-              size="small"
-              variant="outlined"
-              color="error"
+              variant="outline"
+              size="sm"
               disabled={act.isPending}
               onClick={() => void reject()}
-              sx={COMPACT_BTN_SX}
+              className={`${COMPACT_BTN} text-destructive`}
             >
               驳回
             </Button>
             {canIssueCode && (
               <Button
-                size="small"
-                variant="outlined"
+                variant="outline"
+                size="sm"
                 disabled={act.isPending}
                 onClick={() => run('issue_code')}
-                sx={COMPACT_BTN_SX}
+                className={COMPACT_BTN}
               >
                 直接签发解禁码
               </Button>
             )}
             {canRerun && (
               <Button
-                size="small"
-                variant="outlined"
+                variant="outline"
+                size="sm"
                 disabled={act.isPending}
                 onClick={() => run('rerun')}
-                sx={COMPACT_BTN_SX}
+                className={COMPACT_BTN}
               >
                 重跑 AI 复核
               </Button>
             )}
-          </Box>
-          <Typography sx={{ mt: 0.5, fontSize: 11, color: 'text.secondary', lineHeight: 1.5 }}>
+          </div>
+          <p className="mt-1 text-[11px] leading-[1.5] text-muted-foreground">
             人工解除与 AI 撤销同效：解除禁言与冷判定限制；联合封禁只有主管理员能在此一并解除。
-          </Typography>
-        </Box>
+          </p>
+        </div>
       ) : (
-        <Box sx={{ px: 2 }}>
-          <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
+        <div className="px-4">
+          <p className="text-[13px] leading-[1.6] text-muted-foreground">
             该申诉已结（{status.label}），无需再处理。
-          </Typography>
-        </Box>
+          </p>
+        </div>
       )}
-    </Box>
+    </div>
   )
 }

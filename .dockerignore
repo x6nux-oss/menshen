@@ -25,7 +25,6 @@ HANDOFF.md
 # 带上宿主机（macOS）的 node_modules 会覆盖 linux 依赖，rollup/esbuild
 # 平台不符直接构建失败；webdist 则由 web 阶段 COPY --from 提供。
 web/node_modules
-web/.vite
 web/coverage
 internal/panel/webdist
 

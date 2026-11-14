@@ -1,25 +1,11 @@
 // oxlint-disable react/set-state-in-effect -- 草稿态需要跟随服务端返回的值重置（保存后刷新）。
 // 模型定价（主管理员）：列表 + 新增；详情页改价、启停、删除。
 import { useEffect, useState } from "react";
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Switch,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from "../../components/ui";
 import { useModelMutation } from "../../api/mutations";
 import { useMiniState } from "../../api/hooks";
 import { filterRows } from "../../lib/filters";
-import { SearchField } from "../../ui";
+import { SearchField } from "../../components/mobile";
 import {
   CardBlock,
   ConfirmButton,
@@ -34,7 +20,9 @@ import { useRunFeedback } from "../feedback";
 import { useAdminNav } from "../nav";
 import { REASONING_EFFORTS } from "../../api/types";
 import type { Model } from "../../api/types";
-import { LocalModelsCard } from "../../ui";
+import { LocalModelsCard } from "../../components/mobile";
+
+const REASONING_EFFORT_UNSET = "__unset__";
 
 export function ModelsView() {
   const state = useMiniState(true);
@@ -102,11 +90,7 @@ export function ModelsView() {
       <PageHeader
         title="模型定价"
         subtitle={`共 ${models.length} 个；单价用于把开销折算成钱`}
-        actions={
-          <Button variant="contained" onClick={() => setOpen(true)}>
-            ＋ 新增模型
-          </Button>
-        }
+        actions={<Button onClick={() => setOpen(true)}>＋ 新增模型</Button>}
       />
       {state.data.me.main && <LocalModelsCard />}
       <Toolbar>
@@ -114,7 +98,7 @@ export function ModelsView() {
           value={q}
           onChange={setQ}
           placeholder="搜索模型名"
-          sx={{ maxWidth: 320 }}
+          className="max-w-[320px]"
         />
       </Toolbar>
       <DataTable
@@ -122,9 +106,9 @@ export function ModelsView() {
         rowKey={(row) => row.name}
         onRowClick={(row) => nav.go({ k: "model", name: row.name })}
         empty={
-          <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+          <span className="text-[13px] text-muted-foreground">
             没有匹配的模型。
-          </Typography>
+          </span>
         }
         columns={columns}
       />
@@ -159,84 +143,84 @@ function AddModelDialog({
   const valid = upstream !== "" && modelId.trim() !== "";
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontSize: 17 }}>新增模型</DialogTitle>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent>
-        <Box sx={{ display: "grid", gap: 2, pt: 0.5 }}>
-          <FormControl size="small" fullWidth>
-            <InputLabel>上游</InputLabel>
-            <Select
-              label="上游"
-              value={upstream}
-              onChange={(e) => setUpstream(e.target.value)}
-            >
-              {upstreams.map((name) => (
-                <MenuItem key={name} value={name}>
-                  {name}
-                </MenuItem>
-              ))}
+        <DialogHeader>
+          <DialogTitle>新增模型</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="addmodel-upstream">上游</Label>
+            <Select value={upstream} onValueChange={setUpstream}>
+              <SelectTrigger id="addmodel-upstream" aria-label="上游">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {upstreams.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
-          </FormControl>
-          <TextField
-            label="模型 ID"
-            value={modelId}
-            onChange={(e) => setModelId(e.target.value)}
-            helperText="上游侧的模型 ID，可含 /"
-            fullWidth
-          />
-          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-            <TextField
-              label="输入价（每百万 token）"
-              value={pp}
-              onChange={(e) => setPp(e.target.value)}
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="addmodel-id">模型 ID</Label>
+            <Input
+              id="addmodel-id"
+              value={modelId}
+              onChange={(e) => setModelId(e.target.value)}
             />
-            <TextField
-              label="输出价"
-              value={cp}
-              onChange={(e) => setCp(e.target.value)}
-            />
-            <TextField
-              label="缓存读价"
-              value={crp}
-              onChange={(e) => setCrp(e.target.value)}
-            />
-            <TextField
-              label="缓存写价"
-              value={cwp}
-              onChange={(e) => setCwp(e.target.value)}
-            />
-          </Box>
-        </Box>
+            <span className="text-[12px] text-muted-foreground">上游侧的模型 ID，可含 /</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="addmodel-pp">输入价（每百万 token）</Label>
+              <Input id="addmodel-pp" value={pp} onChange={(e) => setPp(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="addmodel-cp">输出价</Label>
+              <Input id="addmodel-cp" value={cp} onChange={(e) => setCp(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="addmodel-crp">缓存读价</Label>
+              <Input id="addmodel-crp" value={crp} onChange={(e) => setCrp(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="addmodel-cwp">缓存写价</Label>
+              <Input id="addmodel-cwp" value={cwp} onChange={(e) => setCwp(e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>取消</Button>
+          <Button
+            disabled={!valid || mut.isPending}
+            onClick={() => {
+              run(
+                mut.mutateAsync({
+                  action: "add",
+                  upstream,
+                  model_id: modelId.trim(),
+                  prompt_price: pp.trim(),
+                  completion_price: cp.trim(),
+                  cache_read_price: crp.trim(),
+                  cache_write_price: cwp.trim(),
+                }),
+                "已新增",
+              );
+              setModelId("");
+              setPp("");
+              setCp("");
+              setCrp("");
+              setCwp("");
+              onClose();
+            }}
+          >
+            新增
+          </Button>
+        </DialogFooter>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>取消</Button>
-        <Button
-          variant="contained"
-          disabled={!valid || mut.isPending}
-          onClick={() => {
-            run(
-              mut.mutateAsync({
-                action: "add",
-                upstream,
-                model_id: modelId.trim(),
-                prompt_price: pp.trim(),
-                completion_price: cp.trim(),
-                cache_read_price: crp.trim(),
-                cache_write_price: cwp.trim(),
-              }),
-              "已新增",
-            );
-            setModelId("");
-            setPp("");
-            setCp("");
-            setCrp("");
-            setCwp("");
-            onClose();
-          }}
-        >
-          新增
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 }
@@ -251,9 +235,7 @@ export function ModelDetailView({ name }: { name: string }) {
   if (!model) {
     return (
       <CardBlock>
-        <Typography sx={{ fontSize: 14, color: "text.secondary" }}>
-          模型不存在。
-        </Typography>
+        <span className="text-sm text-muted-foreground">模型不存在。</span>
       </CardBlock>
     );
   }
@@ -304,122 +286,119 @@ function ModelDetailBody({
         title="启用"
         actions={
           <Switch
+            aria-label="启用模型"
             checked={model.enabled}
             disabled={mut.isPending}
-            onChange={(e) =>
+            onCheckedChange={(checked) =>
               run(
                 mut.mutateAsync({
                   action: "update",
                   name: model.name,
-                  enabled: e.target.checked,
+                  enabled: checked,
                 }),
-                e.target.checked ? "已启用" : "已停用",
+                checked ? "已启用" : "已停用",
               )
             }
           />
         }
       >
-        <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+        <span className="text-[13px] text-muted-foreground">
           只有启用的模型能出现在判定/复判模型选择里。
-        </Typography>
+        </span>
       </CardBlock>
 
       <CardBlock
         title="初判提示词简化为一句话"
         actions={
           <Switch
+            aria-label="简化初判提示词"
             checked={model.simple_instructions}
             disabled={mut.isPending}
-            onChange={(e) =>
+            onCheckedChange={(checked) =>
               run(
                 mut.mutateAsync({
                   action: "update",
                   name: model.name,
-                  simple_instructions: e.target.checked,
+                  simple_instructions: checked,
                 }),
-                e.target.checked ? "已简化" : "已还原完整提示词",
+                checked ? "已简化" : "已还原完整提示词",
               )
             }
           />
         }
       >
-        <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+        <span className="text-[13px] text-muted-foreground">
           给微调过的初判模型用：is_ad 的 instructions
           换成一句「是不是广告」，判定选项与 state 不变。
           同一判定列表里标没标混着时，每次尝试按当前模型各自生效；复判提示词不受影响。
-        </Typography>
+        </span>
       </CardBlock>
 
       <CardBlock
         title="思考强度"
         actions={
           <Select
-            size="small"
-            displayEmpty
-            value={model.reasoning_effort}
+            value={
+              model.reasoning_effort === ""
+                ? REASONING_EFFORT_UNSET
+                : model.reasoning_effort
+            }
             disabled={mut.isPending}
-            onChange={(e) =>
+            onValueChange={(next) => {
+              const effort = next === REASONING_EFFORT_UNSET ? "" : next;
               run(
                 mut.mutateAsync({
                   action: "update",
                   name: model.name,
-                  reasoning_effort: e.target.value,
+                  reasoning_effort: effort,
                 }),
-                e.target.value ? `思考强度 ${e.target.value}` : "不传思考强度",
-              )
-            }
-            sx={{ minWidth: 120 }}
+                effort ? `思考强度 ${effort}` : "不传思考强度",
+              );
+            }}
           >
-            <MenuItem value="">不填</MenuItem>
-            {REASONING_EFFORTS.map((e) => (
-              <MenuItem key={e} value={e}>
-                {e}
-              </MenuItem>
-            ))}
+            <SelectTrigger aria-label="思考强度">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={REASONING_EFFORT_UNSET}>不填</SelectItem>
+              {REASONING_EFFORTS.map((effort) => (
+                <SelectItem key={effort} value={effort}>
+                  {effort}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         }
       >
-        <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+        <span className="text-[13px] text-muted-foreground">
           不填不发，模型按自己的默认思考。按渠道翻成各家字段：OpenAI 的
           reasoning_effort、Responses 的 reasoning.effort、Anthropic 的
           output_config.effort（Gemini / Cloudflare 原生渠道不支持）。
           模型不认这个参数时自动去掉重发，并记一条警告日志。
-        </Typography>
+        </span>
       </CardBlock>
 
       <CardBlock title="单价">
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
-            gap: 2,
-            maxWidth: 720,
-          }}
-        >
-          <TextField
-            label="输入价"
-            value={pp}
-            onChange={(e) => setPp(e.target.value)}
-          />
-          <TextField
-            label="输出价"
-            value={cp}
-            onChange={(e) => setCp(e.target.value)}
-          />
-          <TextField
-            label="缓存读价"
-            value={crp}
-            onChange={(e) => setCrp(e.target.value)}
-          />
-          <TextField
-            label="缓存写价"
-            value={cwp}
-            onChange={(e) => setCwp(e.target.value)}
-          />
-        </Box>
-        <Box sx={{ mt: 2 }}>
+        <div className="grid max-w-[720px] grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="model-pp">输入价</Label>
+            <Input id="model-pp" value={pp} onChange={(e) => setPp(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="model-cp">输出价</Label>
+            <Input id="model-cp" value={cp} onChange={(e) => setCp(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="model-crp">缓存读价</Label>
+            <Input id="model-crp" value={crp} onChange={(e) => setCrp(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="model-cwp">缓存写价</Label>
+            <Input id="model-cwp" value={cwp} onChange={(e) => setCwp(e.target.value)} />
+          </div>
+        </div>
+        <div className="mt-4">
           <Button
-            variant="contained"
             disabled={mut.isPending}
             onClick={() =>
               run(
@@ -437,7 +416,7 @@ function ModelDetailBody({
           >
             保存单价
           </Button>
-        </Box>
+        </div>
       </CardBlock>
 
       <CardBlock title="其他">
@@ -448,7 +427,7 @@ function ModelDetailBody({
             { label: "模型 ID", value: model.model_id || "—" },
           ]}
         />
-        <Box sx={{ mt: 2 }}>
+        <div className="mt-4">
           <ConfirmButton
             variant="outlined"
             color="error"
@@ -466,7 +445,7 @@ function ModelDetailBody({
           >
             删除模型
           </ConfirmButton>
-        </Box>
+        </div>
       </CardBlock>
     </>
   );

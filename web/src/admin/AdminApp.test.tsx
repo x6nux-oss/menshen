@@ -1,7 +1,7 @@
 // 桌面端管理面板的外壳测试：会话有效时渲染侧栏与内容，401 时给登录指引。
 // api 替换为 spy，其余（ApiError）保真。
-import { render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, api } from '../api/client'
 import { mockLogs, mockState } from '../mocks/fixtures'
 import { AdminApp } from './AdminApp'
@@ -12,6 +12,36 @@ vi.mock('../api/client', async (importOriginal) => {
 })
 
 const mockApi = vi.mocked(api)
+
+function mockSystemTheme(initial: 'light' | 'dark') {
+  let dark = initial === 'dark'
+  const listeners = new Set<(event: MediaQueryListEvent) => void>()
+  const media = {
+    get matches() {
+      return dark
+    },
+    media: '(prefers-color-scheme: dark)',
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: (_event: string, listener: (event: MediaQueryListEvent) => void) => {
+      listeners.add(listener)
+    },
+    removeEventListener: (_event: string, listener: (event: MediaQueryListEvent) => void) => {
+      listeners.delete(listener)
+    },
+    dispatchEvent: () => false,
+  }
+  vi.stubGlobal('matchMedia', () => media)
+  return {
+    set(next: 'light' | 'dark') {
+      dark = next === 'dark'
+      for (const listener of listeners) {
+        listener({ matches: dark, media: media.media } as MediaQueryListEvent)
+      }
+    },
+  }
+}
 
 function mockApiByOp() {
   mockApi.mockImplementation((async (op: string) => {
@@ -24,6 +54,12 @@ function mockApiByOp() {
 beforeEach(() => {
   mockApi.mockReset()
   window.history.replaceState(null, '', '/admin/?bot=42')
+})
+
+afterEach(() => {
+  localStorage.clear()
+  document.documentElement.classList.remove('dark')
+  vi.unstubAllGlobals()
 })
 
 describe('AdminApp', () => {
@@ -49,5 +85,37 @@ describe('AdminApp', () => {
 
     expect(await screen.findByText('需要登录')).toBeInTheDocument()
     expect(screen.getByText(/🖥 网页版（浏览器打开）/)).toBeInTheDocument()
+  })
+
+  it('系统主题变化不覆盖用户显式选择', async () => {
+    const system = mockSystemTheme('light')
+    localStorage.setItem('menshen-theme', 'dark')
+    mockApiByOp()
+    render(<AdminApp />)
+
+    await screen.findByText('🛡 门神')
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+
+    act(() => system.set('light'))
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+  })
+
+  it('回到跟随系统后与当前系统主题保持一致', async () => {
+    const system = mockSystemTheme('dark')
+    mockApiByOp()
+    render(<AdminApp />)
+
+    await screen.findByText('🛡 门神')
+    const toggle = screen.getByRole('button', { name: '主题：跟随系统' })
+    fireEvent.click(toggle)
+    fireEvent.click(toggle)
+    expect(localStorage.getItem('menshen-theme')).toBe('dark')
+
+    fireEvent.click(toggle)
+    expect(localStorage.getItem('menshen-theme')).toBeNull()
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+
+    act(() => system.set('light'))
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
   })
 })

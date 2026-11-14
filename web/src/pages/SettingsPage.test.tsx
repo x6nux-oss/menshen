@@ -126,7 +126,8 @@ describe('SettingsPage 主题折叠卡（智能控件）', () => {
     await renderSettings()
 
     fireEvent.click(screen.getByRole('button', { name: /判定与模型/ }))
-    const row = screen.getByText('并发模式持续（分钟）').closest('li')
+    // 新 ListRow 的根是 <div>（旧 MUI ListItem 是 <li>）；取最近的祖先 div 即整行。
+    const row = screen.getByText('并发模式持续（分钟）').closest('div')
     expect(row).not.toBeNull()
     fireEvent.click(within(row as HTMLElement).getByRole('button', { name: '编辑' }))
 

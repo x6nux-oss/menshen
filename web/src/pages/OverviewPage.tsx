@@ -1,12 +1,17 @@
 // 概览（工作台）：待办跳转 + 近 24h 指标 + 最近命中 + 机器人状态。
 // 数据源是外壳已经拉到的 ['state'] 缓存；最近命中额外请求 logs{verdict:'ad'}。
-import { Box, Typography } from '@mui/material'
 import { errorStatus } from '../api/client'
 import { useLogs, useMiniState } from '../api/hooks'
+import { ErrorState, Skeletons } from '../components/feedback'
+import { ListRow, SectionCard } from '../components/mobile'
 import { actionLabel, displayTz, fmtTS, kindLabel, verdictLabel } from '../lib/format'
 import { useNav } from '../nav'
-import { ErrorState, ListRow, SectionCard, Skeletons } from '../ui'
 import { BotStatusBadge, Metric } from './shared'
+
+/** 段落内的「暂无」文案：与列表行同高的轻提示。 */
+function EmptyLine({ children }: { children: string }) {
+  return <p className="px-4 py-3 text-sm text-muted-foreground">{children}</p>
+}
 
 export function OverviewPage() {
   const nav = useNav()
@@ -44,12 +49,10 @@ export function OverviewPage() {
   const recent = hits.data?.logs.slice(0, 3) ?? []
 
   return (
-    <Box data-testid="overview-page">
+    <div data-testid="overview-page">
       <SectionCard title="待办">
         {todos.length === 0 ? (
-          <Typography sx={{ px: 2, py: 1.5, fontSize: 14, color: 'text.secondary' }}>
-            暂无待办事项
-          </Typography>
+          <EmptyLine>暂无待办事项</EmptyLine>
         ) : (
           todos.map((item) => (
             <ListRow
@@ -64,20 +67,12 @@ export function OverviewPage() {
       </SectionCard>
 
       <SectionCard title="近 24 小时">
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 1.5,
-            px: 2,
-            py: 1.5,
-          }}
-        >
+        <div className="grid grid-cols-2 gap-3 px-4 py-3">
           <Metric label="送检" value={stats.checked} />
           <Metric label="命中" value={stats.hits} />
           <Metric label="折算开销" value={stats.cost_text} />
           <Metric label="生效群" value={stats.chats} />
-        </Box>
+        </div>
       </SectionCard>
 
       <SectionCard
@@ -89,9 +84,7 @@ export function OverviewPage() {
         ) : hits.isError ? (
           <ErrorState status={errorStatus(hits.error)} onRetry={() => void hits.refetch()} />
         ) : recent.length === 0 ? (
-          <Typography sx={{ px: 2, py: 1.5, fontSize: 14, color: 'text.secondary' }}>
-            最近没有命中
-          </Typography>
+          <EmptyLine>最近没有命中</EmptyLine>
         ) : (
           recent.map((log) => (
             <ListRow
@@ -108,9 +101,7 @@ export function OverviewPage() {
 
       <SectionCard title="机器人">
         {bots.length === 0 ? (
-          <Typography sx={{ px: 2, py: 1.5, fontSize: 14, color: 'text.secondary' }}>
-            还没有可管理的机器人
-          </Typography>
+          <EmptyLine>还没有可管理的机器人</EmptyLine>
         ) : (
           bots.map((bot) => (
             <ListRow
@@ -123,6 +114,6 @@ export function OverviewPage() {
           ))
         )}
       </SectionCard>
-    </Box>
+    </div>
   )
 }

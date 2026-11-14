@@ -4,13 +4,11 @@
 // - 模型卡仅主管理员可编辑（已登记且启用的模型快选），次管只读；
 // - 参数覆盖卡只渲染 specs∩覆盖表（antiad/both 分组），行内智能控件 + 恢复全局；
 // - `管理其群组` 带 bot 过滤切到群组页；危险区移除该 bot（ActionSheet）。
-import { Box, Button, Chip, IconButton, MenuItem, Switch, TextField, Typography } from '@mui/material'
-import AddCircleOutline from '@mui/icons-material/AddCircleOutline'
-import RemoveCircleOutline from '@mui/icons-material/RemoveCircleOutline'
+import { MinusCircle, PlusCircle } from 'lucide-react'
 import { useState } from 'react'
 import { errorStatus } from '../api/client'
-import { useBotMutation, useOptimisticMiniMutation, useSetMutation } from '../api/mutations'
 import { useMiniState } from '../api/hooks'
+import { useBotMutation, useOptimisticMiniMutation, useSetMutation } from '../api/mutations'
 import { settingOf } from '../lib/format'
 import type { State, Spec } from '../api/types'
 import {
@@ -21,20 +19,25 @@ import {
   specValueText,
   validateSpecValue,
 } from '../lib/settings'
-import { useNav } from '../nav'
+import { EmptyState, ErrorState, Skeletons, useToast } from '../components/feedback'
 import {
-  Badge,
-  EmptyState,
-  ErrorState,
+  Chip,
+  ChipStatic,
   FormDrawer,
   ListRow,
   SectionCard,
   SettingRow,
-  Skeletons,
   SwitchRow,
   useConfirm,
-  useToast,
-} from '../ui'
+} from '../components/mobile'
+import { Badge } from '../components/ui'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import { Switch } from '../components/ui/switch'
+import { Textarea } from '../components/ui/textarea'
+import { useNav } from '../nav'
 import { BotStatusBadge } from './shared'
 
 /** parseModelList 把全局默认模型键（JSON 数组字符串）转成展示文本。 */
@@ -80,16 +83,19 @@ export function BotDetailPage({ botId }: { botId: number }) {
 
   const bot = state.data.bots.find((b) => b.bot_id === botId)
   if (!bot) {
-    return <EmptyState title="机器人不存在或无权管理" description="它可能已被移除，或归属已改派给其他管理员。" />
+    return (
+      <EmptyState
+        title="机器人不存在或无权管理"
+        description="它可能已被移除，或归属已改派给其他管理员。"
+      />
+    )
   }
 
   const { main } = state.data.me
   const overrides = state.data.bot_settings[String(botId)] ?? {}
   const overridden = overrideKeys(state.data.specs, overrides)
   const overriddenKeys = new Set(overridden.map((sp) => sp.key))
-  const scopeSpecs = state.data.specs.filter(
-    (sp) => sp.group === 'antiad' || sp.group === 'both',
-  )
+  const scopeSpecs = state.data.specs.filter((sp) => sp.group === 'antiad' || sp.group === 'both')
   const addable = scopeSpecs.filter((sp) => !overriddenKeys.has(sp.key))
   const groupCount = state.data.chats.filter((c) => c.bot_id === botId).length
   const modelOptions = (state.data.models ?? []).filter((m) => m.enabled)
@@ -249,31 +255,29 @@ export function BotDetailPage({ botId }: { botId: number }) {
 
   const modelRow = (which: 'so' | 'llm', label: string) => {
     const models = which === 'so' ? bot.so_models : bot.llm_models
-    const globalText = parseModelList(
-      state.data.global_defaults[`antiad_${which}_models`],
-    )
+    const globalText = parseModelList(state.data.global_defaults[`antiad_${which}_models`])
     return (
-      <Box key={which} sx={{ px: 2, py: 1.25, borderTop: '1px solid', borderColor: 'divider' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Typography sx={{ flex: 1, fontSize: 16 }}>{label}</Typography>
+      <div key={which} className="border-t border-border px-4 py-2.5 first:border-t-0">
+        <div className="flex items-center">
+          <span className="flex-1 text-[16px]">{label}</span>
           {main ? (
-            <Button size="small" onClick={() => openModels(which)} sx={{ minWidth: 0 }}>
+            <Button size="sm" variant="ghost" onClick={() => openModels(which)}>
               编辑
             </Button>
           ) : (
-            <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>由主管理员配置</Typography>
+            <span className="text-[13px] text-muted-foreground">由主管理员配置</span>
           )}
-        </Box>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 0.5 }}>
+        </div>
+        <div className="mt-1 flex flex-wrap gap-1.5">
           {models.length > 0 ? (
-            models.map((name) => <Chip key={name} size="small" label={name} />)
+            models.map((name) => <ChipStatic key={name} label={name} />)
           ) : (
-            <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+            <span className="text-[13px] text-muted-foreground">
               跟随全局{globalText ? `（${globalText}）` : '（全局未配置）'}
-            </Typography>
+            </span>
           )}
-        </Box>
-      </Box>
+        </div>
+      </div>
     )
   }
 
@@ -288,7 +292,7 @@ export function BotDetailPage({ botId }: { botId: number }) {
   }
 
   return (
-    <Box data-testid="bot-detail-page">
+    <div data-testid="bot-detail-page">
       <SectionCard>
         <ListRow
           primary={
@@ -354,9 +358,9 @@ export function BotDetailPage({ botId }: { botId: number }) {
         }
       >
         {overridden.length === 0 ? (
-          <Typography sx={{ px: 2, py: 1.5, fontSize: 14, color: 'text.secondary' }}>
+          <p className="px-4 py-3 text-sm text-muted-foreground">
             当前没有覆盖项，全部跟随全局。
-          </Typography>
+          </p>
         ) : (
           overridden.map((sp) => {
             const effective = settingOf(
@@ -375,18 +379,16 @@ export function BotDetailPage({ botId }: { botId: number }) {
                   kind === 'toggle' ? (
                     <>
                       <Switch
-                        size="small"
                         checked={effective === '1'}
                         disabled={setPending}
-                        onChange={(event) => toggleOverride(sp, event.target.checked)}
-                        slotProps={{ input: { 'aria-label': sp.label } }}
+                        onCheckedChange={(next) => toggleOverride(sp, next)}
+                        aria-label={sp.label}
                       />
                       <Button
-                        size="small"
-                        color="inherit"
+                        size="sm"
+                        variant="ghost"
                         disabled={setPending}
                         onClick={() => restoreOverride(sp)}
-                        sx={{ minWidth: 0, color: 'text.secondary' }}
                       >
                         恢复全局
                       </Button>
@@ -394,19 +396,18 @@ export function BotDetailPage({ botId }: { botId: number }) {
                   ) : (
                     <>
                       <Button
-                        size="small"
+                        size="sm"
+                        variant="ghost"
                         disabled={setPending}
                         onClick={() => openEditor(sp)}
-                        sx={{ minWidth: 0 }}
                       >
                         {specValueText(effective, sp)}
                       </Button>
                       <Button
-                        size="small"
-                        color="inherit"
+                        size="sm"
+                        variant="ghost"
                         disabled={setPending}
                         onClick={() => restoreOverride(sp)}
-                        sx={{ minWidth: 0, color: 'text.secondary' }}
                       >
                         恢复全局
                       </Button>
@@ -426,7 +427,7 @@ export function BotDetailPage({ botId }: { botId: number }) {
             secondary="删除群配置与阈值并撤销 webhook；判定流水保留"
             disabled={removeMut.isPending}
             onClick={() => void removeBot()}
-            sx={{ color: 'error.main' }}
+            className="text-destructive"
           />
         </SectionCard>
       )}
@@ -439,23 +440,27 @@ export function BotDetailPage({ botId }: { botId: number }) {
         submitText="保存"
         onSubmit={submitOwner}
       >
-        <TextField
-          select
-          fullWidth
-          size="small"
-          label="新的归属人"
+        <Label htmlFor="owner-select" className="mb-1 block">
+          新的归属人
+        </Label>
+        <Select
           value={String(ownerID)}
-          onChange={(event) => setOwnerID(Number(event.target.value))}
+          onValueChange={(value) => setOwnerID(Number(value))}
         >
-          {(state.data.owner_opts ?? []).map((opt) => (
-            <MenuItem key={opt.user_id} value={String(opt.user_id)}>
-              {opt.label} · {opt.user_id}
-            </MenuItem>
-          ))}
-        </TextField>
-        <Typography sx={{ mt: 1, fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
+          <SelectTrigger id="owner-select" aria-label="新的归属人">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(state.data.owner_opts ?? []).map((opt) => (
+              <SelectItem key={opt.user_id} value={String(opt.user_id)}>
+                {opt.label} · {opt.user_id}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="mt-2 text-[13px] leading-[1.6] text-muted-foreground">
           改派后，该 bot 的配置只能由新的归属人与主管理员管理。
-        </Typography>
+        </p>
       </FormDrawer>
 
       <FormDrawer
@@ -466,23 +471,26 @@ export function BotDetailPage({ botId }: { botId: number }) {
         submitText="保存"
         onSubmit={submitModels}
       >
-        <TextField
-          fullWidth
-          multiline
-          minRows={2}
-          size="small"
-          label="模型列表（逗号分隔，按重试顺序）"
+        <Label htmlFor="bot-model-list" className="mb-1 block">
+          模型列表（逗号分隔，按重试顺序）
+        </Label>
+        <Textarea
+          id="bot-model-list"
+          rows={2}
           placeholder="例如 demo/gpt-5-mini, demo/gpt-5"
           value={modelText}
           onChange={(event) => setModelText(event.target.value)}
-          helperText="留空 = 跟随全局默认；模型需先在「我的 → 模型定价」登记并启用。"
+          aria-describedby="bot-model-list-hint"
         />
+        <p id="bot-model-list-hint" className="mt-1 text-[12px] text-muted-foreground">
+          留空 = 跟随全局默认；模型需先在「我的 → 模型定价」登记并启用。
+        </p>
         {modelOptions.length > 0 && (
           <>
-            <Typography sx={{ mt: 1.5, fontSize: 13, color: 'text.secondary' }}>
+            <p className="mt-3 text-[13px] text-muted-foreground">
               已登记且启用的模型（点选加入/移出）
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 0.75 }}>
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
               {modelOptions.map((model) => {
                 const picked = modelText
                   .split(',')
@@ -491,15 +499,13 @@ export function BotDetailPage({ botId }: { botId: number }) {
                 return (
                   <Chip
                     key={model.name}
-                    size="small"
                     label={model.name}
-                    color={picked ? 'primary' : 'default'}
-                    variant={picked ? 'filled' : 'outlined'}
+                    selected={picked}
                     onClick={() => toggleModel(model.name)}
                   />
                 )
               })}
-            </Box>
+            </div>
           </>
         )}
       </FormDrawer>
@@ -510,14 +516,12 @@ export function BotDetailPage({ botId }: { botId: number }) {
         title="添加参数覆盖"
       >
         {addable.length === 0 ? (
-          <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>
-            可覆盖的参数都已在列表里。
-          </Typography>
+          <p className="text-sm text-muted-foreground">可覆盖的参数都已在列表里。</p>
         ) : (
           <>
-            <Typography sx={{ mb: 1, fontSize: 13, color: 'text.secondary' }}>
+            <p className="mb-2 text-[13px] text-muted-foreground">
               只列出反广告相关的参数；模型覆盖在「模型」卡里改。
-            </Typography>
+            </p>
             {addable.map((sp) => (
               <ListRow
                 key={sp.key}
@@ -550,52 +554,65 @@ export function BotDetailPage({ botId }: { botId: number }) {
               />
             ) : (
               <>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <IconButton aria-label="减一" onClick={() => stepDraft(-stepSize)}>
-                    <RemoveCircleOutline />
-                  </IconButton>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label={editing.label}
-                    value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
-                    slotProps={{ htmlInput: { inputMode: 'numeric' } }}
-                    helperText={specHint(editing)}
-                  />
-                  <IconButton aria-label="加一" onClick={() => stepDraft(stepSize)}>
-                    <AddCircleOutline />
-                  </IconButton>
-                </Box>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="减一"
+                    onClick={() => stepDraft(-stepSize)}
+                    className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50"
+                  >
+                    <MinusCircle className="size-5" aria-hidden />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <Label htmlFor="spec-draft" className="mb-1 block">
+                      {editing.label}
+                    </Label>
+                    <Input
+                      id="spec-draft"
+                      inputMode="numeric"
+                      value={draft}
+                      onChange={(event) => setDraft(event.target.value)}
+                      aria-describedby="spec-draft-hint"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="加一"
+                    onClick={() => stepDraft(stepSize)}
+                    className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50"
+                  >
+                    <PlusCircle className="size-5" aria-hidden />
+                  </button>
+                </div>
+                <p id="spec-draft-hint" className="mt-1 text-[12px] text-muted-foreground">
+                  {specHint(editing)}
+                </p>
                 {editingIsMinutes && minutePresets(editing).length > 0 && (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1.5 }}>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
                     {minutePresets(editing).map((preset) => {
                       const picked = presetSelected(preset.value)
                       return (
                         <Chip
                           key={preset.value}
-                          size="small"
                           label={preset.label}
-                          color={picked ? 'primary' : 'default'}
-                          variant={picked ? 'filled' : 'outlined'}
+                          selected={picked}
                           data-testid={`preset-${preset.value}`}
-                          data-selected={picked ? 'true' : undefined}
                           onClick={() => setDraft(String(preset.value))}
                         />
                       )
                     })}
-                  </Box>
+                  </div>
                 )}
-                <Typography sx={{ mt: 1, fontSize: 13, color: 'text.secondary' }}>
+                <p className="mt-2 text-[13px] text-muted-foreground">
                   {draft.trim() === ''
                     ? '留空并保存 = 恢复全局。'
                     : `生效值：${specValueText(draft, editing)}`}
-                </Typography>
+                </p>
               </>
             )}
           </>
         )}
       </FormDrawer>
-    </Box>
+    </div>
   )
 }

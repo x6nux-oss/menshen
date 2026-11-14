@@ -1,17 +1,7 @@
 // oxlint-disable react/set-state-in-effect -- 草稿态需要跟随服务端返回的值重置（保存后刷新）。
 // 上游详情：改名、渠道配置、启停、连通性测试、删除。
 import { useEffect, useState } from 'react'
-import {
-  Box,
-  Button,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Switch,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from '../../components/ui'
 import { useUpstreamMutation } from '../../api/mutations'
 import { useMiniState } from '../../api/hooks'
 import { CardBlock, ConfirmButton, InfoList, PageHeader, StatusBadge } from '../components'
@@ -29,7 +19,7 @@ export function UpstreamDetailView({ id }: { id: number }) {
   if (!up) {
     return (
       <CardBlock>
-        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>上游不存在。</Typography>
+        <span className="text-sm text-muted-foreground">上游不存在。</span>
       </CardBlock>
     )
   }
@@ -48,23 +38,24 @@ export function UpstreamDetailView({ id }: { id: number }) {
           <Switch
             checked={up.status}
             disabled={mut.isPending}
-            onChange={(e) =>
-              run(mut.mutateAsync({ action: 'update', id: up.id, status: e.target.checked }), e.target.checked ? '已启用' : '已停用')
+            aria-label="启用该上游"
+            onCheckedChange={(checked) =>
+              run(mut.mutateAsync({ action: 'update', id: up.id, status: checked }), checked ? '已启用' : '已停用')
             }
           />
         }
       >
-        <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.8 }}>
+        <span className="text-[13px] leading-relaxed text-muted-foreground">
           停用后该上游不参与选路，其名下模型的判定请求会失败。
-        </Typography>
+        </span>
       </CardBlock>
 
       <ConfigCard up={{ id: up.id, name: up.name, kind: up.kind, base_url: up.base_url, supports_chat: up.supports_chat, supports_systemone: up.supports_systemone }} />
 
       <CardBlock title="连通性测试">
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="flex flex-wrap items-center gap-3">
           <Button
-            variant="outlined"
+            variant="outline"
             disabled={mut.isPending}
             onClick={() => {
               mut.mutate({ action: 'test', id: up.id })
@@ -74,14 +65,14 @@ export function UpstreamDetailView({ id }: { id: number }) {
           </Button>
           {mut.data &&
             (mut.data.ok ? (
-              <Typography sx={{ fontSize: 13, color: 'success.main' }}>
+              <span className="text-[13px] text-[#067A3E] dark:text-[#4ADE80]">
                 连通正常{mut.data.latency_ms !== undefined ? ` · ${mut.data.latency_ms} ms` : ''}
                 {mut.data.model ? ` · ${mut.data.model}` : ''}
-              </Typography>
+              </span>
             ) : (
-              <Typography sx={{ fontSize: 13, color: 'error.main' }}>{mut.data.error || '测试失败'}</Typography>
+              <span className="text-[13px] text-[#C62828] dark:text-[#FF8A80]">{mut.data.error || '测试失败'}</span>
             ))}
-        </Box>
+        </div>
       </CardBlock>
 
       <CardBlock title="其他">
@@ -92,7 +83,7 @@ export function UpstreamDetailView({ id }: { id: number }) {
             { label: '权重', value: up.weight },
           ]}
         />
-        <Box sx={{ mt: 2 }}>
+        <div className="mt-4">
           <ConfirmButton
             variant="outlined"
             color="error"
@@ -105,7 +96,7 @@ export function UpstreamDetailView({ id }: { id: number }) {
           >
             删除上游
           </ConfirmButton>
-        </Box>
+        </div>
       </CardBlock>
     </>
   )
@@ -140,29 +131,39 @@ function ConfigCard({
 
   return (
     <CardBlock title="配置">
-      <Box sx={{ display: 'grid', gap: 2, maxWidth: 560 }}>
-        <TextField label="名称" value={name} onChange={(e) => setName(e.target.value)} helperText="改名会连带改写模型名与绑定，谨慎操作" fullWidth />
-        <FormControl size="small" fullWidth>
-          <InputLabel>渠道类型</InputLabel>
-          <Select label="渠道类型" value={kind} onChange={(e) => setKind(e.target.value as UpstreamKind)}>
-            {KINDS.map((k) => (
-              <MenuItem key={k.value} value={k.value}>
-                {k.label}
-              </MenuItem>
-            ))}
+      <div className="grid max-w-[560px] gap-4">
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="up-name">名称</Label>
+          <Input id="up-name" value={name} onChange={(e) => setName(e.target.value)} />
+          <span className="text-[12px] text-muted-foreground">改名会连带改写模型名与绑定，谨慎操作</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="up-kind">渠道类型</Label>
+          <Select value={kind} onValueChange={(v) => setKind(v as UpstreamKind)}>
+            <SelectTrigger id="up-kind" aria-label="渠道类型">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {KINDS.map((k) => (
+                <SelectItem key={k.value} value={k.value}>
+                  {k.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
-        </FormControl>
-        <TextField label="base_url" value={baseURL} onChange={(e) => setBaseURL(e.target.value)} helperText="留空用渠道默认端点" fullWidth />
-        <TextField
-          label="api_key"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          helperText="留空表示不修改；当前为掩码显示"
-          fullWidth
-        />
-        <Box>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="up-base-url">base_url</Label>
+          <Input id="up-base-url" value={baseURL} onChange={(e) => setBaseURL(e.target.value)} />
+          <span className="text-[12px] text-muted-foreground">留空用渠道默认端点</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="up-api-key">api_key</Label>
+          <Input id="up-api-key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+          <span className="text-[12px] text-muted-foreground">留空表示不修改；当前为掩码显示</span>
+        </div>
+        <div>
           <Button
-            variant="contained"
             disabled={!dirty || mut.isPending}
             onClick={() => {
               const caps = kindCaps(kind)
@@ -183,8 +184,8 @@ function ConfigCard({
           >
             保存配置
           </Button>
-        </Box>
-      </Box>
+        </div>
+      </div>
     </CardBlock>
   )
 }

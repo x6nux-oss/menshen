@@ -6,27 +6,26 @@
 // - 主题折叠卡（state.sections）：卡头显示已设置 N 项；逐项智能控件——
 //   toggle → Switch、number → 抽屉（时长类预设按 spec.min/max 过滤并显示换算）；
 // - 展示时区 / 群内提示附加链接 / 形态摘要 / 修正文本。
-import AddCircleOutline from '@mui/icons-material/AddCircleOutline'
-import ExpandMore from '@mui/icons-material/ExpandMore'
-import RemoveCircleOutline from '@mui/icons-material/RemoveCircleOutline'
-import {
-  Box,
-  Button,
-  Card,
-  Chip,
-  Collapse,
-  IconButton,
-  ListItemButton,
-  ListItemText,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { ChevronDown, MinusCircle, PlusCircle } from 'lucide-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { errorStatus } from '../api/client'
 import { useMiniState } from '../api/hooks'
 import { useDigestMutation, useOptimisticMiniMutation, useSetMutation } from '../api/mutations'
 import type { Spec, State } from '../api/types'
+import { ErrorState, Skeletons, useToast } from '../components/feedback'
+import {
+  Chip,
+  FormDrawer,
+  ListRow,
+  SectionCard,
+  SettingRow,
+  SwitchRow,
+} from '../components/mobile'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Textarea } from '../components/ui/textarea'
 import {
   CAPTCHA_DEMO_PATH,
   controlKind,
@@ -35,16 +34,6 @@ import {
   specValueText,
   validateSpecValue,
 } from '../lib/settings'
-import {
-  ErrorState,
-  FormDrawer,
-  ListRow,
-  SectionCard,
-  SettingRow,
-  Skeletons,
-  SwitchRow,
-  useToast,
-} from '../ui'
 
 /** parseModelList 把模型列表键（JSON 数组或逗号串）转成逗号分隔文本。 */
 function parseModelList(raw: string | undefined): string {
@@ -116,6 +105,20 @@ const MODEL_ROWS: { which: ModelWhich; key: string; label: string; hint: string 
   },
 ]
 
+/** FieldLabel 抽屉里的字段标签（与 Input/Textarea 用 id 关联）。 */
+function FieldLabel({ htmlFor, children }: { htmlFor: string; children: ReactNode }) {
+  return (
+    <Label htmlFor={htmlFor} className="mt-3 mb-1 block first:mt-0">
+      {children}
+    </Label>
+  )
+}
+
+/** FieldHint 字段下方的辅助说明（旧 TextField 的 helperText）。 */
+function FieldHint({ children }: { children: ReactNode }) {
+  return <p className="mt-1 text-[12px] leading-[1.6] text-muted-foreground">{children}</p>
+}
+
 /** SettingsSection 是设置主题折叠卡：卡头显示已设置项数，展开后渲染子行。 */
 function SettingsSection({
   name,
@@ -128,38 +131,28 @@ function SettingsSection({
 }) {
   const [open, setOpen] = useState(false)
   return (
-    <Card
-      elevation={0}
-      sx={{
-        bgcolor: 'background.paper',
-        backgroundImage: 'none',
-        borderRadius: '12px',
-        boxShadow: 'none',
-        mb: 1.5,
-      }}
-    >
-      <ListItemButton onClick={() => setOpen((prev) => !prev)} aria-expanded={open}>
-        <ListItemText
-          primary={name}
-          secondary={`已设置 ${configured} 项`}
-          slotProps={{
-            primary: { sx: { fontSize: 15 } },
-            secondary: { sx: { fontSize: 12 } },
-          }}
-          sx={{ my: 0 }}
+    <div className="mb-3 overflow-hidden rounded-xl bg-card">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex min-h-[52px] w-full items-center gap-2 px-4 py-2 text-left transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] leading-[1.4]">{name}</span>
+          <span className="block text-[12px] leading-[1.4] text-muted-foreground">
+            已设置 {configured} 项
+          </span>
+        </span>
+        <ChevronDown
+          className={`size-5 shrink-0 text-muted-foreground/60 transition-transform ${
+            open ? 'rotate-180' : ''
+          }`}
+          aria-hidden
         />
-        <ExpandMore
-          sx={{
-            color: 'text.disabled',
-            transition: 'transform .2s',
-            transform: open ? 'rotate(180deg)' : 'none',
-          }}
-        />
-      </ListItemButton>
-      <Collapse in={open} unmountOnExit>
-        {children}
-      </Collapse>
-    </Card>
+      </button>
+      {open && <div>{children}</div>}
+    </div>
   )
 }
 
@@ -422,7 +415,7 @@ export function SettingsPage() {
         secondary={specHint(spec)}
         value={raw === '' ? '未设置' : specValueText(raw, spec)}
         trailing={
-          <Button size="small" onClick={() => openSpec(spec)} sx={{ minWidth: 0 }}>
+          <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => openSpec(spec)}>
             编辑
           </Button>
         }
@@ -438,7 +431,7 @@ export function SettingsPage() {
   const editingModelRow = MODEL_ROWS.find((r) => r.which === modelEdit)
 
   return (
-    <Box data-testid="settings-page">
+    <div data-testid="settings-page">
       <SectionCard title="总开关">
         {MASTER_TOGGLES.map((t) => (
           <SwitchRow
@@ -462,19 +455,16 @@ export function SettingsPage() {
             onClick={() => openModel(row.which)}
           />
         ))}
-        <Box sx={{ px: 2, py: 1.5 }}>
-          <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.7 }}>
+        <div className="px-4 py-3">
+          <p className="text-[12px] leading-[1.7] text-muted-foreground">
             模型必须是「模型定价」里已登记且启用的；判定与复判列表按重试顺序排列。
-          </Typography>
-        </Box>
+          </p>
+        </div>
       </SectionCard>
 
-      <Typography
-        component="h2"
-        sx={{ fontSize: 13, fontWeight: 500, color: 'text.secondary', mb: 0.75, pl: 1 }}
-      >
+      <h2 className="mt-0 mb-1.5 pl-2 text-[13px] font-medium text-muted-foreground">
         全局参数（各 bot 未覆盖时使用）
-      </Typography>
+      </h2>
       {data.sections.map((sec) => (
         <SettingsSection
           key={sec.name}
@@ -552,21 +542,18 @@ export function SettingsPage() {
       </SectionCard>
 
       <SectionCard title="形态摘要">
-        <Box sx={{ px: 2, py: 1.5 }}>
-          <Typography
-            sx={{
-              fontSize: 14,
-              lineHeight: 1.7,
-              whiteSpace: 'pre-wrap',
-              color: data.digest ? undefined : 'text.secondary',
-            }}
+        <div className="px-4 py-3">
+          <p
+            className={`text-sm leading-[1.7] whitespace-pre-wrap ${
+              data.digest ? '' : 'text-muted-foreground'
+            }`}
           >
             {data.digest || '（还没有摘要；点「立即重新总结」生成）'}
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
+          </p>
+          <div className="mt-3 flex gap-2">
             <Button
-              variant="outlined"
-              size="small"
+              variant="outline"
+              size="sm"
               onClick={() => {
                 setDigestDraft(data.digest ?? '')
                 setDigestOpen(true)
@@ -575,36 +562,33 @@ export function SettingsPage() {
               编辑摘要
             </Button>
             <Button
-              variant="outlined"
-              size="small"
+              variant="outline"
+              size="sm"
               disabled={runMut.isPending}
               onClick={runDigest}
             >
               立即重新总结
             </Button>
-          </Box>
-          <Typography sx={{ mt: 1, fontSize: 12, color: 'text.secondary', lineHeight: 1.7 }}>
+          </div>
+          <p className="mt-2 text-[12px] leading-[1.7] text-muted-foreground">
             摘要随每条群消息发给判定模型；越长越准也越贵。
-          </Typography>
-        </Box>
+          </p>
+        </div>
       </SectionCard>
 
       <SectionCard title="修正文本">
-        <Box sx={{ px: 2, py: 1.5 }}>
-          <Typography
-            sx={{
-              fontSize: 14,
-              lineHeight: 1.7,
-              whiteSpace: 'pre-wrap',
-              color: data.digest_fix ? undefined : 'text.secondary',
-            }}
+        <div className="px-4 py-3">
+          <p
+            className={`text-sm leading-[1.7] whitespace-pre-wrap ${
+              data.digest_fix ? '' : 'text-muted-foreground'
+            }`}
           >
             {data.digest_fix || '（未设置）'}
-          </Typography>
+          </p>
           <Button
-            variant="outlined"
-            size="small"
-            sx={{ mt: 1.5 }}
+            variant="outline"
+            size="sm"
+            className="mt-3"
             onClick={() => {
               setFixDraft(data.digest_fix ?? '')
               setFixOpen(true)
@@ -612,10 +596,10 @@ export function SettingsPage() {
           >
             编辑修正文本
           </Button>
-          <Typography sx={{ mt: 1, fontSize: 12, color: 'text.secondary', lineHeight: 1.7 }}>
+          <p className="mt-2 text-[12px] leading-[1.7] text-muted-foreground">
             写给总结模型的口径说明，每轮重新总结都会附上它；不改摘要正文，想让它立刻生效请点摘要卡的「立即重新总结」。
-          </Typography>
-        </Box>
+          </p>
+        </div>
       </SectionCard>
 
       <FormDrawer
@@ -627,40 +611,41 @@ export function SettingsPage() {
         onSubmit={submitModel}
       >
         {modelEdit !== null && SINGLE_MODELS.has(modelEdit) ? (
-          <TextField
-            fullWidth
-            size="small"
-            label="模型名"
-            placeholder="如 demo/gpt-5-mini"
-            value={modelDraft}
-            onChange={(event) => setModelDraft(event.target.value)}
-            helperText={
-              modelEdit === 'ocr'
+          <>
+            <FieldLabel htmlFor="model-single">模型名</FieldLabel>
+            <Input
+              id="model-single"
+              placeholder="如 demo/gpt-5-mini"
+              value={modelDraft}
+              onChange={(event) => setModelDraft(event.target.value)}
+            />
+            <FieldHint>
+              {modelEdit === 'ocr'
                 ? '留空 = 跳过 OCR，直接使用识图模型'
                 : modelEdit === 'vision'
                   ? '留空 = 图片与贴纸不判'
-                  : '形如 上游名/模型ID；留空 = 复判模型列表里第一个 OpenAI 兼容模型'
-            }
-          />
+                  : '形如 上游名/模型ID；留空 = 复判模型列表里第一个 OpenAI 兼容模型'}
+            </FieldHint>
+          </>
         ) : (
-          <TextField
-            fullWidth
-            multiline
-            minRows={2}
-            size="small"
-            label="模型列表（逗号分隔，按重试顺序）"
-            placeholder="如 demo/gpt-5-mini, demo/gpt-5"
-            value={modelDraft}
-            onChange={(event) => setModelDraft(event.target.value)}
-            helperText="留空 = 清空，跟随内置默认"
-          />
+          <>
+            <FieldLabel htmlFor="model-list">模型列表（逗号分隔，按重试顺序）</FieldLabel>
+            <Textarea
+              id="model-list"
+              rows={2}
+              placeholder="如 demo/gpt-5-mini, demo/gpt-5"
+              value={modelDraft}
+              onChange={(event) => setModelDraft(event.target.value)}
+            />
+            <FieldHint>留空 = 清空，跟随内置默认</FieldHint>
+          </>
         )}
         {enabledModels.length > 0 ? (
           <>
-            <Typography sx={{ mt: 1.5, fontSize: 13, color: 'text.secondary' }}>
+            <p className="mt-3 text-[13px] text-muted-foreground">
               已登记且启用的模型（点选加入/移出）
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 0.75 }}>
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
               {enabledModels.map((m) => {
                 const picked =
                   modelEdit !== null && SINGLE_MODELS.has(modelEdit)
@@ -672,20 +657,18 @@ export function SettingsPage() {
                 return (
                   <Chip
                     key={m.name}
-                    size="small"
                     label={m.name}
-                    color={picked ? 'primary' : 'default'}
-                    variant={picked ? 'filled' : 'outlined'}
+                    selected={picked}
                     onClick={() => toggleModelChip(m.name)}
                   />
                 )
               })}
-            </Box>
+            </div>
           </>
         ) : (
-          <Typography sx={{ mt: 1.5, fontSize: 13, color: 'text.secondary' }}>
+          <p className="mt-3 text-[13px] text-muted-foreground">
             「模型定价」里还没有启用的模型，先去登记。
-          </Typography>
+          </p>
         )}
       </FormDrawer>
 
@@ -706,58 +689,70 @@ export function SettingsPage() {
                 checked={specDraft === '1'}
                 onChange={(next) => setSpecDraft(next ? '1' : '0')}
               />
-            ) : editingSpec !== null && controlKind(editingSpec) === 'text' ? (
-              <TextField
-                fullWidth
-                size="small"
-                label={editingSpec.label}
-                value={specDraft}
-                onChange={(event) => setSpecDraft(event.target.value)}
-                helperText={specHint(editingSpec)}
-              />
+            ) : controlKind(editingSpec) === 'text' ? (
+              <>
+                <FieldLabel htmlFor="spec-text">{editingSpec.label}</FieldLabel>
+                <Input
+                  id="spec-text"
+                  value={specDraft}
+                  onChange={(event) => setSpecDraft(event.target.value)}
+                />
+                <FieldHint>{specHint(editingSpec)}</FieldHint>
+              </>
             ) : (
               <>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <IconButton aria-label="减一" onClick={() => stepSpec(-stepSize)}>
-                    <RemoveCircleOutline />
-                  </IconButton>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label={editingSpec.label}
-                    value={specDraft}
-                    onChange={(event) => setSpecDraft(event.target.value)}
-                    slotProps={{ htmlInput: { inputMode: 'numeric' } }}
-                    helperText={specHint(editingSpec)}
-                  />
-                  <IconButton aria-label="加一" onClick={() => stepSpec(stepSize)}>
-                    <AddCircleOutline />
-                  </IconButton>
-                </Box>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="减一"
+                    onClick={() => stepSpec(-stepSize)}
+                    className="grid size-10 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50"
+                  >
+                    <MinusCircle className="size-5" aria-hidden />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <Label htmlFor="spec-number" className="mb-1 block">
+                      {editingSpec.label}
+                    </Label>
+                    <Input
+                      id="spec-number"
+                      inputMode="numeric"
+                      value={specDraft}
+                      onChange={(event) => setSpecDraft(event.target.value)}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="加一"
+                    onClick={() => stepSpec(stepSize)}
+                    className="grid size-10 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50"
+                  >
+                    <PlusCircle className="size-5" aria-hidden />
+                  </button>
+                </div>
+                <FieldHint>{specHint(editingSpec)}</FieldHint>
                 {editingIsMinutes && minutePresets(editingSpec).length > 0 && (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1.5 }}>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
                     {minutePresets(editingSpec).map((preset) => {
                       const picked = presetSelected(preset.value)
                       return (
                         <Chip
                           key={preset.value}
-                          size="small"
                           label={preset.label}
-                          color={picked ? 'primary' : 'default'}
-                          variant={picked ? 'filled' : 'outlined'}
+                          selected={picked}
                           data-testid={`preset-${preset.value}`}
                           data-selected={picked ? 'true' : undefined}
                           onClick={() => setSpecDraft(String(preset.value))}
                         />
                       )
                     })}
-                  </Box>
+                  </div>
                 )}
-                <Typography sx={{ mt: 1, fontSize: 13, color: 'text.secondary' }}>
+                <p className="mt-2 text-[13px] text-muted-foreground">
                   {specDraft.trim() === ''
                     ? '请输入取值；全局设置项不支持留空恢复默认。'
                     : `生效值：${specValueText(specDraft, editingSpec)}`}
-                </Typography>
+                </p>
               </>
             )}
           </>
@@ -773,27 +768,26 @@ export function SettingsPage() {
         onSubmit={submitCaptcha}
       >
         {captchaField === 'captcha_provider' && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
+          <div className="mb-3 flex flex-wrap gap-1.5">
             {['turnstile', 'hcaptcha', 'cap'].map((p) => (
               <Chip
                 key={p}
-                size="small"
                 label={p}
-                color={captchaDraft.trim() === p ? 'primary' : 'default'}
-                variant={captchaDraft.trim() === p ? 'filled' : 'outlined'}
+                selected={captchaDraft.trim() === p}
                 onClick={() => setCaptchaDraft(p)}
               />
             ))}
-          </Box>
+          </div>
         )}
-        <TextField
-          fullWidth
-          size="small"
-          label={captchaField ? (CAPTCHA_FIELDS[captchaField]?.label ?? '') : ''}
+        <FieldLabel htmlFor="captcha-value">
+          {captchaField ? (CAPTCHA_FIELDS[captchaField]?.label ?? '') : ''}
+        </FieldLabel>
+        <Input
+          id="captcha-value"
           value={captchaDraft}
           onChange={(event) => setCaptchaDraft(event.target.value)}
-          helperText={captchaField ? CAPTCHA_FIELDS[captchaField]?.hint : ''}
         />
+        <FieldHint>{captchaField ? CAPTCHA_FIELDS[captchaField]?.hint : ''}</FieldHint>
       </FormDrawer>
 
       <FormDrawer
@@ -804,28 +798,24 @@ export function SettingsPage() {
         submitText="保存"
         onSubmit={submitTz}
       >
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+        <div className="flex flex-wrap gap-1.5">
           {TIMEZONES.map((tz) => (
             <Chip
               key={tz}
-              size="small"
               label={tz}
-              color={tzDraft.trim() === tz ? 'primary' : 'default'}
-              variant={tzDraft.trim() === tz ? 'filled' : 'outlined'}
+              selected={tzDraft.trim() === tz}
               onClick={() => setTzDraft(tz)}
             />
           ))}
-        </Box>
-        <TextField
-          fullWidth
-          size="small"
-          label="自定义 IANA 时区"
+        </div>
+        <FieldLabel htmlFor="tz-custom">自定义 IANA 时区</FieldLabel>
+        <Input
+          id="tz-custom"
           placeholder="如 Asia/Shanghai"
           value={tzDraft}
           onChange={(event) => setTzDraft(event.target.value)}
-          sx={{ mt: 1.5 }}
-          helperText="留空 = 恢复默认 Asia/Shanghai"
         />
+        <FieldHint>留空 = 恢复默认 Asia/Shanghai</FieldHint>
       </FormDrawer>
 
       <FormDrawer
@@ -836,18 +826,16 @@ export function SettingsPage() {
         submitText="保存"
         onSubmit={submitFooter}
       >
-        <TextField
-          fullWidth
-          multiline
-          minRows={3}
-          size="small"
-          label="附加文本"
+        <FieldLabel htmlFor="footer-text">附加文本</FieldLabel>
+        <Textarea
+          id="footer-text"
+          rows={3}
+          maxLength={300}
           placeholder="② 使用指南 (https://t.me/your_link)"
           value={footerDraft}
           onChange={(event) => setFooterDraft(event.target.value)}
-          slotProps={{ htmlInput: { maxLength: 300 } }}
-          helperText="留空 = 不附加；上限 300 字"
         />
+        <FieldHint>留空 = 不附加；上限 300 字</FieldHint>
       </FormDrawer>
 
       <FormDrawer
@@ -858,16 +846,14 @@ export function SettingsPage() {
         submitText="保存摘要"
         onSubmit={saveDigest}
       >
-        <TextField
-          fullWidth
-          multiline
-          minRows={5}
-          size="small"
-          label="摘要正文"
+        <FieldLabel htmlFor="digest-text">摘要正文</FieldLabel>
+        <Textarea
+          id="digest-text"
+          rows={5}
           value={digestDraft}
           onChange={(event) => setDigestDraft(event.target.value)}
-          helperText="随每条群消息发给判定模型；越长越准也越贵"
         />
+        <FieldHint>随每条群消息发给判定模型；越长越准也越贵</FieldHint>
       </FormDrawer>
 
       <FormDrawer
@@ -878,17 +864,15 @@ export function SettingsPage() {
         submitText="保存修正文本"
         onSubmit={saveFix}
       >
-        <TextField
-          fullWidth
-          multiline
-          minRows={5}
-          size="small"
-          label="修正文本"
+        <FieldLabel htmlFor="fix-text">修正文本</FieldLabel>
+        <Textarea
+          id="fix-text"
+          rows={5}
           placeholder="例：技术讨论里出现的 GitHub、npm 链接不算广告；兼职招募一律按诈骗归类。"
           value={fixDraft}
           onChange={(event) => setFixDraft(event.target.value)}
         />
       </FormDrawer>
-    </Box>
+    </div>
   )
 }

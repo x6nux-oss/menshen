@@ -1,10 +1,11 @@
 // 机器人列表：本地搜索（label/username/bot_id）+ 状态徽标 + 空态引导。
-import { Box } from '@mui/material'
 import { errorStatus } from '../api/client'
 import { useMiniState } from '../api/hooks'
+import { EmptyState, ErrorState, Skeletons } from '../components/feedback'
+import { ListRow, SearchField, SectionCard } from '../components/mobile'
+import { Badge } from '../components/ui'
 import { filterRows } from '../lib/filters'
 import { useNav, usePageParam } from '../nav'
-import { Badge, EmptyState, ErrorState, ListRow, SearchField, SectionCard, Skeletons } from '../ui'
 import { BotStatusBadge } from './shared'
 
 export function BotsPage() {
@@ -21,14 +22,14 @@ export function BotsPage() {
   const visible = filterRows(bots, q, (b) => `${b.label} ${b.username} ${b.bot_id}`)
 
   return (
-    <Box data-testid="bots-page">
+    <div data-testid="bots-page">
       {bots.length > 0 && (
         <SearchField
           value={q}
           onChange={setQ}
           placeholder="搜索名称 / 用户名 / bot ID"
           ariaLabel="搜索机器人"
-          sx={{ mb: 1.5 }}
+          className="mb-3"
         />
       )}
       {visible.length === 0 ? (
@@ -64,6 +65,6 @@ export function BotsPage() {
           ))}
         </SectionCard>
       )}
-    </Box>
+    </div>
   )
 }

@@ -8,21 +8,27 @@
 //   3) Telegram 里：initData 鉴权，就绪后挂载数据查询。
 //
 // 契约：鉴权信息就绪前不得发请求（api 鉴权头为空会 401）——桥注入之后才挂载。
-import { Box, CssBaseline, Skeleton, Typography } from '@mui/material'
-import { ThemeProvider } from '@mui/material/styles'
-import type { Theme } from '@mui/material/styles'
+//
+// 主题（设计文档 §6）：**只跟随 Telegram 的 colorScheme（亮/暗），忽略主题色**。
+// 玻璃效果依赖可控的底色；Telegram 允许任意自定义主色，白玻璃叠在自选深蓝上
+// 会发脏，且每套自定义主题都要单独调玻璃参数 —— 那是无法收敛的维护路径。
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Bot, LayoutDashboard, ReceiptText, User, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ApiError, setApiBridge } from './api/client'
 import { useMiniState } from './api/hooks'
+import { ErrorBoundary, ErrorState, Skeletons, ToastProvider } from './components/feedback'
+import { ActionSheetProvider, TabBar, TopBar } from './components/mobile'
+import type { TabBarItem } from './components/mobile'
+import { Skeleton } from './components/ui'
 import { meLabel } from './lib/format'
+import { applyThemeMode } from './lib/theme-mode'
 import { NavProvider, PageScope, useNav } from './nav'
+import type { TabKey } from './nav'
 import { routeSlug } from './route'
 import { detailTitle, renderStackPage, renderTabPage, TAB_NAMES } from './shellPages'
-import { buildMiniTheme } from './theme'
 import { initTelegram } from './telegram'
 import type { TelegramBridge, TelegramTheme } from './telegram'
-import { ActionSheetProvider, ErrorBoundary, ErrorState, Skeletons, TabBar, ToastProvider, TopBar } from './ui'
 
 type Boot =
   | { phase: 'booting' }
@@ -56,18 +62,25 @@ export default function App() {
   return <ReadyApp bridge={boot.bridge} />
 }
 
-/** useLiveTheme 初读 getTheme，并订阅 onThemeChanged 实时重建主题（不是静态快照）。 */
-function useLiveTheme(bridge: TelegramBridge): Theme {
-  const [theme, setTheme] = useState<Theme>(() => buildMiniTheme(bridge.getTheme()))
-  useEffect(
-    () => bridge.onThemeChanged((next: TelegramTheme) => setTheme(buildMiniTheme(next))),
-    [bridge],
-  )
-  return theme
+/** colorScheme → 主题模式。缺省（空串/未知）按亮色。 */
+function toThemeMode(colorScheme: string): 'dark' | 'light' {
+  return colorScheme === 'dark' ? 'dark' : 'light'
+}
+
+/**
+ * useLiveTheme 订阅 Telegram 的 colorScheme 并把亮/暗写进 <html>。
+ * **只读 colorScheme**：themeParams 里的主题色一律忽略（设计文档 §6）。
+ */
+function useLiveTheme(bridge: TelegramBridge): void {
+  useEffect(() => {
+    const apply = (theme: TelegramTheme) => applyThemeMode(toThemeMode(theme.colorScheme))
+    apply(bridge.getTheme())
+    return bridge.onThemeChanged(apply)
+  }, [bridge])
 }
 
 function ReadyApp({ bridge }: { bridge: TelegramBridge }) {
-  const theme = useLiveTheme(bridge)
+  useLiveTheme(bridge)
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -87,22 +100,28 @@ function ReadyApp({ bridge }: { bridge: TelegramBridge }) {
   )
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <QueryClientProvider client={queryClient}>
-        <NavProvider backButton={bridge.backButton}>
-          <ActionSheetProvider>
-            <ToastProvider>
-              <ErrorBoundary>
-                <Shell />
-              </ErrorBoundary>
-            </ToastProvider>
-          </ActionSheetProvider>
-        </NavProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <NavProvider backButton={bridge.backButton}>
+        <ActionSheetProvider>
+          <ToastProvider>
+            <ErrorBoundary>
+              <Shell />
+            </ErrorBoundary>
+          </ToastProvider>
+        </ActionSheetProvider>
+      </NavProvider>
+    </QueryClientProvider>
   )
 }
+
+/** TABS 是五个一级 Tab。key 用 nav 的 TabKey，图标用 lucide。 */
+const TABS: TabBarItem[] = [
+  { key: 'overview', label: '概览', icon: <LayoutDashboard /> },
+  { key: 'bots', label: '机器人', icon: <Bot /> },
+  { key: 'chats', label: '群组', icon: <Users /> },
+  { key: 'records', label: '记录', icon: <ReceiptText /> },
+  { key: 'mine', label: '我的', icon: <User /> },
+]
 
 function Shell() {
   const nav = useNav()
@@ -112,11 +131,11 @@ function Shell() {
 
   if (state.isPending) {
     return (
-      <Box sx={{ px: 2, pt: 1 }}>
-        <Skeleton variant="text" width={96} height={30} sx={{ mx: 'auto', mb: 1 }} />
-        <Skeleton variant="rounded" height={88} sx={{ borderRadius: '12px', mb: 1.5 }} />
+      <div className="px-4 pt-2">
+        <Skeleton className="mx-auto mb-2 h-7 w-24" />
+        <Skeleton className="mb-3 h-22 rounded-xl" />
         <Skeletons rows={3} />
-      </Box>
+      </div>
     )
   }
 
@@ -136,22 +155,24 @@ function Shell() {
 
   return (
     <>
+      {/* 顶栏 sticky：旧实现用 MUI AppBar position="sticky"，内容从下方滚过时
+          玻璃才有东西可模糊（设计文档 §4.4）。z 低于 TabBar 的 30。 */}
       <TopBar
+        className="sticky top-0 z-20"
         title={top ? currentName : '门神'}
         subtitle={top ? undefined : `${role} · ${meLabel(me)}`}
+        onBack={top ? nav.pop : undefined}
       />
-      <Box
-        component="main"
-        sx={{
-          px: 2,
-          pt: 0.5,
-          // 根页给固定 Tab 栏留位；二级页 Tab 栏隐藏，留常规底部间距即可。
-          pb: top ? 4 : 'calc(72px + env(safe-area-inset-bottom))',
-        }}
+      {/* 不要给这个 main 铺不透明底色：会盖住 body::before 的景深光晕，
+          玻璃（顶栏/底栏/弹层）立刻退化成白板（设计文档 §4.6）。
+          根页给固定 Tab 栏留位；二级页 Tab 栏隐藏，留常规底部间距。 */}
+      <main
+        className="px-4 pt-1"
+        style={{ paddingBottom: top ? '1rem' : 'calc(72px + env(safe-area-inset-bottom))' }}
       >
         {/* Tab 根页常驻：push 二级页时只隐藏不卸载，返回后搜索词/批量选择等内存状态不丢。
             页面级筛选/搜索由 PageScope 写进 URL；被盖住时 active=false，只留内存不写 URL。 */}
-        <Box sx={{ display: top ? 'none' : 'block' }}>
+        <div className={top ? 'hidden' : 'block'}>
           <PageScope
             key={routeSlug(nav.tab, [])}
             scope={routeSlug(nav.tab, [])}
@@ -159,14 +180,21 @@ function Shell() {
           >
             {renderTabPage(nav.tab)}
           </PageScope>
-        </Box>
+        </div>
         {top && (
           <PageScope key={routeSlug(nav.tab, nav.stack)} scope={routeSlug(nav.tab, nav.stack)} active>
             {renderStackPage(top)}
           </PageScope>
         )}
-      </Box>
-      <TabBar />
+      </main>
+      {/* 二级页有自己的底部操作栏；Tab 栏只在 tab 根页出现（与旧实现一致）。 */}
+      {top === null && (
+        <TabBar
+          tabs={TABS}
+          active={nav.tab}
+          onChange={(key) => nav.switchTab(key as TabKey)}
+        />
+      )}
     </>
   )
 }
@@ -174,28 +202,28 @@ function Shell() {
 /** BootSkeleton 初始化阶段的整页骨架（此时还没有主题与导航）。 */
 function BootSkeleton() {
   return (
-    <Box data-testid="boot-skeleton" sx={{ minHeight: '100dvh', bgcolor: '#F5F6F7', px: 2, pt: 3 }}>
-      <Skeleton variant="text" width={80} height={30} sx={{ mx: 'auto' }} />
-      <Skeleton variant="text" width={140} height={20} sx={{ mx: 'auto', mb: 2 }} />
-      <Skeleton variant="rounded" height={88} sx={{ borderRadius: '12px', mb: 1.5 }} />
+    <div data-testid="boot-skeleton" className="min-h-dvh px-4 pt-6">
+      <Skeleton className="mx-auto h-7 w-20" />
+      <Skeleton className="mx-auto mt-1 mb-4 h-5 w-36" />
+      <Skeleton className="mb-3 h-22 rounded-xl" />
       <Skeletons rows={3} />
-    </Box>
+    </div>
   )
 }
 
 /** UnavailableGuide 在 SDK 未加载出来时给出可操作提示。 */
 function UnavailableGuide() {
   return (
-    <Box data-testid="unavailable-guide" sx={{ minHeight: '100dvh', bgcolor: '#F5F6F7', p: 2, pt: 6 }}>
-      <Box sx={{ bgcolor: '#fff', borderRadius: '12px', p: 2 }}>
-        <Typography sx={{ fontSize: 15, lineHeight: 1.6 }}>
+    <div data-testid="unavailable-guide" className="min-h-dvh p-4 pt-12">
+      <div className="rounded-xl bg-card p-4 text-card-foreground shadow-sm">
+        <p className="text-[15px] leading-relaxed">
           请通过 Telegram 里的菜单按钮「配置」打开本页。
-        </Typography>
-        <Typography sx={{ mt: 1, fontSize: 13, color: '#6B6B70', lineHeight: 1.6 }}>
+        </p>
+        <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
           如果你已经在 Telegram 里打开，请关闭后重新打开本页；仍不行请更新 Telegram
           客户端或换网络重试。
-        </Typography>
-      </Box>
-    </Box>
+        </p>
+      </div>
+    </div>
   )
 }

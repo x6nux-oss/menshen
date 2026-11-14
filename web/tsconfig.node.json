@@ -20,5 +20,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "vite.admin.config.ts"]
+  "include": ["rsbuild.config.ts", "rsbuild.admin.config.ts", "vitest.config.ts"]
 }

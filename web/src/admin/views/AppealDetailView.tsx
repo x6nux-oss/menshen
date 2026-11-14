@@ -1,11 +1,11 @@
 // 申诉详情：状况、AI 复核、解禁码与兑换记录，以及人工处置。
-import { Box, Button, Typography } from '@mui/material'
 import { useAppeal, useMiniState } from '../../api/hooks'
 import { useAppealactMutation } from '../../api/mutations'
 import { apAI, apStatus, displayTz, fmtTSFull } from '../../lib/format'
 import { appealStatusInfo } from '../../lib/status'
 import { openLink } from '../../telegram'
-import { ChatRef } from '../../ui'
+import { Button } from '../../components/ui'
+import { ChatRef } from '../../components/mobile'
 import { CardBlock, ConfirmButton, InfoList, MonoText, PageHeader, StatusBadge } from '../components'
 import { useRunFeedback } from '../feedback'
 
@@ -15,11 +15,11 @@ export function AppealDetailView({ id }: { id: number }) {
   const run = useRunFeedback()
   const actMut = useAppealactMutation()
 
-  if (appeal.isPending) return <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>加载中…</Typography>
+  if (appeal.isPending) return <span className="text-sm text-muted-foreground">加载中…</span>
   if (appeal.isError || !appeal.data) {
     return (
       <CardBlock>
-        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>申诉加载失败或不存在。</Typography>
+        <span className="text-sm text-muted-foreground">申诉加载失败或不存在。</span>
       </CardBlock>
     )
   }
@@ -47,16 +47,16 @@ export function AppealDetailView({ id }: { id: number }) {
             { label: '网页尝试', value: `${a.web_attempts} 次（通过 ${a.web_passes} / 校验 ${a.web_checks}）` },
           ]}
         />
-        <Typography sx={{ mt: 1.5, fontSize: 13.5, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+        <p className="mt-3 text-[13.5px] leading-relaxed whitespace-pre-wrap">
           {a.statement || '（无申诉陈述）'}
-        </Typography>
+        </p>
       </CardBlock>
 
       <CardBlock
         title="AI 复核"
         actions={
           a.detail_url ? (
-            <Button size="small" variant="text" onClick={() => openLink(a.detail_url)}>
+            <Button size="sm" variant="ghost" onClick={() => openLink(a.detail_url)}>
               公开详情页
             </Button>
           ) : undefined
@@ -70,40 +70,40 @@ export function AppealDetailView({ id }: { id: number }) {
             { label: '开销', value: a.ai_cost || '—' },
           ]}
         />
-        <Typography sx={{ mt: 1.5, fontSize: 13.5, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+        <p className="mt-3 text-[13.5px] leading-relaxed whitespace-pre-wrap">
           {a.ai_reason || '—'}
-        </Typography>
+        </p>
       </CardBlock>
 
       <CardBlock title="解禁码">
         {a.code ? (
           <>
-            <Typography sx={{ fontSize: 16 }}>
+            <p className="text-base">
               <MonoText>{a.code}</MonoText>
-            </Typography>
-            <Typography sx={{ mt: 0.5, fontSize: 12.5, color: 'text.secondary' }}>
+            </p>
+            <p className="mt-1 text-[12.5px] text-muted-foreground">
               {a.code_expires > 0 ? `有效期至 ${fmtTSFull(a.code_expires, tz)}` : '已过期或未签发'}
-            </Typography>
+            </p>
           </>
         ) : (
-          <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>尚未签发解禁码。</Typography>
+          <p className="text-[13px] text-muted-foreground">尚未签发解禁码。</p>
         )}
         {a.redeems.length > 0 && (
-          <Box sx={{ mt: 1.5 }}>
-            <Typography sx={{ fontSize: 13, mb: 0.5 }}>兑换记录</Typography>
+          <div className="mt-3">
+            <p className="mb-1 text-[13px]">兑换记录</p>
             {a.redeems.map((r, index) => (
-              <Typography key={index} sx={{ fontSize: 12.5, color: 'text.secondary' }}>
+              <p key={index} className="text-[12.5px] text-muted-foreground">
                 {fmtTSFull(r.at, tz)} · 群{' '}
                 <ChatRef name={r.chat} url={r.chat_url} fallback={r.chat_id} /> · by uid {r.by_uid}
-              </Typography>
+              </p>
             ))}
-          </Box>
+          </div>
         )}
       </CardBlock>
 
       {open && (
         <CardBlock title="人工处置">
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <div className="flex flex-wrap gap-2">
             <ConfirmButton
               variant="contained"
               title="人工解除"
@@ -127,7 +127,7 @@ export function AppealDetailView({ id }: { id: number }) {
             </ConfirmButton>
             {(a.status === 'web' || a.status === 'noweb') && (
               <Button
-                variant="outlined"
+                variant="outline"
                 disabled={actMut.isPending}
                 onClick={() => act('issue_code', '已签发解禁码')}
               >
@@ -135,11 +135,11 @@ export function AppealDetailView({ id }: { id: number }) {
               </Button>
             )}
             {['web', 'noweb', 'ai'].includes(a.status) && (
-              <Button variant="outlined" disabled={actMut.isPending} onClick={() => act('rerun', '已重跑 AI 复核')}>
+              <Button variant="outline" disabled={actMut.isPending} onClick={() => act('rerun', '已重跑 AI 复核')}>
                 重跑 AI 复核
               </Button>
             )}
-          </Box>
+          </div>
         </CardBlock>
       )}
     </>

@@ -6,13 +6,6 @@
 // - 详情：全库误封测试（FP/已撤销样本红色高亮，TP 样本可折叠）、启用/强制
 //   开关（乐观更新；强制受服务端防误封门约束：未测试或 fp/undone>0 时禁用）、
 //   删除确认（写明规则名与后果）。
-import {
-  Box,
-  Button,
-  Chip,
-  TextField,
-  Typography,
-} from '@mui/material'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { errorStatus } from '../api/client'
@@ -29,22 +22,24 @@ import type {
 } from '../api/types'
 import { actionLabel, displayTz, fmtTS, verdictLabel } from '../lib/format'
 import { useNav, usePageParam } from '../nav'
+import { EmptyState, ErrorState, Skeletons, useToast } from '../components/feedback'
 import {
-  Badge,
   ChatRef,
-  EmptyState,
-  ErrorState,
+  Chip,
   FormDrawer,
   ListRow,
+  SearchField,
   SectionCard,
-  Skeletons,
   SwitchRow,
   useConfirm,
-  useToast,
-} from '../ui'
+} from '../components/mobile'
+import { Badge } from '../components/ui'
+import { Button } from '../components/ui/button'
+import { Spinner } from '../components/ui/spinner'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Textarea } from '../components/ui/textarea'
 import { InfoRow } from './shared'
-
-const MONO = 'ui-monospace, Menlo, monospace'
 
 /** 规则列表的筛选与排序。 */
 type RuleFilter = 'all' | 'enabled' | 'candidate' | 'enforce'
@@ -81,35 +76,29 @@ function pct(matched: number, total: number): string | null {
 function KindCoverageList({ kinds }: { kinds: RuleKindStat[] }) {
   if (!kinds || kinds.length === 0) return null
   return (
-    <Box sx={{ mt: 1.5 }}>
-      <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'text.secondary' }}>
-        按类型覆盖
-      </Typography>
+    <div className="mt-3">
+      <p className="text-[13px] font-semibold text-muted-foreground">按类型覆盖</p>
       {kinds.map((k) => (
-        <Box
+        <div
           key={k.kind || '（空）'}
-          sx={{ display: 'flex', gap: 1, mt: 0.5, fontSize: 13, alignItems: 'baseline' }}
+          className="mt-1 flex items-baseline gap-2 text-[13px]"
         >
-          <Box component="span" sx={{ flex: 1, fontFamily: MONO, wordBreak: 'break-all' }}>
-            {k.kind || '（空）'}
-          </Box>
-          <Box component="span" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
+          <span className="min-w-0 flex-1 font-mono break-all">{k.kind || '（空）'}</span>
+          <span className="whitespace-nowrap text-muted-foreground">
             {k.matched}/{k.total}
-          </Box>
-          <Box
-            component="span"
-            sx={{
-              minWidth: 48,
-              textAlign: 'right',
-              whiteSpace: 'nowrap',
-              color: k.matched === 0 ? 'text.disabled' : 'text.primary',
-            }}
+          </span>
+          <span
+            className={
+              k.matched === 0
+                ? 'min-w-12 text-right whitespace-nowrap text-muted-foreground/60'
+                : 'min-w-12 text-right whitespace-nowrap'
+            }
           >
             {pct(k.matched, k.total) ?? '—'}
-          </Box>
-        </Box>
+          </span>
+        </div>
       ))}
-    </Box>
+    </div>
   )
 }
 
@@ -151,63 +140,37 @@ function enforceHint(rule: Rule): string {
 /** RuleBadges 列表/详情共用的启用状态与强制徽标。 */
 function RuleBadges({ rule }: { rule: Rule }) {
   return (
-    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+    <span className="inline-flex items-center gap-1">
       <Badge tone={rule.enabled ? 'ok' : 'neutral'}>{rule.enabled ? '启用' : '候选'}</Badge>
       {rule.enforce && <Badge tone="warn">强制</Badge>}
-    </Box>
+    </span>
   )
 }
 
 /** RuleSecondary 列表副行：分类灰字 + 等宽正则（单行截断）。 */
 function RuleSecondary({ rule }: { rule: Rule }) {
   return (
-    <Box component="span" sx={{ display: 'block' }}>
-      {rule.category !== '' && (
-        <Box component="span" sx={{ mr: 0.75 }}>
-          {rule.category}
-        </Box>
-      )}
-      <Box
-        component="span"
-        sx={{
-          display: 'inline-block',
-          maxWidth: '100%',
-          verticalAlign: 'bottom',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          fontFamily: MONO,
-          fontSize: 12,
-        }}
-      >
+    <span className="block">
+      {rule.category !== '' && <span className="mr-1.5">{rule.category}</span>}
+      <span className="inline-block max-w-full overflow-hidden align-bottom font-mono text-xs text-ellipsis whitespace-nowrap">
         {rule.pattern}
-      </Box>
-    </Box>
+      </span>
+    </span>
   )
 }
 
 /** TpFpValue 列表右侧的最近测试摘要：从未测试时明确写 `未测试`。 */
 function TpFpValue({ rule }: { rule: Rule }) {
   if (rule.last_tested_at === 0) {
-    return (
-      <Box component="span" sx={{ fontSize: 12 }}>
-        未测试
-      </Box>
-    )
+    return <span className="text-xs">未测试</span>
   }
   const cov = pct(rule.last_tp, rule.last_ads_total)
   return (
-    <Box
-      component="span"
-      data-testid={`rule-tpfp-${rule.id}`}
-      sx={{ fontSize: 12, whiteSpace: 'nowrap' }}
-    >
+    <span data-testid={`rule-tpfp-${rule.id}`} className="text-xs whitespace-nowrap">
       TP {rule.last_tp} ·{' '}
-      <Box component="span" sx={{ color: rule.last_fp > 0 ? 'error.main' : 'inherit' }}>
-        FP {rule.last_fp}
-      </Box>
+      <span className={rule.last_fp > 0 ? 'text-destructive' : undefined}>FP {rule.last_fp}</span>
       {cov !== null && <> · 覆盖 {cov}</>}
-    </Box>
+    </span>
   )
 }
 
@@ -272,71 +235,64 @@ function AgentCard() {
 
   return (
     <SectionCard title="AI 规则发现">
-      <Box sx={{ px: 2, py: 1.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <div className="px-4 py-3">
+        <div className="flex items-center gap-2">
           <Badge tone={status.tone}>{status.label}</Badge>
           {agentQuery.isError ? (
             <>
-              <Typography
-                sx={{ flex: 1, minWidth: 0, fontSize: 13, color: 'error.main', lineHeight: 1.5 }}
-              >
+              <p className="min-w-0 flex-1 text-[13px] leading-normal text-destructive">
                 状态读取失败
-              </Typography>
-              <Button size="small" onClick={() => void agentQuery.refetch()}>
+              </p>
+              <Button size="sm" variant="ghost" onClick={() => void agentQuery.refetch()}>
                 重试
               </Button>
             </>
           ) : (
-            <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.5 }}>
+            <p className="text-[13px] leading-normal text-muted-foreground">
               {running
                 ? targetLogId > 0
                   ? `正在针对记录 #${targetLogId} 总结必封规则…已执行 ${stepsCount} 步`
                   : `正在从历史封禁里总结必封规则…已执行 ${stepsCount} 步`
                 : '让 AI 扫描历史封禁生成规则；无误封的会自动启用（仅作为判定证据）。'}
-            </Typography>
+            </p>
           )}
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
+        </div>
+        <div className="mt-3 flex gap-2">
           <Button
-            variant="contained"
-            size="small"
-            loading={startMut.isPending}
+            size="sm"
             disabled={running || startMut.isPending || stopMut.isPending}
             onClick={start}
           >
+            {startMut.isPending && <Spinner size={14} />}
             开始发现
           </Button>
           <Button
-            variant="outlined"
-            size="small"
-            color="error"
-            loading={stopMut.isPending}
+            size="sm"
+            variant="outline"
             disabled={!running || stopMut.isPending || startMut.isPending}
             onClick={stop}
+            className="text-destructive"
           >
+            {stopMut.isPending && <Spinner size={14} />}
             停止
           </Button>
-        </Box>
-      </Box>
+        </div>
+      </div>
 
       {!running && ended && agent !== undefined && (
-        <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+        <div className="border-t border-border px-4 py-3">
           {agent.error !== '' ? (
-            <Typography sx={{ fontSize: 13, color: 'error.main', lineHeight: 1.6 }}>
-              失败：{agent.error}
-            </Typography>
+            <p className="text-[13px] leading-relaxed text-destructive">失败：{agent.error}</p>
           ) : (
-            agent.result !== '' && (
-              <Typography sx={{ fontSize: 13, lineHeight: 1.6 }}>{agent.result}</Typography>
-            )
+            agent.result !== '' && <p className="text-[13px] leading-relaxed">{agent.result}</p>
           )}
           {(agent.created_rule_ids ?? []).length > 0 && (
-            <Typography sx={{ mt: 0.5, fontSize: 13, color: 'text.secondary' }}>
+            <p className="mt-1 text-[13px] text-muted-foreground">
               本轮创建规则：{(agent.created_rule_ids ?? []).map((id) => `#${id}`).join('、')}
               ，可在下方列表查看与测试
-            </Typography>
+            </p>
           )}
-        </Box>
+        </div>
       )}
     </SectionCard>
   )
@@ -439,7 +395,7 @@ export function RulesPage() {
   }
 
   return (
-    <Box data-testid="rules-page">
+    <div data-testid="rules-page">
       <AgentCard />
 
       {rulesQuery.isError ? (
@@ -451,63 +407,56 @@ export function RulesPage() {
         <Skeletons rows={3} />
       ) : (
         <>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.75, pl: 1 }}>
-            <Typography
-              component="h2"
-              sx={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'text.secondary' }}
-            >
+          <div className="mb-1.5 flex items-center pl-2">
+            <h2 className="flex-1 text-[13px] font-medium text-muted-foreground">
               规则（{filteredRules.length}
               {filteredRules.length !== rules.length ? `/${rules.length}` : ''}）
-            </Typography>
+            </h2>
             <Button
-              size="small"
+              size="sm"
+              variant="ghost"
               onClick={() => {
                 setTestPattern('')
                 setTestResult(null)
                 setTestOpen(true)
               }}
-              sx={{ minHeight: 30, px: 1, fontSize: 13 }}
+              className="h-7.5 px-2 text-[13px]"
             >
               测试正则
             </Button>
-            <Button size="small" onClick={openAdd} sx={{ minHeight: 30, px: 1, fontSize: 13 }}>
+            <Button size="sm" variant="ghost" onClick={openAdd} className="h-7.5 px-2 text-[13px]">
               ＋ 手动新增
             </Button>
-          </Box>
-          <Box sx={{ px: 1, mb: 0.75, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="搜索名称或正则"
+          </div>
+          <div className="mb-1.5 flex flex-col gap-1.5 px-2">
+            <SearchField
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={setSearch}
+              placeholder="搜索名称或正则"
+              ariaLabel="搜索规则"
             />
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center' }}>
+            <div className="flex flex-wrap items-center gap-1.5">
               {RULE_FILTERS.map((f) => (
                 <Chip
                   key={f.key}
-                  size="small"
                   label={f.label}
-                  color={filter === f.key ? 'primary' : 'default'}
-                  variant={filter === f.key ? 'filled' : 'outlined'}
+                  selected={filter === f.key}
                   onClick={() => setFilter(f.key)}
                 />
               ))}
-            </Box>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center' }}>
-              <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>排序</Typography>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">排序</span>
               {RULE_SORTS.map((s) => (
                 <Chip
                   key={s.key}
-                  size="small"
                   label={s.label}
-                  color={sort === s.key ? 'primary' : 'default'}
-                  variant={sort === s.key ? 'filled' : 'outlined'}
+                  selected={sort === s.key}
                   onClick={() => setSort(s.key)}
                 />
               ))}
-            </Box>
-          </Box>
+            </div>
+          </div>
           <SectionCard>
             {rules.length === 0 ? (
               <EmptyState
@@ -551,12 +500,11 @@ export function RulesPage() {
           )
         }}
       >
-        <TextField
-          fullWidth
-          multiline
-          minRows={2}
-          size="small"
-          label="正则（RE2）"
+        <Label htmlFor="rule-test-pattern">正则（RE2）</Label>
+        <Textarea
+          id="rule-test-pattern"
+          className="mt-1 font-mono text-[13px]"
+          rows={2}
           placeholder="如 兼职.{0,6}(日结|垫付|押金)"
           value={testPattern}
           onChange={(event) => {
@@ -564,18 +512,16 @@ export function RulesPage() {
             // 改了正则，旧结果不再对应当前输入，立即作废。
             setTestResult(null)
           }}
-          sx={{ '& textarea': { fontFamily: MONO, fontSize: 13 } }}
         />
-        <Typography sx={{ mt: 1, fontSize: 12, color: 'text.secondary', lineHeight: 1.6 }}>
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
           只试跑不落库；保存时服务端仍会跑一次同样的全库测试。
-        </Typography>
+        </p>
         {testResult !== null && testResult.pattern === testPattern.trim() && (
           <>
             <RuleTestPanel test={testResult.test} tz={tz} />
             <Button
-              fullWidth
-              variant="outlined"
-              sx={{ mt: 1.5 }}
+              variant="outline"
+              className="mt-3 w-full"
               onClick={() => {
                 setTestOpen(false)
                 setName('')
@@ -600,51 +546,52 @@ export function RulesPage() {
         submitDisabled={name.trim() === '' || pattern.trim() === ''}
         onSubmit={submitAdd}
       >
-        <TextField
-          fullWidth
-          size="small"
-          label="名称"
+        <Label htmlFor="rule-name">名称</Label>
+        <Input
+          id="rule-name"
+          className="mt-1"
+          maxLength={60}
           placeholder="如 兼职押金话术"
           value={name}
           onChange={(event) => setName(event.target.value)}
-          slotProps={{ htmlInput: { maxLength: 60 } }}
         />
-        <TextField
-          fullWidth
-          multiline
-          minRows={2}
-          size="small"
-          label="正则（RE2）"
+        <Label htmlFor="rule-pattern" className="mt-3 block">
+          正则（RE2）
+        </Label>
+        <Textarea
+          id="rule-pattern"
+          className="mt-1 font-mono text-[13px]"
+          rows={2}
           placeholder="如 兼职.{0,6}(日结|垫付|押金)"
           value={pattern}
           onChange={(event) => setPattern(event.target.value)}
-          sx={{ mt: 1.5, '& textarea': { fontFamily: MONO, fontSize: 13 } }}
         />
-        <TextField
-          fullWidth
-          size="small"
-          label="分类（可选）"
+        <Label htmlFor="rule-category" className="mt-3 block">
+          分类（可选）
+        </Label>
+        <Input
+          id="rule-category"
+          className="mt-1"
+          maxLength={20}
           placeholder="如 scam"
           value={category}
           onChange={(event) => setCategory(event.target.value)}
-          slotProps={{ htmlInput: { maxLength: 20 } }}
-          sx={{ mt: 1.5 }}
         />
-        <TextField
-          fullWidth
-          multiline
-          minRows={2}
-          size="small"
-          label="备注（可选）"
+        <Label htmlFor="rule-note" className="mt-3 block">
+          备注（可选）
+        </Label>
+        <Textarea
+          id="rule-note"
+          className="mt-1"
+          rows={2}
           value={note}
           onChange={(event) => setNote(event.target.value)}
-          sx={{ mt: 1.5 }}
         />
-        <Typography sx={{ mt: 1, fontSize: 12, color: 'text.secondary', lineHeight: 1.6 }}>
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
           保存时服务端会自动跑一次全库测试；不能编译或会匹配空文本的正则会被拒绝。
-        </Typography>
+        </p>
       </FormDrawer>
-    </Box>
+    </div>
   )
 }
 
@@ -660,19 +607,15 @@ function TestStat({
   tone?: 'plain' | 'ok' | 'no'
   testId: string
 }) {
-  const color = tone === 'ok' ? 'success.main' : tone === 'no' ? 'error.main' : 'text.primary'
+  const color =
+    tone === 'ok' ? 'text-success' : tone === 'no' ? 'text-destructive' : 'text-foreground'
   return (
-    <Box sx={{ bgcolor: 'action.hover', borderRadius: '8px', px: 1, py: 0.75 }}>
-      <Typography sx={{ fontSize: 11, color: 'text.secondary', lineHeight: 1.5 }}>
-        {label}
-      </Typography>
-      <Typography
-        data-testid={testId}
-        sx={{ fontSize: 18, fontWeight: 600, color, lineHeight: 1.4 }}
-      >
+    <div className="rounded-lg bg-accent px-2 py-1.5">
+      <p className="text-[11px] leading-normal text-muted-foreground">{label}</p>
+      <p data-testid={testId} className={`text-lg leading-snug font-semibold ${color}`}>
         {value}
-      </Typography>
-    </Box>
+      </p>
+    </div>
   )
 }
 
@@ -691,35 +634,32 @@ function SampleRow({
 }) {
   const flagged = flag !== ''
   return (
-    <Box
+    <div
       data-testid={testId}
-      sx={{
-        mt: 0.75,
-        p: 1,
-        borderRadius: '8px',
-        bgcolor: flagged ? 'rgba(198, 40, 40, 0.07)' : 'action.hover',
-        borderLeft: '3px solid',
-        borderColor: flagged ? 'error.main' : 'transparent',
-      }}
+      className={
+        flagged
+          ? 'mt-1.5 rounded-lg border-l-[3px] border-destructive bg-destructive/7 p-2'
+          : 'mt-1.5 rounded-lg border-l-[3px] border-transparent bg-accent p-2'
+      }
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+      <div className="flex flex-wrap items-center gap-1">
         {flagged && <Badge tone="no">{flag}</Badge>}
         <Badge tone={sample.verdict === 'ad' ? 'ok' : 'neutral'}>
           {verdictLabel(sample.verdict)}
         </Badge>
         <Badge tone="neutral">{actionLabel(sample.action)}</Badge>
-        <Typography sx={{ ml: 'auto', fontSize: 12, color: 'text.secondary' }}>
+        <span className="ml-auto text-xs text-muted-foreground">
           {fmtTS(sample.created_at, tz)}
-        </Typography>
-      </Box>
-      <Typography sx={{ mt: 0.5, fontSize: 12, color: 'text.secondary' }}>
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
         chat <ChatRef name={sample.chat} url={sample.chat_url} fallback={sample.chat_id} /> · uid{' '}
         {sample.user_id}
-      </Typography>
-      <Typography sx={{ mt: 0.25, fontSize: 13, lineHeight: 1.6, wordBreak: 'break-word' }}>
+      </p>
+      <p className="mt-0.5 text-[13px] leading-relaxed break-words">
         {sample.text || '（空文本）'}
-      </Typography>
-    </Box>
+      </p>
+    </div>
   )
 }
 
@@ -738,16 +678,20 @@ function SampleList({
   tz?: string
 }) {
   return (
-    <Box sx={{ mt: 1.5 }}>
-      <Typography
-        sx={{ fontSize: 13, fontWeight: 600, color: flag === '' ? 'text.secondary' : 'error.main' }}
+    <div className="mt-3">
+      <p
+        className={
+          flag === ''
+            ? 'text-[13px] font-semibold text-muted-foreground'
+            : 'text-[13px] font-semibold text-destructive'
+        }
       >
         {title}
-      </Typography>
+      </p>
       {samples.map((sample) => (
         <SampleRow key={sample.id} sample={sample} flag={flag} testId={testId} tz={tz} />
       ))}
-    </Box>
+    </div>
   )
 }
 
@@ -755,11 +699,8 @@ function SampleList({
 function RuleTestPanel({ test, tz }: { test: RuleTest; tz?: string }) {
   const [tpOpen, setTpOpen] = useState(false)
   return (
-    <Box
-      data-testid="rule-test-result"
-      sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider' }}
-    >
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
+    <div data-testid="rule-test-result" className="border-t border-border px-4 py-3">
+      <div className="grid grid-cols-3 gap-2">
         <TestStat testId="rule-test-scanned" label="扫描" value={test.scanned} />
         <TestStat testId="rule-test-matched" label="命中" value={test.matched} />
         <TestStat
@@ -786,7 +727,7 @@ function RuleTestPanel({ test, tz }: { test: RuleTest; tz?: string }) {
           tone={test.undone > 0 ? 'no' : 'plain'}
         />
         <TestStat testId="rule-test-neutral" label="中性" value={test.neutral} />
-      </Box>
+      </div>
 
       <KindCoverageList kinds={test.kinds} />
 
@@ -810,7 +751,12 @@ function RuleTestPanel({ test, tz }: { test: RuleTest; tz?: string }) {
       )}
       {test.tp_samples.length > 0 && (
         <>
-          <Button size="small" onClick={() => setTpOpen((open) => !open)} sx={{ mt: 1.5 }}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="mt-3"
+            onClick={() => setTpOpen((open) => !open)}
+          >
             {tpOpen ? '收起 TP 样本' : `展开 TP 样本（${test.tp_samples.length}）`}
           </Button>
           {tpOpen && (
@@ -825,11 +771,11 @@ function RuleTestPanel({ test, tz }: { test: RuleTest; tz?: string }) {
         </>
       )}
       {test.matched === 0 && (
-        <Typography sx={{ mt: 1, fontSize: 13, color: 'text.secondary' }}>
+        <p className="mt-2 text-[13px] text-muted-foreground">
           这次测试没有命中任何历史记录。
-        </Typography>
+        </p>
       )}
-    </Box>
+    </div>
   )
 }
 
@@ -945,16 +891,11 @@ export function RuleDetailPage({ id }: { id: number }) {
   }
 
   return (
-    <Box data-testid="rule-detail-page">
+    <div data-testid="rule-detail-page">
       <SectionCard>
         <ListRow primary={rule.name} secondary={sourceText(rule, tz)} badge={<RuleBadges rule={rule} />} />
         <InfoRow label="正则">
-          <Box
-            component="code"
-            sx={{ fontFamily: MONO, fontSize: 13, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}
-          >
-            {rule.pattern}
-          </Box>
+          <code className="font-mono text-[13px] break-all whitespace-pre-wrap">{rule.pattern}</code>
         </InfoRow>
         {rule.note !== '' && <InfoRow label="备注">{rule.note}</InfoRow>}
         {rule.category !== '' && <InfoRow label="分类">{rule.category}</InfoRow>}
@@ -994,21 +935,21 @@ export function RuleDetailPage({ id }: { id: number }) {
       </SectionCard>
 
       <SectionCard title="全库误封测试">
-        <Box sx={{ px: 2, py: 1.5 }}>
+        <div className="px-4 py-3">
           <Button
-            fullWidth
-            variant="outlined"
-            loading={testMut.isPending}
+            variant="outline"
+            className="w-full"
             disabled={testMut.isPending}
             onClick={runTest}
           >
+            {testMut.isPending && <Spinner size={14} />}
             重新跑全库测试
           </Button>
-          <Typography sx={{ mt: 1, fontSize: 12, color: 'text.secondary', lineHeight: 1.7 }}>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
             在全部判定历史上试跑这条正则：FP（正常消息或已撤销的处罚）为 0
             且测试过，服务端才允许开启强制。
-          </Typography>
-        </Box>
+          </p>
+        </div>
         {test !== null && <RuleTestPanel test={test} tz={tz} />}
       </SectionCard>
 
@@ -1018,9 +959,9 @@ export function RuleDetailPage({ id }: { id: number }) {
           secondary="删除后立即从判定快照移除；此操作不可恢复"
           disabled={removeMut.isPending}
           onClick={() => void removeRule()}
-          sx={{ color: 'error.main' }}
+          className="text-destructive"
         />
       </SectionCard>
-    </Box>
+    </div>
   )
 }

@@ -6,7 +6,7 @@
 
 **Architecture:** A Go model manager downloads checksum-pinned assets and owns one persistent Python ONNX worker. Existing authenticated panels expose status/install/settings, and the current media pipeline consumes independent OCR/NSFW evidence.
 
-**Tech stack:** Go standard library, existing React/MUI/TanStack Query, RapidOCR, ONNX Runtime CPU, Python standard library and existing inference dependencies.
+**Tech stack:** Go standard library, existing React/Base UI/Tailwind/TanStack Query with Rsbuild, RapidOCR, ONNX Runtime CPU, Python standard library and existing inference dependencies.
 
 **Spec:** `docs/superpowers/specs/2026-11-14-local-vision-design.md`
 
@@ -38,3 +38,9 @@ The primary agent owns Go manager/core/media/CLI code. Worker, panel and packagi
 - All 21 Python checks pass with real model assets, including malformed images, QR errors, partial frame evidence and bounded NSFW/QR resize allocation. Go real-model and authenticated one-click enable integration checks also pass.
 - Both Docker build modes pass on arm64. The preloaded image runs both models with networking disabled and an empty data volume; the default image contains no weights. amd64 dependency wheels were checked, but a full amd64 image was not built locally.
 - Existing unrelated anti-ad race flakiness is tracked in `menshen-dok`.
+
+## Main integration
+
+- Synced the frontend rewrite from `main` at `7b4b71b`. The local model card now uses the existing Base UI/Tailwind components in `components/mobile`, with Rsbuild producing all three frontend entry points.
+- Preserved download, progress, retry, per-model switches, threshold editing and main-admin access. Added a real `/admin/api/localmodels` path check for download and configuration.
+- The merged tree passes frontend lint, all 505 tests, production builds, `go test ./...` and `go vet ./...`. Both arm64 Docker build modes pass, including real-model inference with networking disabled and an empty data volume.

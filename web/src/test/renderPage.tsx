@@ -1,14 +1,17 @@
 // 页面测试渲染器：一次性装上 QueryClient / Nav / ActionSheet / Toast 四层 Provider，
 // 并提供 NavProbe / IntentSetter 观察与预置导航状态。
+//
+// Phase 3 结束后只剩一套组件层（components/*），不再需要新旧双挂。
 /* oxlint-disable react/only-export-components -- 测试辅助文件，导出渲染器与探针组件 */
 /* oxlint-disable react-hooks/exhaustive-deps -- IntentSetter 只在挂载时预置一次导航状态 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { ToastProvider } from '../components/feedback'
+import { ActionSheetProvider } from '../components/mobile'
 import { NavProvider, useNav } from '../nav'
 import type { TabKey } from '../nav'
-import { ActionSheetProvider, ToastProvider } from '../ui'
 
 export function makeTestClient(): QueryClient {
   return new QueryClient({

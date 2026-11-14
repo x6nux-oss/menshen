@@ -382,7 +382,8 @@ describe('ListsPage 写操作参数', () => {
     await waitFor(() => expect(bodies).toHaveLength(1))
     expect(bodies[0]).toEqual({ action: 'add', user_id: '300', note: '值班号' })
 
-    const row = screen.getByText('（mock）备用管理员').closest('li')
+    // 新 ListRow 的根是 <div>（旧 MUI ListItem 是 <li>）；取最近的祖先 div 即整行。
+    const row = screen.getByText('（mock）备用管理员').closest('div')
     expect(row).not.toBeNull()
     fireEvent.click(
       await within(row as HTMLElement).findByRole('button', { name: '移除' }),

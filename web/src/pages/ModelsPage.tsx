@@ -2,86 +2,79 @@
 // - 列表：搜索（名称，本地）；行 = 等宽模型名 + 启用徽标 + 单价摘要；
 // - ＋ 抽屉：上游（仅启用中）+ 模型 ID + 四个价格（数字键盘）→ model add；
 // - 详情：四价格编辑、启停 Switch（乐观）、删除（ActionSheet 写明对象）。
-import { Box, Button, MenuItem, TextField, Typography } from "@mui/material";
-import { useState } from "react";
-import { errorStatus } from "../api/client";
-import { useMiniState } from "../api/hooks";
-import { useModelMutation, useOptimisticMiniMutation } from "../api/mutations";
-import { REASONING_EFFORTS } from "../api/types";
-import type { Model, State } from "../api/types";
-import { filterRows } from "../lib/filters";
-import { useNav, usePageParam } from "../nav";
+import { useState } from 'react'
+import { errorStatus } from '../api/client'
+import { useMiniState } from '../api/hooks'
+import { useModelMutation, useOptimisticMiniMutation } from '../api/mutations'
+import { REASONING_EFFORTS } from '../api/types'
+import type { Model, State } from '../api/types'
+import { EmptyState, ErrorState, Skeletons, useToast } from '../components/feedback'
 import {
-  Badge,
-  EmptyState,
-  ErrorState,
   FormDrawer,
   ListRow,
+  LocalModelsCard,
   SearchField,
   SectionCard,
-  Skeletons,
   SwitchRow,
   useConfirm,
-  useToast,
-  LocalModelsCard,
-} from "../ui";
+} from '../components/mobile'
+import { Badge } from '../components/ui'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import { filterRows } from '../lib/filters'
+import { useNav, usePageParam } from '../nav'
 
-const MONO = "ui-monospace, Menlo, monospace";
+const REASONING_EFFORT_UNSET = '__unset__'
 
-function priceText(
-  m: Pick<Model, "prompt_price" | "completion_price">,
-): string {
-  return `输入 $${m.prompt_price}/M · 补全 $${m.completion_price}/M`;
+function priceText(m: Pick<Model, 'prompt_price' | 'completion_price'>): string {
+  return `输入 $${m.prompt_price}/M · 补全 $${m.completion_price}/M`
 }
 
 function priceSummary(m: Model): string {
-  return `${priceText(m)} · 缓存读 $${m.cache_read_price} / 写 $${m.cache_write_price}`;
+  return `${priceText(m)} · 缓存读 $${m.cache_read_price} / 写 $${m.cache_write_price}`
 }
 
 export function ModelsPage() {
-  const nav = useNav();
-  const toast = useToast();
-  const state = useMiniState(true);
-  const addMut = useModelMutation();
+  const nav = useNav()
+  const toast = useToast()
+  const state = useMiniState(true)
+  const addMut = useModelMutation()
 
-  const [q, setQ] = usePageParam("q");
-  const [addOpen, setAddOpen] = useState(false);
-  const [upstream, setUpstream] = useState("");
-  const [modelID, setModelID] = useState("");
-  const [prompt, setPrompt] = useState("0");
-  const [completion, setCompletion] = useState("0");
-  const [cacheRead, setCacheRead] = useState("0");
-  const [cacheWrite, setCacheWrite] = useState("0");
+  const [q, setQ] = usePageParam('q')
+  const [addOpen, setAddOpen] = useState(false)
+  const [upstream, setUpstream] = useState('')
+  const [modelID, setModelID] = useState('')
+  const [prompt, setPrompt] = useState('0')
+  const [completion, setCompletion] = useState('0')
+  const [cacheRead, setCacheRead] = useState('0')
+  const [cacheWrite, setCacheWrite] = useState('0')
 
-  if (state.isPending) return <Skeletons rows={4} />;
+  if (state.isPending) return <Skeletons rows={4} />
   if (state.isError) {
-    return (
-      <ErrorState
-        status={errorStatus(state.error)}
-        onRetry={() => void state.refetch()}
-      />
-    );
+    return <ErrorState status={errorStatus(state.error)} onRetry={() => void state.refetch()} />
   }
-  if (!state.data.me.main) return <ErrorState status={403} />;
+  if (!state.data.me.main) return <ErrorState status={403} />
 
-  const models = state.data.models ?? [];
-  const enabledUpstreams = (state.data.upstreams ?? []).filter((u) => u.status);
-  const visible = filterRows(models, q, (m) => m.name);
+  const models = state.data.models ?? []
+  const enabledUpstreams = (state.data.upstreams ?? []).filter((u) => u.status)
+  const visible = filterRows(models, q, (m) => m.name)
 
   function openAdd() {
-    setUpstream(enabledUpstreams[0]?.name ?? "");
-    setModelID("");
-    setPrompt("0");
-    setCompletion("0");
-    setCacheRead("0");
-    setCacheWrite("0");
-    setAddOpen(true);
+    setUpstream(enabledUpstreams[0]?.name ?? '')
+    setModelID('')
+    setPrompt('0')
+    setCompletion('0')
+    setCacheRead('0')
+    setCacheWrite('0')
+    setAddOpen(true)
   }
 
   function submitAdd() {
     addMut.mutate(
       {
-        action: "add",
+        action: 'add',
         upstream,
         model_id: modelID.trim(),
         prompt_price: prompt.trim(),
@@ -91,26 +84,26 @@ export function ModelsPage() {
       },
       {
         onSuccess: (resp) => {
-          toast(resp.note ?? "已添加；可在「全局设置 → 默认模型」里引用");
-          setAddOpen(false);
+          toast(resp.note ?? '已添加；可在「全局设置 → 默认模型」里引用')
+          setAddOpen(false)
         },
         onError: (err) => toast(err.message),
       },
-    );
+    )
   }
 
   return (
-    <Box data-testid="models-page">
+    <div data-testid="models-page">
       <LocalModelsCard />
 
-      <Box sx={{ mb: 1 }}>
+      <div className="mb-2">
         <SearchField
           value={q}
           onChange={setQ}
           placeholder="搜索模型名称"
           ariaLabel="搜索模型"
         />
-      </Box>
+      </div>
 
       <SectionCard
         title={countText(visible.length, models.length)}
@@ -121,44 +114,27 @@ export function ModelsPage() {
         }
       >
         {visible.length === 0 ? (
-          <Typography
-            sx={{ px: 2, py: 1.5, fontSize: 13, color: "text.secondary" }}
-          >
-            {models.length === 0 ? "（还没有模型）" : "没有匹配的模型"}
-          </Typography>
+          <p className="px-4 py-3 text-[13px] text-muted-foreground">
+            {models.length === 0 ? '（还没有模型）' : '没有匹配的模型'}
+          </p>
         ) : (
           visible.map((m) => (
             <ListRow
               key={m.name}
-              primary={
-                <Box component="span" sx={{ fontFamily: MONO, fontSize: 15 }}>
-                  {m.name}
-                </Box>
-              }
+              primary={<span className="font-mono text-[15px]">{m.name}</span>}
               secondary={priceSummary(m)}
-              badge={
-                <Badge tone={m.enabled ? "ok" : "no"}>
-                  {m.enabled ? "启用" : "停用"}
-                </Badge>
-              }
+              badge={<Badge tone={m.enabled ? 'ok' : 'no'}>{m.enabled ? '启用' : '停用'}</Badge>}
               chevron
-              onClick={() => nav.push({ k: "model", name: m.name })}
+              onClick={() => nav.push({ k: 'model', name: m.name })}
             />
           ))
         )}
       </SectionCard>
 
       {enabledUpstreams.length === 0 && (
-        <Typography
-          sx={{
-            px: 1.5,
-            fontSize: 12,
-            color: "text.secondary",
-            lineHeight: 1.7,
-          }}
-        >
+        <p className="px-3 text-[12px] leading-[1.7] text-muted-foreground">
           还没有启用的上游渠道：先到「上游渠道」添加并启用，才能登记模型。
-        </Typography>
+        </p>
       )}
 
       <FormDrawer
@@ -167,98 +143,114 @@ export function ModelsPage() {
         title="添加模型"
         pending={addMut.isPending}
         submitText="添加"
-        submitDisabled={upstream === "" || modelID.trim() === ""}
+        submitDisabled={upstream === '' || modelID.trim() === ''}
         onSubmit={submitAdd}
       >
-        <TextField
-          select
-          fullWidth
-          size="small"
-          label="上游（仅启用中）"
-          value={upstream}
-          onChange={(event) => setUpstream(event.target.value)}
-        >
-          {enabledUpstreams.map((u) => (
-            <MenuItem key={u.id} value={u.name}>
-              {u.name}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          fullWidth
-          size="small"
-          label="模型 ID"
-          placeholder="如 gpt-5-mini"
-          value={modelID}
-          onChange={(event) => setModelID(event.target.value)}
-          sx={{ mt: 1.5 }}
-        />
-        <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
-          <TextField
-            fullWidth
-            size="small"
-            label="输入价 $/M"
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            slotProps={{ htmlInput: { inputMode: "decimal" } }}
+        <div className="mb-3">
+          <Label htmlFor="model-upstream" className="mb-1 block">
+            上游（仅启用中）
+          </Label>
+          <Select value={upstream} onValueChange={(value) => setUpstream(value)}>
+            <SelectTrigger id="model-upstream" aria-label="上游（仅启用中）">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {enabledUpstreams.map((u) => (
+                <SelectItem key={u.id} value={u.name}>
+                  {u.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="model-id" className="mb-1 block">
+            模型 ID
+          </Label>
+          <Input
+            id="model-id"
+            placeholder="如 gpt-5-mini"
+            value={modelID}
+            onChange={(event) => setModelID(event.target.value)}
           />
-          <TextField
-            fullWidth
-            size="small"
-            label="补全价 $/M"
-            value={completion}
-            onChange={(event) => setCompletion(event.target.value)}
-            slotProps={{ htmlInput: { inputMode: "decimal" } }}
-          />
-        </Box>
-        <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
-          <TextField
-            fullWidth
-            size="small"
-            label="缓存读取价"
-            value={cacheRead}
-            onChange={(event) => setCacheRead(event.target.value)}
-            slotProps={{ htmlInput: { inputMode: "decimal" } }}
-          />
-          <TextField
-            fullWidth
-            size="small"
-            label="缓存创建价"
-            value={cacheWrite}
-            onChange={(event) => setCacheWrite(event.target.value)}
-            slotProps={{ htmlInput: { inputMode: "decimal" } }}
-          />
-        </Box>
-        <Typography
-          sx={{ mt: 1, fontSize: 13, color: "text.secondary", lineHeight: 1.6 }}
-        >
-          四项价格单位都是每百万 token 美元；留空按 0 计。模型全名 = 上游名/模型
-          ID。
-        </Typography>
+        </div>
+
+        <div className="mt-3 flex gap-2">
+          <div className="min-w-0 flex-1">
+            <Label htmlFor="model-prompt" className="mb-1 block">
+              输入价 $/M
+            </Label>
+            <Input
+              id="model-prompt"
+              inputMode="decimal"
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <Label htmlFor="model-completion" className="mb-1 block">
+              补全价 $/M
+            </Label>
+            <Input
+              id="model-completion"
+              inputMode="decimal"
+              value={completion}
+              onChange={(event) => setCompletion(event.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="mt-3 flex gap-2">
+          <div className="min-w-0 flex-1">
+            <Label htmlFor="model-cache-read" className="mb-1 block">
+              缓存读取价
+            </Label>
+            <Input
+              id="model-cache-read"
+              inputMode="decimal"
+              value={cacheRead}
+              onChange={(event) => setCacheRead(event.target.value)}
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <Label htmlFor="model-cache-write" className="mb-1 block">
+              缓存创建价
+            </Label>
+            <Input
+              id="model-cache-write"
+              inputMode="decimal"
+              value={cacheWrite}
+              onChange={(event) => setCacheWrite(event.target.value)}
+            />
+          </div>
+        </div>
+
+        <p className="mt-2 text-[13px] leading-[1.6] text-muted-foreground">
+          四项价格单位都是每百万 token 美元；留空按 0 计。模型全名 = 上游名/模型 ID。
+        </p>
       </FormDrawer>
-    </Box>
-  );
+    </div>
+  )
 }
 
 function countText(shown: number, total: number): string {
-  return shown === total
-    ? `共 ${total} 个模型`
-    : `匹配 ${shown} / 共 ${total} 个模型`;
+  return shown === total ? `共 ${total} 个模型` : `匹配 ${shown} / 共 ${total} 个模型`
 }
 
 /** PriceCard 是详情的四价格编辑卡：子组件持有草稿，挂载时从模型值初始化。 */
 function PriceCard({ model }: { model: Model }) {
-  const toast = useToast();
-  const mut = useModelMutation();
-  const [prompt, setPrompt] = useState(String(model.prompt_price));
-  const [completion, setCompletion] = useState(String(model.completion_price));
-  const [cacheRead, setCacheRead] = useState(String(model.cache_read_price));
-  const [cacheWrite, setCacheWrite] = useState(String(model.cache_write_price));
+  const toast = useToast()
+  const mut = useModelMutation()
+  const [prompt, setPrompt] = useState(String(model.prompt_price))
+  const [completion, setCompletion] = useState(String(model.completion_price))
+  const [cacheRead, setCacheRead] = useState(String(model.cache_read_price))
+  const [cacheWrite, setCacheWrite] = useState(String(model.cache_write_price))
 
   function submit() {
     mut.mutate(
       {
-        action: "update",
+        action: 'update',
         name: model.name,
         prompt_price: prompt.trim(),
         completion_price: completion.trim(),
@@ -266,104 +258,87 @@ function PriceCard({ model }: { model: Model }) {
         cache_write_price: cacheWrite.trim(),
       },
       {
-        onSuccess: (resp) => toast(resp.note ?? "已保存"),
+        onSuccess: (resp) => toast(resp.note ?? '已保存'),
         onError: (err) => toast(err.message),
       },
-    );
+    )
   }
 
-  const field = (
-    label: string,
-    value: string,
-    setValue: (next: string) => void,
-  ) => (
-    <TextField
-      fullWidth
-      size="small"
-      label={label}
-      value={value}
-      onChange={(event) => setValue(event.target.value)}
-      slotProps={{ htmlInput: { inputMode: "decimal" } }}
-    />
-  );
+  const field = (id: string, label: string, value: string, setValue: (next: string) => void) => (
+    <div className="min-w-0 flex-1">
+      <Label htmlFor={id} className="mb-1 block">
+        {label}
+      </Label>
+      <Input
+        id={id}
+        inputMode="decimal"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+      />
+    </div>
+  )
 
   return (
     <SectionCard title="单价（每百万 token，美元）">
-      <Box sx={{ p: 1.5 }}>
-        <Box sx={{ display: "flex", gap: 1 }}>
-          {field("输入价", prompt, setPrompt)}
-          {field("补全价", completion, setCompletion)}
-        </Box>
-        <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
-          {field("缓存读取价", cacheRead, setCacheRead)}
-          {field("缓存创建价", cacheWrite, setCacheWrite)}
-        </Box>
-        <Button
-          fullWidth
-          variant="contained"
-          loading={mut.isPending}
-          disabled={mut.isPending}
-          onClick={submit}
-          sx={{ mt: 2 }}
-        >
+      <div className="p-3">
+        <div className="flex gap-2">
+          {field('price-prompt', '输入价', prompt, setPrompt)}
+          {field('price-completion', '补全价', completion, setCompletion)}
+        </div>
+        <div className="mt-3 flex gap-2">
+          {field('price-cache-read', '缓存读取价', cacheRead, setCacheRead)}
+          {field('price-cache-write', '缓存创建价', cacheWrite, setCacheWrite)}
+        </div>
+        <Button className="mt-4 h-11 w-full" disabled={mut.isPending} onClick={submit}>
           保存价格
         </Button>
-        <Typography
-          sx={{ mt: 1, fontSize: 12, color: "text.secondary", lineHeight: 1.7 }}
-        >
+        <p className="mt-2 text-[12px] leading-[1.7] text-muted-foreground">
           留空按 0 计；改价只影响之后的核算，不会重算历史开销。
-        </Typography>
-      </Box>
+        </p>
+      </div>
     </SectionCard>
-  );
+  )
 }
 
 export function ModelDetailPage({ name }: { name: string }) {
-  const nav = useNav();
-  const toast = useToast();
-  const confirm = useConfirm();
-  const state = useMiniState(true);
-  const removeMut = useModelMutation();
-  const enableMut = useOptimisticMiniMutation("model");
+  const nav = useNav()
+  const toast = useToast()
+  const confirm = useConfirm()
+  const state = useMiniState(true)
+  const removeMut = useModelMutation()
+  const enableMut = useOptimisticMiniMutation('model')
 
-  if (state.isPending) return <Skeletons rows={4} />;
+  if (state.isPending) return <Skeletons rows={4} />
   if (state.isError) {
-    return (
-      <ErrorState
-        status={errorStatus(state.error)}
-        onRetry={() => void state.refetch()}
-      />
-    );
+    return <ErrorState status={errorStatus(state.error)} onRetry={() => void state.refetch()} />
   }
-  if (!state.data.me.main) return <ErrorState status={403} />;
+  if (!state.data.me.main) return <ErrorState status={403} />
 
-  const model = (state.data.models ?? []).find((m) => m.name === name);
+  const model = (state.data.models ?? []).find((m) => m.name === name)
   if (!model) {
-    return <EmptyState title="模型不存在" description="它可能已被删除。" />;
+    return <EmptyState title="模型不存在" description="它可能已被删除。" />
   }
 
   function toggleEnabled(next: boolean) {
     enableMut.mutate(
       {
-        body: { action: "update", name, enabled: next },
+        body: { action: 'update', name, enabled: next },
         apply: (s: State) => ({
           ...s,
-          models: (s.models ?? []).map((m) =>
-            m.name === name ? { ...m, enabled: next } : m,
-          ),
+          models: (s.models ?? []).map((m) => (m.name === name ? { ...m, enabled: next } : m)),
         }),
       },
       {
-        onSuccess: (resp) => toast(resp.note ?? (next ? "已启用" : "已停用")),
+        onSuccess: (resp) => toast(resp.note ?? (next ? '已启用' : '已停用')),
         onError: (err) => toast(err.message),
       },
-    );
+    )
   }
 
   function toggleSimple(next: boolean) {
     enableMut.mutate(
       {
-        body: { action: "update", name, simple_instructions: next },
+        body: { action: 'update', name, simple_instructions: next },
         apply: (s: State) => ({
           ...s,
           models: (s.models ?? []).map((m) =>
@@ -372,74 +347,63 @@ export function ModelDetailPage({ name }: { name: string }) {
         }),
       },
       {
-        onSuccess: (resp) =>
-          toast(resp.note ?? (next ? "已简化" : "已还原完整提示词")),
+        onSuccess: (resp) => toast(resp.note ?? (next ? '已简化' : '已还原完整提示词')),
         onError: (err) => toast(err.message),
       },
-    );
+    )
   }
 
   function setEffort(next: string) {
     enableMut.mutate(
       {
-        body: { action: "update", name, reasoning_effort: next },
-        apply: (s: State) => ({
-          ...s,
-          models: (s.models ?? []).map((m) =>
-            m.name === name ? { ...m, reasoning_effort: next } : m,
+        body: { action: 'update', name, reasoning_effort: next },
+        apply: (state: State) => ({
+          ...state,
+          models: (state.models ?? []).map((entry) =>
+            entry.name === name ? { ...entry, reasoning_effort: next } : entry,
           ),
         }),
       },
       {
         onSuccess: (resp) =>
-          toast(resp.note ?? (next ? `思考强度 ${next}` : "不传思考强度")),
+          toast(resp.note ?? (next ? `思考强度 ${next}` : '不传思考强度')),
         onError: (err) => toast(err.message),
       },
-    );
+    )
   }
 
   async function removeModel() {
     const ok = await confirm({
-      title: "删除该模型？",
+      title: '删除该模型？',
       description: `将删除「${model?.name}」及其单价配置；仍在默认模型或机器人模型列表里引用时会判定失败，请先改掉引用。此操作不可恢复。`,
-      confirmText: "删除",
+      confirmText: '删除',
       danger: true,
-    });
-    if (!ok) return;
+    })
+    if (!ok) return
     removeMut.mutate(
-      { action: "remove", name },
+      { action: 'remove', name },
       {
         onSuccess: (resp) => {
-          toast(resp.note ?? "已删除");
-          nav.pop();
+          toast(resp.note ?? '已删除')
+          nav.pop()
         },
         onError: (err) => toast(err.message),
       },
-    );
+    )
   }
 
   return (
-    <Box data-testid="model-detail-page">
+    <div data-testid="model-detail-page">
       <SectionCard>
         <ListRow
-          primary={
-            <Box component="span" sx={{ fontFamily: MONO, fontSize: 15 }}>
-              {model.name}
-            </Box>
-          }
-          secondary={`上游 ${model.upstream || "（旧格式）"} ｜ 模型 ID ${model.model_id}`}
-          badge={
-            <Badge tone={model.enabled ? "ok" : "no"}>
-              {model.enabled ? "启用" : "停用"}
-            </Badge>
-          }
+          primary={<span className="font-mono text-[15px]">{model.name}</span>}
+          secondary={`上游 ${model.upstream || '（旧格式）'} ｜ 模型 ID ${model.model_id}`}
+          badge={<Badge tone={model.enabled ? 'ok' : 'no'}>{model.enabled ? '启用' : '停用'}</Badge>}
         />
         <SwitchRow
           primary="启用"
           secondary={
-            model.enabled
-              ? "停用后不能再被选为默认模型或 bot 模型"
-              : "启用后才能被引用"
+            model.enabled ? '停用后不能再被选为默认模型或 bot 模型' : '启用后才能被引用'
           }
           checked={model.enabled}
           disabled={enableMut.isPending}
@@ -449,32 +413,44 @@ export function ModelDetailPage({ name }: { name: string }) {
           primary="初判提示词简化为一句话"
           secondary={
             model.simple_instructions
-              ? "is_ad 只问一句「是不是广告」，给微调过的初判模型用"
-              : "初判带完整判定口径；微调过的初判模型可打开此项"
+              ? 'is_ad 只问一句「是不是广告」，给微调过的初判模型用'
+              : '初判带完整判定口径；微调过的初判模型可打开此项'
           }
           checked={model.simple_instructions}
           disabled={enableMut.isPending}
           onChange={toggleSimple}
         />
-        <Box sx={{ p: 1.5 }}>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="思考强度"
-            value={model.reasoning_effort}
+        <div className="px-4 py-3">
+          <Label htmlFor="model-reasoning-effort" className="mb-1 block">
+            思考强度
+          </Label>
+          <Select
+            value={
+              model.reasoning_effort === ''
+                ? REASONING_EFFORT_UNSET
+                : model.reasoning_effort
+            }
             disabled={enableMut.isPending}
-            onChange={(event) => setEffort(event.target.value)}
-            helperText="不填不发，模型按自己的默认思考；模型不认时自动去掉"
+            onValueChange={(next) =>
+              setEffort(next === REASONING_EFFORT_UNSET ? '' : next)
+            }
           >
-            <MenuItem value="">不填</MenuItem>
-            {REASONING_EFFORTS.map((e) => (
-              <MenuItem key={e} value={e}>
-                {e}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Box>
+            <SelectTrigger id="model-reasoning-effort" aria-label="思考强度">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={REASONING_EFFORT_UNSET}>不填</SelectItem>
+              {REASONING_EFFORTS.map((effort) => (
+                <SelectItem key={effort} value={effort}>
+                  {effort}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="mt-1 text-[12px] leading-[1.7] text-muted-foreground">
+            不填不发，模型按自己的默认思考；模型不认时自动去掉
+          </p>
+        </div>
       </SectionCard>
 
       <PriceCard key={model.name} model={model} />
@@ -485,9 +461,9 @@ export function ModelDetailPage({ name }: { name: string }) {
           secondary="先确认没有默认模型或机器人还在引用它"
           disabled={removeMut.isPending}
           onClick={() => void removeModel()}
-          sx={{ color: "error.main" }}
+          className="text-destructive"
         />
       </SectionCard>
-    </Box>
-  );
+    </div>
+  )
 }

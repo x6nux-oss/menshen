@@ -1,32 +1,37 @@
 // 桌面端专用展示组件：页面头、工具条、数据表、指标卡、确认按钮、键值列表。
 //
-// 这套是给管理面板单独写的 UI，不复用 Mini App 的 ListRow/TopBar/TabBar 等
-// 移动形态；语义色标（Badge）与错误/空态是通用件，直接复用 ui/。
+// Phase 2 起改用新的设计系统（Tailwind + shadcn 风格的 components/ui + 玻璃层），
+// 不再依赖 MUI。**props 与旧实现保持兼容** —— 16 个视图的调用点不因这次迁移而改。
+//
+// 几处必须知道的历史包袱：
+//   1. `ConfirmButton` 的调用方仍传 MUI 风格的 `variant`/`color`/`size`
+//      （`contained`/`outlined`/`text`、`error`/`primary`、`small`），本组件负责翻译；
+//      等视图逐个迁完后（Phase 2 的 Task 4-19）可以收紧这层翻译。
+//   2. `StatusBadge` 收的是 `info: StatusInfo`（不是散开的 label/tone），
+//      `EmptyRow` 收的是 `text`（不是 children）—— 都照旧实现来。
+//   3. `CardBlock` 曾经接受 MUI 的 `sx`；迁移后改为 `className`，但为兼容仍接受
+//      并忽略 `sx`（当前无调用方使用，见 Phase 2 的扫描）。
+import type { ReactNode } from 'react'
+import { cn } from '../lib/utils'
+import type { StatusInfo } from '../lib/status'
+import { Badge } from '../components/ui'
 import {
-  Box,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
   Button,
   Card,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-} from '@mui/material'
-import type { ButtonProps } from '@mui/material'
-import type { SxProps, Theme } from '@mui/material/styles'
-import type { ReactNode } from 'react'
-import { useState } from 'react'
-import { Badge } from '../ui'
-import type { StatusInfo } from '../lib/status'
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Spinner,
+} from '../components/ui'
 
 /** PageHeader 页面标题 + 说明 + 右侧操作区。 */
 export function PageHeader({
@@ -39,31 +44,23 @@ export function PageHeader({
   actions?: ReactNode
 }) {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ fontSize: 20, fontWeight: 700, lineHeight: 1.3 }}>{title}</Typography>
+    <div className="mb-4 flex flex-wrap items-start gap-4">
+      <div className="min-w-0">
+        <h1 className="text-xl leading-tight font-bold">{title}</h1>
         {subtitle !== undefined && (
-          <Typography sx={{ mt: 0.25, fontSize: 13, color: 'text.secondary' }}>
-            {subtitle}
-          </Typography>
+          <p className="mt-1 text-[13px] text-muted-foreground">{subtitle}</p>
         )}
-      </Box>
+      </div>
       {actions !== undefined && (
-        <Stack direction="row" spacing={1} sx={{ ml: 'auto', flexShrink: 0 }}>
-          {actions}
-        </Stack>
+        <div className="ml-auto flex max-w-full flex-wrap items-center gap-2">{actions}</div>
       )}
-    </Box>
+    </div>
   )
 }
 
 /** Toolbar 一行筛选控件（搜索框、分段、按钮），自动换行。 */
 export function Toolbar({ children }: { children: ReactNode }) {
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 1.5 }}>
-      {children}
-    </Box>
-  )
+  return <div className="mb-3 flex flex-wrap items-center gap-3">{children}</div>
 }
 
 /** StatCard 指标卡；onClick 存在时整卡可点。 */
@@ -78,26 +75,29 @@ export function StatCard({
   hint?: ReactNode
   onClick?: () => void
 }) {
-  return (
-    <Card
-      elevation={0}
-      onClick={onClick}
-      sx={{
-        p: 2,
-        borderRadius: 2,
-        border: '1px solid',
-        borderColor: 'divider',
-        cursor: onClick ? 'pointer' : 'default',
-        '&:hover': onClick ? { borderColor: 'primary.main' } : undefined,
-      }}
-    >
-      <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>{label}</Typography>
-      <Typography sx={{ mt: 0.5, fontSize: 24, fontWeight: 700, lineHeight: 1.2 }}>{value}</Typography>
+  const body = (
+    <>
+      <div className="text-[13px] text-muted-foreground">{label}</div>
+      <div className="mt-1 text-2xl leading-tight font-bold">{value}</div>
       {hint !== undefined && (
-        <Typography sx={{ mt: 0.5, fontSize: 12.5, color: 'text.secondary' }}>{hint}</Typography>
+        <div className="mt-1 text-[12.5px] text-muted-foreground">{hint}</div>
       )}
-    </Card>
+    </>
   )
+
+  // 玻璃卡：统计卡是「浮起」元素（§4.4）。不开 refract —— 折射只给少量静态装饰。
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="glass block w-full rounded-xl p-4 text-left outline-none transition-colors hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
+        {body}
+      </button>
+    )
+  }
+  return <div className="glass block w-full rounded-xl p-4">{body}</div>
 }
 
 export interface Column<T> {
@@ -118,64 +118,97 @@ export interface DataTableProps<T> {
   empty?: ReactNode
 }
 
-/** DataTable 桌面表格：表头吸顶、行可点、加载与空态内置。 */
-export function DataTable<T>({ columns, rows, rowKey, onRowClick, loading, empty }: DataTableProps<T>) {
+/** align 取值 → Tailwind 的文本对齐类。 */
+const ALIGN_CLASS: Record<NonNullable<Column<unknown>['align']>, string> = {
+  left: 'text-left',
+  center: 'text-center',
+  right: 'text-right',
+}
+
+/**
+ * DataTable 桌面表格：表头、行可点、加载与空态内置。
+ *
+ * **不用玻璃**（§4.4：表格与长列表不做玻璃 —— 行数多时每帧重算模糊会掉帧）。
+ * 加载中只在**首屏无数据**时占位；已有数据时继续渲染旧行，避免刷新闪烁。
+ */
+export function DataTable<T>({
+  columns,
+  rows,
+  rowKey,
+  onRowClick,
+  loading,
+  empty,
+}: DataTableProps<T>) {
   if (loading && rows.length === 0) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-        <CircularProgress size={26} />
-      </Box>
+      <div data-testid="table-loading" className="flex justify-center py-12">
+        <Spinner size={26} className="text-muted-foreground" />
+      </div>
     )
   }
   if (rows.length === 0) {
-    return <>{empty ?? <EmptyRow text="暂无数据" />}</>
+    if (empty !== undefined) return <>{empty}</>
+    return <EmptyRow text="暂无数据" />
   }
   return (
-    <TableContainer
-      component={Card}
-      elevation={0}
-      sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}
-    >
-      <Table stickyHeader size="small">
-        <TableHead>
-          <TableRow>
+    <div className="w-full overflow-x-auto rounded-xl border border-border bg-card">
+      <table className="w-full border-collapse text-sm">
+        <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur-sm">
+          <tr className="border-b border-border">
             {columns.map((col) => (
-              <TableCell key={col.key} align={col.align ?? 'left'} sx={{ width: col.width, whiteSpace: 'nowrap' }}>
+              <th
+                key={col.key}
+                scope="col"
+                className={cn(
+                  'h-9 px-3 text-left align-middle text-[12.5px] font-medium whitespace-nowrap text-muted-foreground',
+                  ALIGN_CLASS[col.align ?? 'left'],
+                )}
+                style={{ width: col.width }}
+              >
                 {col.header}
-              </TableCell>
+              </th>
             ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
+          </tr>
+        </thead>
+        <tbody>
           {rows.map((row) => (
-            <TableRow
+            <tr
               key={rowKey(row)}
-              hover={onRowClick !== undefined}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
-              sx={onRowClick ? { cursor: 'pointer' } : undefined}
+              className={cn(
+                'border-b border-border transition-colors last:border-0 hover:bg-muted/50',
+                onRowClick && 'cursor-pointer',
+              )}
             >
               {columns.map((col) => (
-                <TableCell key={col.key} align={col.align ?? 'left'} sx={{ maxWidth: 420 }}>
+                <td
+                  key={col.key}
+                  data-align={col.align ?? 'left'}
+                  className={cn(
+                    'max-w-[420px] px-3 py-2 align-middle',
+                    ALIGN_CLASS[col.align ?? 'left'],
+                  )}
+                >
                   {col.render(row)}
-                </TableCell>
+                </td>
               ))}
-            </TableRow>
+            </tr>
           ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+        </tbody>
+      </table>
+    </div>
   )
 }
 
 /** EmptyRow 表格内的空态。 */
 export function EmptyRow({ text }: { text: ReactNode }) {
   return (
-    <Card
-      elevation={0}
-      sx={{ p: 4, textAlign: 'center', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}
+    <div
+      data-testid="table-empty"
+      className="rounded-xl border border-border bg-card p-8 text-center"
     >
-      <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>{text}</Typography>
-    </Card>
+      <p className="text-sm text-muted-foreground">{text}</p>
+    </div>
   )
 }
 
@@ -184,7 +217,62 @@ export function StatusBadge({ info }: { info: StatusInfo }) {
   return <Badge tone={info.tone}>{info.label}</Badge>
 }
 
-/** ConfirmButton 需要二次确认的危险操作：点击先弹确认框，确认后才执行。 */
+/** MUI ButtonProps 里调用方仍在传的取值（视图未迁完期间必须翻译）。 */
+type LegacyVariant = 'contained' | 'outlined' | 'text'
+type LegacyColor = 'primary' | 'error' | 'inherit' | 'secondary' | 'success' | 'warning'
+type LegacySize = 'small' | 'medium' | 'large'
+
+export interface ConfirmButtonProps {
+  title: ReactNode
+  description?: ReactNode
+  confirmLabel?: ReactNode
+  cancelLabel?: ReactNode
+  /** 危险操作：确认按钮用错误色。 */
+  danger?: boolean
+  disabled?: boolean
+  onConfirm: () => void
+  children: ReactNode
+  /** 旧调用方的 MUI 变体名；本组件翻译成新变体。 */
+  variant?: LegacyVariant
+  /** 旧调用方的 MUI 颜色名。 */
+  color?: LegacyColor
+  /** 旧调用方的 MUI 尺寸名。 */
+  size?: LegacySize
+  className?: string
+}
+
+/** 把旧调用方的 MUI variant/color 翻译成新组件的 variant。 */
+function translateVariant(variant?: LegacyVariant, color?: LegacyColor) {
+  if (kindOf(variant, color) === 'destructive') return 'destructive' as const
+  switch (variant) {
+    case 'outlined':
+      return 'outline' as const
+    case 'text':
+      return 'ghost' as const
+    default:
+      return 'default' as const
+  }
+}
+
+function kindOf(variant?: LegacyVariant, color?: LegacyColor) {
+  if (color === 'error') return 'destructive'
+  if (variant === 'contained') return 'primary'
+  return 'neutral'
+}
+
+/** 把旧 size 名翻译成新 size。 */
+function translateSize(size?: LegacySize) {
+  if (size === 'small') return 'sm' as const
+  if (size === 'large') return 'lg' as const
+  return 'default' as const
+}
+
+/**
+ * ConfirmButton 需要二次确认的危险操作：点击先弹确认框，确认后才执行。
+ *
+ * 用 AlertDialog 而非 Dialog —— 危险操作不能点遮罩/Esc 顺手关掉，
+ * 必须明确选「确认」或「取消」。
+ */
 export function ConfirmButton({
   title,
   description,
@@ -194,69 +282,68 @@ export function ConfirmButton({
   disabled = false,
   onConfirm,
   children,
-  ...buttonProps
-}: {
-  title: ReactNode
-  description?: ReactNode
-  confirmLabel?: ReactNode
-  cancelLabel?: ReactNode
-  danger?: boolean
-  disabled?: boolean
-  onConfirm: () => void
-  children: ReactNode
-} & Omit<ButtonProps, 'onClick' | 'children'>) {
-  const [open, setOpen] = useState(false)
+  variant,
+  color,
+  size,
+  className,
+}: ConfirmButtonProps) {
   return (
-    <>
-      <Button {...buttonProps} disabled={disabled} onClick={() => setOpen(true)}>
-        {children}
-      </Button>
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontSize: 17 }}>{title}</DialogTitle>
-        {description !== undefined && (
-          <DialogContent>
-            <DialogContentText sx={{ fontSize: 14, lineHeight: 1.7 }}>{description}</DialogContentText>
-          </DialogContent>
-        )}
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>{cancelLabel}</Button>
+    <AlertDialog>
+      <AlertDialogTrigger
+        render={
           <Button
-            color={danger ? 'error' : 'primary'}
-            variant="contained"
-            onClick={() => {
-              setOpen(false)
-              onConfirm()
-            }}
+            variant={danger ? 'destructive' : translateVariant(variant, color)}
+            size={translateSize(size)}
+            disabled={disabled}
+            className={className}
           >
-            {confirmLabel}
+            {children}
           </Button>
-        </DialogActions>
-      </Dialog>
-    </>
+        }
+      />
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          {description !== undefined && (
+            <AlertDialogDescription>{description}</AlertDialogDescription>
+          )}
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel
+            render={
+              <Button variant="outline" size={translateSize(size)}>
+                {cancelLabel}
+              </Button>
+            }
+          />
+          <AlertDialogAction
+            render={
+              <Button
+                variant={danger ? 'destructive' : 'default'}
+                size={translateSize(size)}
+                onClick={onConfirm}
+              >
+                {confirmLabel}
+              </Button>
+            }
+          />
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 
 /** InfoList 键值信息块（详情页通用）。 */
 export function InfoList({ items }: { items: { label: ReactNode; value: ReactNode }[] }) {
   return (
-    <Box
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: { xs: '1fr', sm: 'auto 1fr' },
-        columnGap: 2,
-        rowGap: 1,
-        alignItems: 'baseline',
-      }}
-    >
+    <dl className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[auto_1fr] sm:items-baseline">
       {items.map((item, index) => (
-        <Box key={index} sx={{ display: 'contents' }}>
-          <Typography sx={{ fontSize: 13, color: 'text.secondary', whiteSpace: 'nowrap' }}>
-            {item.label}
-          </Typography>
-          <Typography sx={{ fontSize: 13.5, wordBreak: 'break-word' }}>{item.value}</Typography>
-        </Box>
+        <div key={index} className="contents">
+          <dt className="text-[13px] whitespace-nowrap text-muted-foreground">{item.label}</dt>
+          <dd className="text-[13.5px] break-words">{item.value}</dd>
+        </div>
       ))}
-    </Box>
+    </dl>
   )
 }
 
@@ -265,43 +352,39 @@ export function CardBlock({
   title,
   actions,
   children,
-  sx,
+  className,
 }: {
   title?: ReactNode
   actions?: ReactNode
   children: ReactNode
-  sx?: SxProps<Theme>
+  /** 覆盖卡片样式（旧实现叫 sx，改名为 className；旧调用方无 sx 用法）。 */
+  className?: string
+  /** @deprecated 旧 MUI 写法，迁移期接受并忽略。 */
+  sx?: unknown
 }) {
   return (
-    <Card
-      elevation={0}
-      sx={[{ p: 2, mb: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider' }, ...(Array.isArray(sx) ? sx : [sx])]}
-    >
+    <Card className={cn('mb-4 gap-0 p-4', className)}>
       {(title !== undefined || actions !== undefined) && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-          {title !== undefined && (
-            <Typography sx={{ fontSize: 15, fontWeight: 600 }}>{title}</Typography>
-          )}
-          {actions !== undefined && <Box sx={{ ml: 'auto' }}>{actions}</Box>}
-        </Box>
+        <CardHeader className="mb-3 flex-row items-center gap-2 p-0">
+          {title !== undefined && <CardTitle className="text-[15px] font-semibold">{title}</CardTitle>}
+          {actions !== undefined && <div className="ml-auto">{actions}</div>}
+        </CardHeader>
       )}
-      {children}
+      <CardContent className="p-0">{children}</CardContent>
     </Card>
   )
 }
 
 /** MonoText 正文/正则等等宽展示，长文可换行。 */
-export function MonoText({ children }: { children: ReactNode }) {
+export function MonoText({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <Typography
-      component="span"
-      sx={{
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-        fontSize: 12.5,
-        wordBreak: 'break-all',
-      }}
+    <span
+      className={cn(
+        'font-mono text-[12.5px] break-all',
+        className,
+      )}
     >
       {children}
-    </Typography>
+    </span>
   )
 }

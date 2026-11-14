@@ -1,13 +1,49 @@
 // 公开网页（_w）行为测试：申诉验证页渲染处罚依据与失效态；原文查看页
 // 门槛凭据 → 内容；申诉详情页资料渲染。
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { server, startTestServer } from '../test/server'
 import type { AppealData, AppealDossierView, JoinVerifyData, LogRecordView } from './api'
 import { PublicApp } from './PublicApp'
 
 startTestServer()
+
+function mockSystemTheme(initial: 'light' | 'dark') {
+  let dark = initial === 'dark'
+  const listeners = new Set<(event: MediaQueryListEvent) => void>()
+  const media = {
+    get matches() {
+      return dark
+    },
+    media: '(prefers-color-scheme: dark)',
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: (_event: string, listener: (event: MediaQueryListEvent) => void) => {
+      listeners.add(listener)
+    },
+    removeEventListener: (_event: string, listener: (event: MediaQueryListEvent) => void) => {
+      listeners.delete(listener)
+    },
+    dispatchEvent: () => false,
+  }
+  vi.stubGlobal('matchMedia', () => media)
+  return {
+    set(next: 'light' | 'dark') {
+      dark = next === 'dark'
+      for (const listener of listeners) {
+        listener({ matches: dark, media: media.media } as MediaQueryListEvent)
+      }
+    },
+  }
+}
+
+afterEach(() => {
+  localStorage.clear()
+  document.documentElement.classList.remove('dark')
+  vi.unstubAllGlobals()
+})
 
 /** at 设定当前路径：PublicApp 挂载时按 location.pathname 解析路由。 */
 function at(path: string) {
@@ -364,20 +400,6 @@ describe('PublicApp · 申诉验证测试台', () => {
   })
 })
 
-// stubMatchMedia 让 jsdom 里的 useMediaQuery 按查询返回指定匹配。
-function stubMatchMedia(matches: (q: string) => boolean) {
-  window.matchMedia = ((q: string) => ({
-    matches: matches(q),
-    media: q,
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  })) as unknown as typeof window.matchMedia
-}
-
 /** mockAPV 挂上申诉详情的门槛与内容接口。 */
 function mockAPV(view: unknown) {
   server.use(
@@ -391,29 +413,50 @@ function mockAPV(view: unknown) {
 }
 
 describe('PublicApp · 申诉详情响应式列数', () => {
-  const realMatchMedia = window.matchMedia
-  afterEach(() => {
-    window.matchMedia = realMatchMedia
-  })
-
-  it('≥1400px 三列并排', async () => {
-    stubMatchMedia((q) => q.includes('1400') || q.includes('900'))
+  it('栅格用 CSS 断点控制列数（≥900px 两列、≥1400px 三列）', async () => {
     at('/_w/apv/7/sig')
     mockAPV(appealView)
     render(<PublicApp />)
     fireEvent.click(await screen.findByRole('button', { name: '查看内容' }))
-    expect(await screen.findByTestId('appeal-grid-3')).toBeInTheDocument()
-    expect(screen.queryByTestId('appeal-grid-2')).not.toBeInTheDocument()
+
+    // 列数由纯 CSS 断点决定（不再读视口）：断言栅格上挂着两个断点类，
+    // 且三栏都作为网格项存在。
+    const grid = await screen.findByTestId('appeal-grid')
+    expect(grid).toHaveClass('min-[900px]:grid-cols-2')
+    expect(grid).toHaveClass('min-[1400px]:grid-cols-3')
+    expect(screen.getByTestId('appeal-main')).toBeInTheDocument()
+    expect(screen.getByTestId('appeal-profile')).toBeInTheDocument()
+    expect(screen.getByTestId('appeal-activity')).toBeInTheDocument()
+  })
+})
+
+describe('PublicApp · 主题优先级', () => {
+  it('系统主题变化不覆盖用户显式选择', () => {
+    const system = mockSystemTheme('light')
+    localStorage.setItem('menshen-theme', 'dark')
+    at('/_w/nope')
+    render(<PublicApp />)
+
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    act(() => system.set('light'))
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
   })
 
-  it('900–1400px 两列（资料与活动同栏）', async () => {
-    stubMatchMedia((q) => q.includes('900') && !q.includes('1400'))
-    at('/_w/apv/7/sig')
-    mockAPV(appealView)
+  it('回到跟随系统后与当前系统主题保持一致', () => {
+    const system = mockSystemTheme('dark')
+    at('/_w/nope')
     render(<PublicApp />)
-    fireEvent.click(await screen.findByRole('button', { name: '查看内容' }))
-    expect(await screen.findByTestId('appeal-grid-2')).toBeInTheDocument()
-    expect(screen.getByTestId('appeal-two-wrap')).toBeInTheDocument()
-    expect(screen.queryByTestId('appeal-grid-3')).not.toBeInTheDocument()
+
+    const toggle = screen.getByRole('button', { name: '主题：跟随系统' })
+    fireEvent.click(toggle)
+    fireEvent.click(toggle)
+    expect(localStorage.getItem('menshen-theme')).toBe('dark')
+
+    fireEvent.click(toggle)
+    expect(localStorage.getItem('menshen-theme')).toBeNull()
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+
+    act(() => system.set('light'))
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
   })
 })

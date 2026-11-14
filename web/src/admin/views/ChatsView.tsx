@@ -1,27 +1,14 @@
 // 群组列表：搜索、按 bot 过滤、批量启停/演练/处罚、添加群组。
 import { useState } from 'react'
-import {
-  Box,
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Button, Checkbox, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui'
 import { useChatMutation } from '../../api/mutations'
 import { useMiniState } from '../../api/hooks'
 import { filterRows } from '../../lib/filters'
 import { punishLabel, chatURL } from '../../lib/format'
 import { toggleChatSelection } from '../../lib/selection'
 import { chatStatus } from '../../lib/status'
-import { ChatRef, SearchField, useToast } from '../../ui'
+import { ChatRef, SearchField } from '../../components/mobile'
+import { useToast } from '../../components/feedback'
 import { ConfirmButton, DataTable, PageHeader, StatusBadge, Toolbar } from '../components'
 import type { Column } from '../components'
 import { useRunFeedback } from '../feedback'
@@ -29,6 +16,8 @@ import { useAdminNav } from '../nav'
 import type { Chat } from '../../api/types'
 
 const sameChat = (a: Chat, b: Chat) => a.bot_id === b.bot_id && a.chat_id === b.chat_id
+/** ALL_BOTS 是「全部机器人」在下拉里的哨兵值（Base UI Select 用 null 表示未选中，空串会被当成没选）。 */
+const ALL_BOTS = '__all__'
 
 export function ChatsView() {
   const state = useMiniState(true)
@@ -88,10 +77,10 @@ export function ChatsView() {
       width: 48,
       render: (row) => (
         <Checkbox
-          size="small"
           checked={selected.some((c) => sameChat(c, row))}
-          onChange={() => toggle(row)}
+          onCheckedChange={() => toggle(row)}
           onClick={(event) => event.stopPropagation()}
+          aria-label={`选择 ${row.title || row.chat_id}`}
         />
       ),
     })
@@ -138,7 +127,7 @@ export function ChatsView() {
         actions={
           <>
             <Button
-              variant={batch ? 'contained' : 'outlined'}
+              variant={batch ? 'default' : 'outline'}
               onClick={() => {
                 setBatch(!batch)
                 setSelected([])
@@ -146,63 +135,65 @@ export function ChatsView() {
             >
               {batch ? '退出批量' : '批量操作'}
             </Button>
-            <Button variant="contained" onClick={() => setAddOpen(true)}>
-              ＋ 添加群组
-            </Button>
+            <Button onClick={() => setAddOpen(true)}>＋ 添加群组</Button>
           </>
         }
       />
       <Toolbar>
-        <SearchField value={q} onChange={setQ} placeholder="搜索群名 / chat id" sx={{ maxWidth: 320 }} />
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>机器人</InputLabel>
+        <SearchField value={q} onChange={setQ} placeholder="搜索群名 / chat id" className="max-w-[320px]" />
+        <div className="flex min-w-[200px] flex-col gap-1">
+          <Label htmlFor="chats-bot">机器人</Label>
           <Select
-            label="机器人"
-            value={botFilter}
-            onChange={(event) => setBotFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))}
+            value={botFilter === 'all' ? ALL_BOTS : String(botFilter)}
+            onValueChange={(v) => setBotFilter(v === ALL_BOTS ? 'all' : Number(v))}
           >
-            <MenuItem value="all">全部机器人</MenuItem>
-            {bots.map((b) => (
-              <MenuItem key={b.bot_id} value={b.bot_id}>
-                {b.label}
-              </MenuItem>
-            ))}
+            <SelectTrigger id="chats-bot" aria-label="机器人">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_BOTS}>全部机器人</SelectItem>
+              {bots.map((b) => (
+                <SelectItem key={b.bot_id} value={String(b.bot_id)}>
+                  {b.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
-        </FormControl>
+        </div>
       </Toolbar>
 
       {batch && selected.length > 0 && (
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1.5, alignItems: 'center' }}>
-          <Typography sx={{ fontSize: 13 }}>已选 {selected.length} 个：</Typography>
-          <Button size="small" variant="outlined" onClick={() => bulk({ enabled: true }, '已启用')}>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="text-[13px]">已选 {selected.length} 个：</span>
+          <Button size="sm" variant="outline" onClick={() => bulk({ enabled: true }, '已启用')}>
             启用
           </Button>
-          <Button size="small" variant="outlined" onClick={() => bulk({ enabled: false }, '已停用')}>
+          <Button size="sm" variant="outline" onClick={() => bulk({ enabled: false }, '已停用')}>
             停用
           </Button>
-          <Button size="small" variant="outlined" onClick={() => bulk({ dryrun: true }, '已进入演练')}>
+          <Button size="sm" variant="outline" onClick={() => bulk({ dryrun: true }, '已进入演练')}>
             开启演练
           </Button>
-          <Button size="small" variant="outlined" onClick={() => bulk({ dryrun: false }, '已退出演练')}>
+          <Button size="sm" variant="outline" onClick={() => bulk({ dryrun: false }, '已退出演练')}>
             关闭演练
           </Button>
-          <Button size="small" variant="outlined" onClick={() => bulk({ punish: -1 }, '处罚改为跟随机器人')}>
+          <Button size="sm" variant="outline" onClick={() => bulk({ punish: -1 }, '处罚改为跟随机器人')}>
             处罚：跟随
           </Button>
-          <Button size="small" variant="outlined" onClick={() => bulk({ punish: 0 }, '处罚改为禁言')}>
+          <Button size="sm" variant="outline" onClick={() => bulk({ punish: 0 }, '处罚改为禁言')}>
             处罚：禁言
           </Button>
-          <Button size="small" variant="outlined" onClick={() => bulk({ punish: 1 }, '处罚改为封禁')}>
+          <Button size="sm" variant="outline" onClick={() => bulk({ punish: 1 }, '处罚改为封禁')}>
             处罚：封禁
           </Button>
-        </Box>
+        </div>
       )}
 
       <DataTable
         rows={rows}
         rowKey={(row) => `${row.bot_id}:${row.chat_id}`}
         onRowClick={batch ? undefined : (row) => nav.go({ k: 'chat', botId: row.bot_id, chatId: row.chat_id })}
-        empty={<Typography sx={{ fontSize: 13, color: 'text.secondary' }}>没有匹配的群组。</Typography>}
+        empty={<span className="text-[13px] text-muted-foreground">没有匹配的群组。</span>}
         columns={columns}
       />
 
@@ -234,43 +225,55 @@ function AddChatDialog({
   const valid = /^-?\d+$/.test(chatId.trim()) && botId !== 0
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{ fontSize: 17 }}>添加群组</DialogTitle>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}>
       <DialogContent>
-        <Box sx={{ display: 'grid', gap: 2, pt: 0.5 }}>
-          <FormControl size="small" fullWidth>
-            <InputLabel>机器人</InputLabel>
-            <Select label="机器人" value={botId} onChange={(event) => setBotId(Number(event.target.value))}>
-              {bots.map((b) => (
-                <MenuItem key={b.id} value={b.id}>
-                  {b.label}
-                </MenuItem>
-              ))}
+        <DialogHeader>
+          <DialogTitle>添加群组</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="addchat-bot">机器人</Label>
+            <Select value={String(botId)} onValueChange={(v) => setBotId(Number(v))}>
+              <SelectTrigger id="addchat-bot" aria-label="机器人">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {bots.map((b) => (
+                  <SelectItem key={b.id} value={String(b.id)}>
+                    {b.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
-          </FormControl>
-          <TextField
-            label="群组 chat id"
-            value={chatId}
-            onChange={(event) => setChatId(event.target.value)}
-            helperText="群/频道 id，形如 -100…；新加的群默认先进入演练"
-            fullWidth
-          />
-        </Box>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="addchat-chatid">群组 chat id</Label>
+            <Input
+              id="addchat-chatid"
+              value={chatId}
+              onChange={(event) => setChatId(event.target.value)}
+            />
+            <span className="text-[12px] text-muted-foreground">
+              群/频道 id，形如 -100…；新加的群默认先进入演练
+            </span>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            disabled={!valid}
+            onClick={() => {
+              onSubmit(botId, chatId.trim())
+              setChatId('')
+              onClose()
+            }}
+          >
+            添加
+          </Button>
+        </DialogFooter>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>取消</Button>
-        <Button
-          variant="contained"
-          disabled={!valid}
-          onClick={() => {
-            onSubmit(botId, chatId.trim())
-            setChatId('')
-            onClose()
-          }}
-        >
-          添加
-        </Button>
-      </DialogActions>
     </Dialog>
   )
 }

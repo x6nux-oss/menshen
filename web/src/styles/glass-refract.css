@@ -1,0 +1,28 @@
+/*
+ * Layer 3：边缘折射增强。**只在浏览器真的支持 `backdrop-filter: url(#…)` 时生效**
+ * —— 实测 iOS Safari 拿不到（WebKit 长期未实现该形式，见设计文档附录 B.1），
+ * 所以它只能是增强层，不能是基线。
+ *
+ * 用法：在 .glass 元素上加 .glass--refract（显式 opt-in，§4.5：列表与表格不用）。
+ *
+ * ⚠️ 这里**只写标准属性 `backdrop-filter`，不要加 `-webkit-backdrop-filter` 副本**。
+ * 实测（2026-11-05，Chromium 151 / rsbuild 2.3.1）：
+ *   1. lightningcss 见到同值的标准+前缀两条声明时，会**只保留 `-webkit-` 那条**；
+ *   2. 而 Chromium **忽略 `-webkit-backdrop-filter: url(#…)`**（只认标准的 `backdrop-filter`），
+ *      却对 `blur()/saturate()` 这类函数形式两者都认。
+ * 两条合起来 = 折射整条失效（`@supports` 返回 true、选择器匹配、但声明被丢）。
+ * 只留标准属性即可绕开这个 dedupe；Safari 本就不支持该形式、不会进这个 @supports 块。
+ */
+@supports (backdrop-filter: url(#menshen-glass-refract)) {
+  .glass--refract {
+    backdrop-filter: url(#menshen-glass-refract) blur(var(--glass-blur))
+      saturate(var(--glass-saturate));
+  }
+}
+
+/* 与回退 2 一致：降低透明度时连折射也去掉 */
+@media (prefers-reduced-transparency: reduce) {
+  .glass--refract {
+    backdrop-filter: none;
+  }
+}

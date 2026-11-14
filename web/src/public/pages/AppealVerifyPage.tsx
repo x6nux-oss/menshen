@@ -1,13 +1,17 @@
 // 申诉验证页（_w/ap/<id>/<sig>）：展示处罚依据 + Turnstile + 采集浏览器
 // 特征提交，换取解禁码。
-import { Box, Button, CircularProgress, Typography } from '@mui/material'
+//
+// Phase 4：展示层换到新设计系统（Tailwind + components/ui）。
+// **验证链路一字未动** —— collectSignals / postJSON 的调用、回调签名、
+// TurnstileWidget 的 props、resetKey 语义全部保持原样（CSP 与安全边界）。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Button, Spinner } from '../../components/ui'
+import { ChatRef } from '../../components/mobile'
 import { getJSON, postJSON } from '../api'
 import type { AppealData, WebRoute } from '../api'
 import { collectSignals } from '../fingerprint'
 import { errorText, InvalidState } from '../InvalidState'
 import { TurnstileWidget } from '../TurnstileWidget'
-import { ChatRef } from '../../ui'
 
 const LIMIT_LABEL: Record<string, string> = {
   join_profile: '进群资料审核限制',
@@ -17,8 +21,8 @@ const LIMIT_LABEL: Record<string, string> = {
   gban_own: '联合封禁 · 本 bot 名下群组',
 }
 
-const cardSx = { bgcolor: 'background.paper', borderRadius: 2, p: 2, mb: 2 }
-const sectionSx = { fontSize: 15, fontWeight: 700, mb: 1 }
+const CARD_CLASS = 'mb-4 rounded-lg bg-card p-4 text-card-foreground'
+const SECTION_CLASS = 'mb-2 text-[15px] font-bold'
 
 export function AppealVerifyPage({ route }: { route: WebRoute }) {
   const [data, setData] = useState<AppealData | null>(null)
@@ -83,26 +87,16 @@ export function AppealVerifyPage({ route }: { route: WebRoute }) {
   if (error) return <InvalidState message={error} />
   if (!data) return <Placeholder />
   return (
-    <Box data-testid="appeal-verify">
-      <Box
-        sx={{
-          bgcolor: 'warning.main',
-          color: '#000',
-          borderRadius: 2,
-          p: 1.5,
-          mb: 2,
-          fontSize: 13,
-          lineHeight: 1.7,
-        }}
-      >
+    <div data-testid="appeal-verify">
+      <div className="mb-4 rounded-lg bg-warning p-3 text-[13px] leading-[1.7] text-warning-foreground">
         为防止滥用，本页会记录你的 IP 与浏览器特征，仅用于反垃圾审核，保留 {data.days} 天。
-      </Box>
+      </div>
 
       <Section title="为什么被限制">
         {data.limits.length > 0 ? (
-          <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+          <ul className="m-0 pl-5">
             {data.limits.map((l, i) => (
-              <Box component="li" key={i} sx={{ mb: 1.25, fontSize: 14, lineHeight: 1.7 }}>
+              <li key={i} className="mb-2.5 text-sm leading-[1.7]">
                 {LIMIT_LABEL[l.type] ?? l.type}
                 {l.chat_id ? (
                   <>
@@ -115,18 +109,16 @@ export function AppealVerifyPage({ route }: { route: WebRoute }) {
                 {l.time ? ` · ${l.time}` : ''}
                 {l.reason && <Sub>理由：{l.reason}</Sub>}
                 {l.text && <Sub>原消息：{l.text}</Sub>}
-              </Box>
+              </li>
             ))}
-          </Box>
+          </ul>
         ) : (
-          <Typography sx={{ fontSize: 14 }}>
-            本 bot 名下已查不到仍在生效的限制，可能已经解除。
-          </Typography>
+          <p className="text-sm">本 bot 名下已查不到仍在生效的限制，可能已经解除。</p>
         )}
       </Section>
 
       <Section title="账号信息">
-        <Typography sx={{ fontSize: 14 }}>
+        <p className="text-sm">
           用户 ID：<Mono>{data.account.uid}</Mono>
           {data.account.name && (
             <>
@@ -134,7 +126,7 @@ export function AppealVerifyPage({ route }: { route: WebRoute }) {
               判定时的昵称：{data.account.name}
             </>
           )}
-        </Typography>
+        </p>
         <Tip>
           这些是 bot 判定时记下的资料。广告号的昵称、用户名或简介里常写着推广、收益承诺或引流话术，
           即使某条消息看起来无害也会被整体判为广告号——把资料改干净再申诉，通过率会高很多。
@@ -145,9 +137,9 @@ export function AppealVerifyPage({ route }: { route: WebRoute }) {
         {data.messages.length > 0 ? (
           <Messages messages={data.messages} />
         ) : (
-          <Typography sx={{ fontSize: 14 }}>
+          <p className="text-sm">
             没有查到你的发言留底（可能已过保留期，或你还没在本 bot 的群里发过言）。
-          </Typography>
+          </p>
         )}
         <Tip>
           以上是 bot 留底的你的发言，最多显示最近 100 条、每条 300 字；留底保留 {data.days} 天。
@@ -155,20 +147,20 @@ export function AppealVerifyPage({ route }: { route: WebRoute }) {
       </Section>
 
       <Section title="AI 复核结论">
-        <Typography sx={{ fontSize: 14 }}>
+        <p className="text-sm">
           {data.ai.label}
           {data.ai.conf > 0 && `（置信度 ${Math.round(data.ai.conf * 100)}%`}
           {data.ai.conf > 0 && data.ai.model ? ` · ${data.ai.model}）` : data.ai.conf > 0 ? '）' : ''}
           {data.ai.conf <= 0 && data.ai.model ? `（${data.ai.model}）` : ''}
-        </Typography>
+        </p>
         {data.ai.reason && <Sub>{data.ai.reason}</Sub>}
         {data.ai.statement && <Sub>你的申诉理由：{data.ai.statement}</Sub>}
       </Section>
 
       <Section title="人机验证">
-        <Typography sx={{ fontSize: 14, mb: 1.5 }}>
+        <p className="mb-3 text-sm">
           完成下方的人机验证后，会给你一个<b>解禁码</b>，把它交给群管理员即可解除限制。
-        </Typography>
+        </p>
         {data.sitekey ? (
           !result?.ok && (
             <TurnstileWidget
@@ -180,20 +172,20 @@ export function AppealVerifyPage({ route }: { route: WebRoute }) {
             />
           )
         ) : (
-          <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+          <p className="text-[13px] text-muted-foreground">
             本页未配置人机验证，请联系群管理员处理。
-          </Typography>
+          </p>
         )}
-        <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 1 }}>
+        <p className="mt-2 text-[13px] text-muted-foreground">
           验证组件加载不出来时，请用系统浏览器打开本页。
-        </Typography>
+        </p>
         <ResultArea
           submitting={submitting}
           result={result}
           onRetry={result && !result.ok && data.sitekey ? retry : undefined}
         />
       </Section>
-    </Box>
+    </div>
   )
 }
 
@@ -208,45 +200,33 @@ function ResultArea({
 }) {
   if (submitting)
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5 }}>
-        <CircularProgress size={16} />
-        <Typography sx={{ fontSize: 14 }}>正在验证…</Typography>
-      </Box>
+      <div className="mt-3 flex items-center gap-2">
+        <Spinner size={16} />
+        <span className="text-sm">正在验证…</span>
+      </div>
     )
   if (!result) return null
   if (result.ok && result.code)
     return (
-      <Box sx={{ mt: 1.5 }}>
-        <Typography sx={{ fontSize: 14 }}>
+      <div className="mt-3">
+        <p className="text-sm">
           解禁码：
-          <Box
-            component="span"
-            sx={{
-              fontFamily: 'ui-monospace, Menlo, monospace',
-              fontSize: 18,
-              letterSpacing: 1,
-              px: 1,
-              py: 0.5,
-              bgcolor: 'success.main',
-              color: '#fff',
-              borderRadius: 1,
-            }}
-          >
+          <span className="rounded-sm bg-success px-2 py-1 font-mono text-lg tracking-wider text-success-foreground">
             {result.code}
-          </Box>
-        </Typography>
-        <Typography sx={{ fontSize: 14, mt: 0.5 }}>{result.msg}</Typography>
-      </Box>
+          </span>
+        </p>
+        <p className="mt-1 text-sm">{result.msg}</p>
+      </div>
     )
   return (
-    <Box sx={{ mt: 1.5 }}>
-      <Typography sx={{ fontSize: 14, color: 'error.main' }}>{result.msg}</Typography>
+    <div className="mt-3">
+      <p className="text-sm text-destructive">{result.msg}</p>
       {onRetry && (
-        <Button size="small" variant="outlined" sx={{ mt: 1 }} onClick={onRetry}>
+        <Button size="sm" variant="outline" className="mt-2" onClick={onRetry}>
           重试验证
         </Button>
       )}
-    </Box>
+    </div>
   )
 }
 
@@ -264,22 +244,18 @@ function Messages({ messages }: { messages: AppealData['messages'] }) {
   return (
     <>
       {groups.map((g, i) => (
-        <Box key={i} sx={{ mb: 1 }}>
-          <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+        <div key={i} className="mb-2">
+          <p className="text-[13px] text-muted-foreground">
             群 <ChatRef name={g.title} url={g.items[0]?.chat_url} fallback={g.items[0]?.chat_id} />
-          </Typography>
-          <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+          </p>
+          <ul className="m-0 pl-5">
             {g.items.map((m, j) => (
-              <Box
-                component="li"
-                key={j}
-                sx={{ mb: 1, fontSize: 13.5, lineHeight: 1.6, wordBreak: 'break-word' }}
-              >
+              <li key={j} className="mb-2 text-[13.5px] leading-[1.6] break-words">
                 <Mono>{m.time}</Mono> {m.text}
-              </Box>
+              </li>
             ))}
-          </Box>
-        </Box>
+          </ul>
+        </div>
       ))}
     </>
   )
@@ -287,37 +263,29 @@ function Messages({ messages }: { messages: AppealData['messages'] }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <Box sx={cardSx}>
-      <Typography sx={sectionSx}>{title}</Typography>
+    <div className={CARD_CLASS}>
+      <p className={SECTION_CLASS}>{title}</p>
       {children}
-    </Box>
+    </div>
   )
 }
 
 function Sub({ children }: { children: React.ReactNode }) {
-  return (
-    <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.5, wordBreak: 'break-word' }}>
-      {children}
-    </Typography>
-  )
+  return <p className="mt-1 text-[13px] break-words text-muted-foreground">{children}</p>
 }
 
 function Tip({ children }: { children: React.ReactNode }) {
-  return (
-    <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 1, lineHeight: 1.7 }}>
-      {children}
-    </Typography>
-  )
+  return <p className="mt-2 text-[13px] leading-[1.7] text-muted-foreground">{children}</p>
 }
 
 function Mono({ children }: { children: React.ReactNode }) {
-  return <Box component="span" sx={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{children}</Box>
+  return <span className="font-mono">{children}</span>
 }
 
 function Placeholder() {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-      <CircularProgress size={22} />
-    </Box>
+    <div className="flex justify-center py-16">
+      <Spinner size={22} />
+    </div>
   )
 }

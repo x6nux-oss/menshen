@@ -1,13 +1,20 @@
 // 申诉详情页（_w/apv/<id>/<sig>）：资料、留底与申诉处理详情。
 // 桌面端按视口宽度自适应列数：<900 一列、≥900 两列、≥1400 三列。
-import { Box, Button, CircularProgress, Typography, useMediaQuery } from '@mui/material'
+//
+// 列数由纯 CSS 断点决定（`min-[900px]:` / `min-[1400px]:`），不用 JS 读视口：
+// 少一次 matchMedia 订阅，窗口缩放时也不用 React 重渲染。
+// 三栏各包一层 div —— 每栏内部是多张卡片，不包的话它们会各自成为网格项、
+// 被拆到不同列里。
+import type { ReactNode } from 'react'
+import { Button, Spinner } from '../../components/ui'
 import type { AppealDossierView, WebRoute } from '../api'
 import { InvalidState } from '../InvalidState'
 import { useGate } from '../useGate'
-import { ChatRef } from '../../ui'
+import { ChatRef } from '../../components/mobile'
 
-const cardSx = { bgcolor: 'background.paper', borderRadius: 2, p: 2, mb: 2 }
-const titleSx = { fontSize: 15, fontWeight: 700, mb: 1 }
+/** 卡片：与 Phase 3 的 SectionCard 视觉一致，但公开页不需要标题栏。 */
+const CARD = 'mb-4 rounded-lg bg-card p-4'
+const TITLE = 'mb-2 text-[15px] font-bold'
 
 export function AppealViewPage({ route }: { route: WebRoute }) {
   const { gate, view, error, loading, reveal } = useGate<AppealDossierView>(route)
@@ -16,113 +23,86 @@ export function AppealViewPage({ route }: { route: WebRoute }) {
   if (view) return <AppealContent view={view} />
   if (!gate)
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress size={22} />
-      </Box>
+      <div className="flex justify-center py-16">
+        <Spinner size={22} />
+      </div>
     )
   return (
     <>
       <WarnCard text={gate.warn} />
-      <Box sx={cardSx}>
-        <Button variant="contained" disabled={loading} onClick={() => void reveal()}>
+      <div className={CARD}>
+        <Button disabled={loading} onClick={() => void reveal()}>
           {loading ? '正在读取…' : '查看内容'}
         </Button>
-        <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 1 }}>
+        <p className="mt-2 text-[13px] text-muted-foreground">
           链接只对持有者有效；查看凭据 5 分钟内有效。
-        </Typography>
-      </Box>
+        </p>
+      </div>
     </>
   )
 }
 
 function AppealContent({ view }: { view: AppealDossierView }) {
-  // 桌面端按宽度自适应：手机一列；≥900px 主栏 + 资料/活动两列；
-  // ≥1400px 主栏 + 资料栏 + 活动栏三列并排（卡片分组见 SideProfile /
-  // SideActivity），避免宽屏下正文被拉成一条细长列。
-  const three = useMediaQuery('(min-width: 1400px)')
-  const two = useMediaQuery('(min-width: 900px)')
+  // 手机一列；≥900px 主栏 + 资料/活动两列；≥1400px 主栏 + 资料栏 + 活动栏三列。
+  // 两列时主栏跨两行，资料与活动同处右栏 —— 避免宽屏下正文被拉成一条细长列。
   return (
-    <Box data-testid="appeal-view">
+    <div data-testid="appeal-view">
       <WarnCard text="敏感内容，请勿转发。以下为账号资料、留底与申诉处理详情。" />
-      {three ? (
-        <Box
-          data-testid="appeal-grid-3"
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 2,
-            alignItems: 'start',
-          }}
+      <div
+        data-testid="appeal-grid"
+        className="grid grid-cols-1 items-start gap-4 min-[900px]:grid-cols-2 min-[1400px]:grid-cols-3"
+      >
+        <div
+          data-testid="appeal-main"
+          className="min-w-0 min-[900px]:row-span-2 min-[1400px]:row-span-1"
         >
           <MainColumn view={view} />
+        </div>
+        <div data-testid="appeal-profile" className="min-w-0">
           <SideProfile view={view} />
+        </div>
+        <div data-testid="appeal-activity" className="min-w-0">
           <SideActivity view={view} />
-        </Box>
-      ) : two ? (
-        <Box
-          data-testid="appeal-grid-2"
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1.1fr) minmax(340px, 1fr)',
-            gap: 2,
-            alignItems: 'start',
-          }}
-        >
-          <MainColumn view={view} />
-          <Box data-testid="appeal-two-wrap" sx={{ minWidth: 0 }}>
-            <SideProfile view={view} />
-            <SideActivity view={view} />
-          </Box>
-        </Box>
-      ) : (
-        <>
-          <MainColumn view={view} />
-          <SideProfile view={view} />
-          <SideActivity view={view} />
-        </>
-      )}
-    </Box>
+        </div>
+      </div>
+    </div>
   )
 }
 
 function MainColumn({ view }: { view: AppealDossierView }) {
   return (
     <>
-      <Box sx={cardSx}>
-        <Typography sx={{ fontSize: 13.5, lineHeight: 1.9 }}>
+      <div className={CARD}>
+        <p className="text-[13.5px] leading-[1.9]">
           申诉单：<Mono>#{view.id}</Mono> ｜ 状态：{view.status}
           <br />
           申诉人：<Mono>{view.uid}</Mono>
           {view.u_name && `（${view.u_name}）`} ｜ 提交时间：{view.created}
           <br />
           申诉理由：{view.statement || '（未填写）'}
-        </Typography>
-      </Box>
-      <Box sx={cardSx}>
-        <Typography sx={titleSx}>AI 复核</Typography>
-        <Typography sx={{ fontSize: 13.5, lineHeight: 1.9 }}>
+        </p>
+      </div>
+      <div className={CARD}>
+        <p className={TITLE}>AI 复核</p>
+        <p className="text-[13.5px] leading-[1.9]">
           {view.ai_result || '（无结论）'}
           {view.ai_model && ` ｜ 模型 `}
           {view.ai_model && <Mono>{view.ai_model}</Mono>}
           {view.ai_conf > 0 && ` ｜ 置信度 ${Math.round(view.ai_conf)}%`}
-        </Typography>
+        </p>
         {view.ai_reason && (
-          <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.5 }}>
-            理由：{view.ai_reason}
-          </Typography>
+          <p className="mt-1 text-[13px] text-muted-foreground">理由：{view.ai_reason}</p>
         )}
-        <Typography sx={{ ...titleSx, mt: 2 }}>网页验证</Typography>
-        <Typography sx={{ fontSize: 13.5 }}>尝试次数：{view.web_attempts}</Typography>
+        <p className={`${TITLE} mt-4`}>网页验证</p>
+        <p className="text-[13.5px]">尝试次数：{view.web_attempts}</p>
         {view.code && (
-          <Typography sx={{ fontSize: 13.5, mt: 0.5 }}>
+          <p className="mt-1 text-[13.5px]">
             解禁码：<Mono>{view.code}</Mono>
             {view.code_expires && `（有效期至 ${view.code_expires}）`}
-          </Typography>
+          </p>
         )}
-        <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.5 }}>
-          验证与发言记录见资料栏。
-        </Typography>
-      </Box>
+        <p className="mt-1 text-[13px] text-muted-foreground">验证与发言记录见资料栏。</p>
+      </div>
     </>
   )
 }
@@ -135,9 +115,9 @@ function SideProfile({ view }: { view: AppealDossierView }) {
   const penalties = view.penalties ?? []
   return (
     <>
-      <Box sx={cardSx}>
-        <Typography sx={titleSx}>账号信息</Typography>
-        <Typography sx={{ fontSize: 13.5, lineHeight: 1.9 }}>
+      <div className={CARD}>
+        <p className={TITLE}>账号信息</p>
+        <p className="text-[13.5px] leading-[1.9]">
           用户 ID：<Mono>{view.uid}</Mono>
           {view.u_name && (
             <>
@@ -177,8 +157,8 @@ function SideProfile({ view }: { view: AppealDossierView }) {
           )}
           <br />
           生效中限制：{limits.length} 条
-        </Typography>
-      </Box>
+        </p>
+      </div>
 
       <PenaltyList title="当前生效限制" items={limits} active />
       <PenaltyList title={`历史处罚（${penalties.length} 条）`} items={penalties} />
@@ -197,23 +177,23 @@ function SideActivity({ view }: { view: AppealDossierView }) {
   return (
     <>
       {history.length > 0 && (
-        <Box sx={cardSx}>
-          <Typography sx={titleSx}>群内留底发言（最近 {view.history_count} 条）</Typography>
+        <div className={CARD}>
+          <p className={TITLE}>群内留底发言（最近 {view.history_count} 条）</p>
           <HistoryList items={history} />
           {historyMore.length > 0 && (
-            <Box component="details" sx={{ mt: 1 }}>
-              <summary style={{ cursor: 'pointer', fontSize: 13 }}>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-[13px]">
                 展开其余 {historyMore.length} 条
               </summary>
               <HistoryList items={historyMore} />
-            </Box>
+            </details>
           )}
-        </Box>
+        </div>
       )}
 
       {logs.length > 0 && (
-        <Box sx={cardSx}>
-          <Typography sx={titleSx}>判定流水（{logs.length} 条）</Typography>
+        <div className={CARD}>
+          <p className={TITLE}>判定流水（{logs.length} 条）</p>
           <List>
             {logs.map((l) => (
               <li key={l.id}>
@@ -224,12 +204,12 @@ function SideActivity({ view }: { view: AppealDossierView }) {
               </li>
             ))}
           </List>
-        </Box>
+        </div>
       )}
 
       {checks.length > 0 && (
-        <Box sx={cardSx}>
-          <Typography sx={titleSx}>网页验证记录（{checks.length} 条）</Typography>
+        <div className={CARD}>
+          <p className={TITLE}>网页验证记录（{checks.length} 条）</p>
           <List>
             {checks.map((c, i) => (
               <li key={i}>
@@ -250,29 +230,27 @@ function SideActivity({ view }: { view: AppealDossierView }) {
               </li>
             ))}
           </List>
-        </Box>
+        </div>
       )}
 
       {(strong.length > 0 || weak.length > 0) && (
-        <Box sx={cardSx}>
-          <Typography sx={titleSx}>关联账号</Typography>
+        <div className={CARD}>
+          <p className={TITLE}>关联账号</p>
           {strong.length > 0 && (
             <>
-              <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.5 }}>
-                强关联（同指纹）
-              </Typography>
+              <p className="mt-1 text-[13px] text-muted-foreground">强关联（同指纹）</p>
               <Related items={strong} />
             </>
           )}
           {weak.length > 0 && (
             <>
-              <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.5 }}>
+              <p className="mt-1 text-[13px] text-muted-foreground">
                 弱关联（30 天内同 IP，仅供参考）
-              </Typography>
+              </p>
               <Related items={weak} />
             </>
           )}
-        </Box>
+        </div>
       )}
     </>
   )
@@ -289,8 +267,8 @@ function PenaltyList({
 }) {
   if (items.length === 0) return null
   return (
-    <Box sx={cardSx}>
-      <Typography sx={titleSx}>{title}</Typography>
+    <div className={CARD}>
+      <p className={TITLE}>{title}</p>
       <List>
         {items.map((p, i) => (
           <li key={i}>
@@ -308,7 +286,7 @@ function PenaltyList({
           </li>
         ))}
       </List>
-    </Box>
+    </div>
   )
 }
 
@@ -316,15 +294,15 @@ function HistoryList({ items }: { items: NonNullable<AppealDossierView['history'
   return (
     <List>
       {items.map((h, i) => (
-        <li key={i} style={h.blocked ? { background: 'rgba(250,81,81,0.08)', borderRadius: 4 } : undefined}>
+        <li key={i} className={h.blocked ? 'rounded bg-destructive/8' : undefined}>
           <Mono>{h.time}</Mono>
           {h.chat && (
-            <span style={{ color: '#888' }}>
+            <span className="text-muted-foreground">
               {' '}
               <ChatRef name={h.chat} url={h.chat_url} />
             </span>
           )}
-          <div style={{ wordBreak: 'break-word' }}>
+          <div className="break-words">
             {h.text}
             {h.mark && <b> ← {h.mark}</b>}
           </div>
@@ -346,50 +324,34 @@ function Related({ items }: { items: NonNullable<AppealDossierView['strong']> })
   )
 }
 
-function List({ children }: { children: React.ReactNode }) {
-  return <Box component="ul" sx={{ m: 0, pl: 2.5, '& li': { fontSize: 13.5, mb: 1 } }}>{children}</Box>
+function List({ children }: { children: ReactNode }) {
+  return <ul className="m-0 pl-5 text-[13.5px] [&>li]:mb-2">{children}</ul>
 }
 
-function Sub({ children }: { children: React.ReactNode }) {
-  return <Typography sx={{ fontSize: 12.5, color: 'text.secondary', mt: 0.25 }}>{children}</Typography>
+function Sub({ children }: { children: ReactNode }) {
+  return <p className="mt-0.5 text-[12.5px] text-muted-foreground">{children}</p>
 }
 
-function Badge({ children, active }: { children: React.ReactNode; active?: boolean }) {
+function Badge({ children, active }: { children: ReactNode; active?: boolean }) {
   return (
-    <Box
-      component="span"
-      sx={{
-        display: 'inline-block',
-        fontSize: 11,
-        px: 0.75,
-        borderRadius: 1,
-        bgcolor: active ? 'error.light' : 'action.selected',
-        verticalAlign: '1px',
-      }}
+    <span
+      className={`inline-block rounded-sm px-1.5 align-[1px] text-[11px] ${
+        active ? 'bg-destructive/15 text-destructive' : 'bg-muted text-muted-foreground'
+      }`}
     >
       {children}
-    </Box>
+    </span>
   )
 }
 
 function WarnCard({ text }: { text: string }) {
   return (
-    <Box
-      sx={{
-        bgcolor: 'warning.main',
-        color: '#000',
-        borderRadius: 2,
-        p: 1.5,
-        mb: 2,
-        fontSize: 13,
-        lineHeight: 1.7,
-      }}
-    >
+    <div className="mb-4 rounded-lg bg-warning p-3 text-[13px] leading-[1.7] text-warning-foreground">
       {text}
-    </Box>
+    </div>
   )
 }
 
-function Mono({ children }: { children: React.ReactNode }) {
-  return <Box component="span" sx={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{children}</Box>
+function Mono({ children }: { children: ReactNode }) {
+  return <span className="font-mono">{children}</span>
 }

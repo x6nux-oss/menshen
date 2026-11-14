@@ -9,7 +9,7 @@
   <body>
     <div id="root"></div>
     <!-- 桌面端管理面板的独立入口：不加载 Telegram SDK，鉴权走会话 cookie。
-         产物由 Go 在 /admin 下托管（internal/panel/admin_panel.go）。 -->
-    <script type="module" src="/src/admin/main.tsx"></script>
+         产物由 Go 在 /admin 下托管（internal/panel/admin_panel.go）。
+         入口脚本由 rsbuild 注入，此处不再手写。 -->
   </body>
 </html>

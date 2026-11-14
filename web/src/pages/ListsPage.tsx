@@ -4,8 +4,7 @@
 // - 四处本地搜索（白名单 / 资料放行 / 全局组 / 专属组）全部受控：输入即时过滤，
 //   不整页重建、焦点不丢。
 // - 顶部新增按钮按当前分段打开抽屉：白名单 / 全局组 / 专属组 / 管理员。
-import Add from '@mui/icons-material/Add'
-import { Box, Button, Fab, MenuItem, TextField, Typography } from '@mui/material'
+import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { errorStatus } from '../api/client'
 import { useMiniState } from '../api/hooks'
@@ -17,23 +16,25 @@ import {
   useWhitelistMutation,
 } from '../api/mutations'
 import type { AdminRow, Bot, Chat, GbanRow, ProfileOKRow, State, WhiteRow } from '../api/types'
-import { filterRows, gbanKey, profileOKKey, whiteKey } from '../lib/filters'
-import { displayTz, fmtTS, meLabel, whiteSourceLabel } from '../lib/format'
-import { usePageParam } from '../nav'
+import { ErrorState, Skeletons, useToast } from '../components/feedback'
 import {
-  Badge,
   ChatRef,
-  ErrorState,
   FormDrawer,
   ListRow,
   SearchField,
   SectionCard,
   Segmented,
-  Skeletons,
   SwitchRow,
   useConfirm,
-  useToast,
-} from '../ui'
+} from '../components/mobile'
+import { Badge } from '../components/ui'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import { filterRows, gbanKey, profileOKKey, whiteKey } from '../lib/filters'
+import { displayTz, fmtTS, meLabel, whiteSourceLabel } from '../lib/format'
+import { usePageParam } from '../nav'
 
 const MAIN_SECTIONS = ['white', 'profile', 'gban', 'admins'] as const
 type MainSection = (typeof MAIN_SECTIONS)[number]
@@ -69,6 +70,30 @@ function ownChats(state: State): Chat[] {
     state.bots.filter((b) => b.owner_id === state.me.uid).map((b) => b.bot_id),
   )
   return state.chats.filter((c) => owned.has(c.bot_id))
+}
+
+/** SearchCount 搜索框下方那行 `共 N 人` / `匹配 M / 共 N 人`。 */
+function SearchCount({ shown, total }: { shown: number; total: number }) {
+  return <p className="mt-1.5 px-1 text-[12px] text-muted-foreground">{countText(shown, total)}</p>
+}
+
+/** Hint 是卡片内的一段说明文字。 */
+function Hint({ children }: { children: React.ReactNode }) {
+  return <p className="px-4 pt-3 text-[13px] leading-[1.6] text-muted-foreground">{children}</p>
+}
+
+/** EmptyLine 是列表为空时的一行灰字。 */
+function EmptyLine({ children }: { children: React.ReactNode }) {
+  return <p className="px-4 pb-3 text-[13px] text-muted-foreground">{children}</p>
+}
+
+/** FieldLabel 抽屉里的字段标签（与 Input/Select 用 id 关联）。 */
+function FieldLabel({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
+  return (
+    <Label htmlFor={htmlFor} className="mt-3 mb-1 block first:mt-0">
+      {children}
+    </Label>
+  )
 }
 
 export function ListsPage({ section }: { section?: string }) {
@@ -344,47 +369,46 @@ export function ListsPage({ section }: { section?: string }) {
   const showAdd = activeSeg !== 'profile'
 
   return (
-    <Box data-testid="lists-page" sx={{ pb: showAdd ? 'calc(72px + env(safe-area-inset-bottom))' : 0 }}>
+    <div
+      data-testid="lists-page"
+      // 悬浮新增按钮压在内容上，给它留出可滚到的底部空间。
+      style={{
+        paddingBottom: showAdd ? 'calc(72px + env(safe-area-inset-bottom))' : undefined,
+      }}
+    >
       <Segmented
         value={activeSeg}
         onChange={(next) => setSeg(next as MainSection)}
         options={segOptions}
         ariaLabel="名单分段"
-        sx={{ mb: 1, flexWrap: 'wrap' }}
+        className="mb-2"
       />
 
       {showAdd && (
-        <Fab
-          size="medium"
-          color="primary"
+        // ListsPage 是二级页，TabBar 在这时不渲染：贴着底部安全区放。
+        <button
+          type="button"
           aria-label="新增"
           onClick={openAdd}
-          sx={{
-            position: 'fixed',
-            right: 16,
-            // ListsPage 是二级页，TabBar 在这时不渲染：贴着底部安全区放。
-            bottom: 'calc(16px + env(safe-area-inset-bottom))',
-            zIndex: (theme) => theme.zIndex.appBar,
-          }}
+          className="fixed right-4 z-20 grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2"
+          style={{ bottom: 'calc(16px + env(safe-area-inset-bottom))' }}
         >
-          <Add />
-        </Fab>
+          <Plus className="size-6" aria-hidden />
+        </button>
       )}
 
       {activeSeg === 'white' && (
         <>
           <SectionCard title="白名单">
-            <Box sx={{ p: 1.5, pb: 1 }}>
+            <div className="px-3 pt-3 pb-2">
               <SearchField
                 value={whiteQ}
                 onChange={setWhiteQ}
                 placeholder="搜索 user_id / 来源 / 群号"
                 ariaLabel="搜索白名单"
               />
-              <Typography sx={{ mt: 0.75, px: 0.5, fontSize: 12, color: 'text.secondary' }}>
-                {countText(whiteRows.length, whitelist.length)}
-              </Typography>
-            </Box>
+              <SearchCount shown={whiteRows.length} total={whitelist.length} />
+            </div>
             {whiteRows.map((w) => (
               <ListRow
                 key={`${w.bot_id}:${w.chat_id}:${w.user_id}`}
@@ -398,30 +422,24 @@ export function ListsPage({ section }: { section?: string }) {
                 }`}
                 trailing={
                   <Button
-                    size="small"
-                    color="error"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 px-2 text-destructive hover:bg-destructive/10"
                     disabled={whiteMut.isPending}
                     onClick={() => removeWhite(w)}
-                    sx={{ minWidth: 0 }}
                   >
                     移除
                   </Button>
                 }
               />
             ))}
-            {whiteRows.length === 0 && (
-              <Typography sx={{ px: 2, pb: 1.5, fontSize: 13, color: 'text.secondary' }}>
-                没有匹配的白名单
-              </Typography>
-            )}
+            {whiteRows.length === 0 && <EmptyLine>没有匹配的白名单</EmptyLine>}
           </SectionCard>
 
           <SectionCard title="默认豁免（内置，无需配置）">
-            <Box sx={{ px: 2, pt: 1.5 }}>
-              <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
-                下面这些人的消息不送检、不处置。它们不在上面的白名单表里，是判定前的内置放行：
-              </Typography>
-            </Box>
+            <Hint>
+              下面这些人的消息不送检、不处置。它们不在上面的白名单表里，是判定前的内置放行：
+            </Hint>
             <ListRow primary="主管理员（你）" value={meLabel(data.me)} />
             {bots
               .filter((b) => b.owner_id)
@@ -442,35 +460,31 @@ export function ListsPage({ section }: { section?: string }) {
             />
             <ListRow primary="有管理员权限的 bot" badge={<Badge tone="ok">默认不判</Badge>} />
             <ListRow primary="普通 bot（工具 bot）" badge={<Badge>默认照判</Badge>} />
-            <Box sx={{ px: 2, pb: 1.5 }}>
-              <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.7 }}>
+            <div className="px-4 pb-3">
+              <p className="text-[12px] leading-[1.7] text-muted-foreground">
                 群主/管理员向 Telegram 实时查询，结果缓存 10 分钟。工具 bot
                 默认与普通成员一样送检；要全豁免可在机器人详情页关闭「判定普通成员 bot」。
-              </Typography>
-            </Box>
+              </p>
+            </div>
           </SectionCard>
         </>
       )}
 
       {activeSeg === 'profile' && (
         <SectionCard title="资料放行（复判确认）">
-          <Box sx={{ px: 2, pt: 1.5 }}>
-            <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
-              这些人的账号资料被复判判定「不构成广告」，到期前不再因资料被删；改过资料或到期后自动失效。
-              正文与链接内容照常判定。
-            </Typography>
-          </Box>
-          <Box sx={{ p: 1.5, pb: 1 }}>
+          <Hint>
+            这些人的账号资料被复判判定「不构成广告」，到期前不再因资料被删；改过资料或到期后自动失效。
+            正文与链接内容照常判定。
+          </Hint>
+          <div className="px-3 pt-3 pb-2">
             <SearchField
               value={profileQ}
               onChange={setProfileQ}
               placeholder="搜索 user_id / 机器人 / 原因"
               ariaLabel="搜索资料放行"
             />
-            <Typography sx={{ mt: 0.75, px: 0.5, fontSize: 12, color: 'text.secondary' }}>
-              {countText(profileRows.length, profileOK.length)}
-            </Typography>
-          </Box>
+            <SearchCount shown={profileRows.length} total={profileOK.length} />
+          </div>
           {profileRows.map((p) => (
             <ListRow
               key={`${p.bot_id}:${p.user_id}`}
@@ -478,11 +492,11 @@ export function ListsPage({ section }: { section?: string }) {
               secondary={`${p.hours} 小时 · 到 ${fmtTS(p.expires_at, tz)}`}
               trailing={
                 <Button
-                  size="small"
-                  color="error"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 px-2 text-destructive hover:bg-destructive/10"
                   disabled={whiteMut.isPending}
                   onClick={() => revokeProfile(p)}
-                  sx={{ minWidth: 0 }}
                 >
                   撤销
                 </Button>
@@ -490,9 +504,9 @@ export function ListsPage({ section }: { section?: string }) {
             />
           ))}
           {profileRows.length === 0 && (
-            <Typography sx={{ px: 2, pb: 1.5, fontSize: 13, color: 'text.secondary' }}>
+            <EmptyLine>
               {profileOK.length === 0 ? '（没有放行中的资料）' : '没有资料放行'}
-            </Typography>
+            </EmptyLine>
           )}
         </SectionCard>
       )}
@@ -507,27 +521,23 @@ export function ListsPage({ section }: { section?: string }) {
               { value: 'own', label: '我的专属组' },
             ]}
             ariaLabel="联封分组"
-            sx={{ mb: 1.5 }}
+            className="mb-3"
           />
 
           {gbanSub === 'global' ? (
             <SectionCard title="全局联合封禁组">
-              <Box sx={{ px: 2, pt: 1.5 }}>
-                <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
-                  所有管理员共同维护；只有加入全局组的 bot 会执行（机器人详情页里选）。
-                </Typography>
-              </Box>
-              <Box sx={{ p: 1.5, pb: 1 }}>
+              <Hint>
+                所有管理员共同维护；只有加入全局组的 bot 会执行（机器人详情页里选）。
+              </Hint>
+              <div className="px-3 pt-3 pb-2">
                 <SearchField
                   value={gbanQ}
                   onChange={setGbanQ}
                   placeholder="搜索 user_id / 原因"
                   ariaLabel="搜索全局组"
                 />
-                <Typography sx={{ mt: 0.75, px: 0.5, fontSize: 12, color: 'text.secondary' }}>
-                  {countText(gbanRows.length, gban.length)}
-                </Typography>
-              </Box>
+                <SearchCount shown={gbanRows.length} total={gban.length} />
+              </div>
               {gbanRows.map((g) => (
                 <ListRow
                   key={g.user_id}
@@ -535,11 +545,11 @@ export function ListsPage({ section }: { section?: string }) {
                   secondary={g.created_at ? `加入 ${fmtTS(g.created_at, tz)}` : undefined}
                   trailing={
                     <Button
-                      size="small"
-                      color="error"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2 text-destructive hover:bg-destructive/10"
                       disabled={gbanMut.isPending}
                       onClick={() => void removeGban(g)}
-                      sx={{ minWidth: 0 }}
                     >
                       解除
                     </Button>
@@ -547,9 +557,9 @@ export function ListsPage({ section }: { section?: string }) {
                 />
               ))}
               {gbanRows.length === 0 && (
-                <Typography sx={{ px: 2, pb: 1.5, fontSize: 13, color: 'text.secondary' }}>
+                <EmptyLine>
                   {gban.length === 0 ? '（名单为空）' : '没有匹配的名单条目'}
-                </Typography>
+                </EmptyLine>
               )}
             </SectionCard>
           ) : (
@@ -562,15 +572,9 @@ export function ListsPage({ section }: { section?: string }) {
                   disabled={ownMut.isPending}
                   onChange={toggleOwnEnabled}
                 />
-                <Box sx={{ px: 2, pt: 1 }}>
-                  <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
-                    生效群（点开关圈定）
-                  </Typography>
-                </Box>
+                <p className="px-4 pt-2 text-[13px] text-muted-foreground">生效群（点开关圈定）</p>
                 {ownedChats.length === 0 ? (
-                  <Typography sx={{ px: 2, pb: 1.5, fontSize: 13, color: 'text.secondary' }}>
-                    （名下 bot 还没有群）
-                  </Typography>
+                  <EmptyLine>（名下 bot 还没有群）</EmptyLine>
                 ) : (
                   ownedChats.map((c) => (
                     <SwitchRow
@@ -587,28 +591,26 @@ export function ListsPage({ section }: { section?: string }) {
               </SectionCard>
 
               <SectionCard title="封禁名单">
-                <Box sx={{ p: 1.5, pb: 1 }}>
+                <div className="px-3 pt-3 pb-2">
                   <SearchField
                     value={ownQ}
                     onChange={setOwnQ}
                     placeholder="搜索 user_id / 原因"
                     ariaLabel="搜索专属组"
                   />
-                  <Typography sx={{ mt: 0.75, px: 0.5, fontSize: 12, color: 'text.secondary' }}>
-                    {countText(ownRows.length, gbanOwn.bans.length)}
-                  </Typography>
-                </Box>
+                  <SearchCount shown={ownRows.length} total={gbanOwn.bans.length} />
+                </div>
                 {ownRows.map((g) => (
                   <ListRow
                     key={g.user_id}
                     primary={`${g.user_id} · ${g.reason || '（无原因）'}`}
                     trailing={
                       <Button
-                        size="small"
-                        color="error"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2 text-destructive hover:bg-destructive/10"
                         disabled={ownListMut.isPending}
                         onClick={() => removeOwn(g)}
-                        sx={{ minWidth: 0 }}
                       >
                         移除
                       </Button>
@@ -616,9 +618,9 @@ export function ListsPage({ section }: { section?: string }) {
                   />
                 ))}
                 {ownRows.length === 0 && (
-                  <Typography sx={{ px: 2, pb: 1.5, fontSize: 13, color: 'text.secondary' }}>
+                  <EmptyLine>
                     {gbanOwn.bans.length === 0 ? '（名单为空）' : '没有匹配的名单条目'}
-                  </Typography>
+                  </EmptyLine>
                 )}
               </SectionCard>
             </>
@@ -628,15 +630,11 @@ export function ListsPage({ section }: { section?: string }) {
 
       {activeSeg === 'admins' && (
         <SectionCard title="次级管理员">
-          <Box sx={{ px: 2, pt: 1.5 }}>
-            <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
-              次级管理员能管理自己名下的机器人、群组与联封名单，看不到白名单、资料放行、上游、模型与全局设置。
-            </Typography>
-          </Box>
+          <Hint>
+            次级管理员能管理自己名下的机器人、群组与联封名单，看不到白名单、资料放行、上游、模型与全局设置。
+          </Hint>
           {admins !== undefined && admins.length === 0 && (
-            <Typography sx={{ px: 2, pb: 1.5, fontSize: 13, color: 'text.secondary' }}>
-              （还没有次级管理员）
-            </Typography>
+            <EmptyLine>（还没有次级管理员）</EmptyLine>
           )}
           {(admins ?? []).map((a) => (
             <ListRow
@@ -645,11 +643,11 @@ export function ListsPage({ section }: { section?: string }) {
               secondary={a.note || '（无备注）'}
               trailing={
                 <Button
-                  size="small"
-                  color="error"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 px-2 text-destructive hover:bg-destructive/10"
                   disabled={adminMut.isPending}
                   onClick={() => void removeAdmin(a)}
-                  sx={{ minWidth: 0 }}
                 >
                   移除
                 </Button>
@@ -668,50 +666,46 @@ export function ListsPage({ section }: { section?: string }) {
         submitDisabled={whiteBot === 0 || whiteUID.trim() === ''}
         onSubmit={submitWhite}
       >
-        <TextField
-          select
-          fullWidth
-          size="small"
-          label="机器人"
-          value={String(whiteBot)}
-          onChange={(event) => setWhiteBot(Number(event.target.value))}
-        >
-          {bots.map((b) => (
-            <MenuItem key={b.bot_id} value={String(b.bot_id)}>
-              {b.label} · {b.bot_id}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          fullWidth
-          size="small"
-          label="user_id"
+        <Label htmlFor="white-bot" className="mb-1 block">
+          机器人
+        </Label>
+        <Select value={String(whiteBot)} onValueChange={(value) => setWhiteBot(Number(value))}>
+          {/* Base UI 的 Trigger 是 role=combobox，htmlFor 对它不生效，必须补 aria-label。 */}
+          <SelectTrigger id="white-bot" aria-label="机器人">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {bots.map((b) => (
+              <SelectItem key={b.bot_id} value={String(b.bot_id)}>
+                {b.label} · {b.bot_id}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <FieldLabel htmlFor="white-uid">user_id</FieldLabel>
+        <Input
+          id="white-uid"
+          inputMode="numeric"
           value={whiteUID}
           onChange={(event) => setWhiteUID(event.target.value)}
-          slotProps={{ htmlInput: { inputMode: 'numeric' } }}
-          sx={{ mt: 1.5 }}
         />
-        <TextField
-          fullWidth
-          size="small"
-          label="chat_id（0 = 该 bot 所有群）"
+        <FieldLabel htmlFor="white-chat">chat_id（0 = 该 bot 所有群）</FieldLabel>
+        <Input
+          id="white-chat"
+          inputMode="numeric"
           value={whiteChat}
           onChange={(event) => setWhiteChat(event.target.value)}
-          slotProps={{ htmlInput: { inputMode: 'numeric' } }}
-          sx={{ mt: 1.5 }}
         />
-        <TextField
-          fullWidth
-          size="small"
-          label="小时（留空 = 永久）"
+        <FieldLabel htmlFor="white-hours">小时（留空 = 永久）</FieldLabel>
+        <Input
+          id="white-hours"
+          inputMode="numeric"
           value={whiteHours}
           onChange={(event) => setWhiteHours(event.target.value)}
-          slotProps={{ htmlInput: { inputMode: 'numeric' } }}
-          sx={{ mt: 1.5 }}
         />
-        <Typography sx={{ mt: 1, fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
+        <p className="mt-2 text-[13px] leading-[1.6] text-muted-foreground">
           白名单只免判定，不会自动撤销已经执行的处罚。
-        </Typography>
+        </p>
       </FormDrawer>
 
       <FormDrawer
@@ -723,25 +717,22 @@ export function ListsPage({ section }: { section?: string }) {
         submitDisabled={gbanUID.trim() === ''}
         onSubmit={submitGban}
       >
-        <TextField
-          fullWidth
-          size="small"
-          label="user_id"
+        <FieldLabel htmlFor="gban-uid">user_id</FieldLabel>
+        <Input
+          id="gban-uid"
+          inputMode="numeric"
           value={gbanUID}
           onChange={(event) => setGbanUID(event.target.value)}
-          slotProps={{ htmlInput: { inputMode: 'numeric' } }}
         />
-        <TextField
-          fullWidth
-          size="small"
-          label="原因（可留空）"
+        <FieldLabel htmlFor="gban-reason">原因（可留空）</FieldLabel>
+        <Input
+          id="gban-reason"
           value={gbanReason}
           onChange={(event) => setGbanReason(event.target.value)}
-          sx={{ mt: 1.5 }}
         />
-        <Typography sx={{ mt: 1, fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
+        <p className="mt-2 text-[13px] leading-[1.6] text-muted-foreground">
           手工加入与判定命中同待遇：名单内的用户会被全局组覆盖范围内执行封禁。
-        </Typography>
+        </p>
       </FormDrawer>
 
       <FormDrawer
@@ -753,21 +744,18 @@ export function ListsPage({ section }: { section?: string }) {
         submitDisabled={ownUID.trim() === ''}
         onSubmit={submitOwn}
       >
-        <TextField
-          fullWidth
-          size="small"
-          label="user_id"
+        <FieldLabel htmlFor="own-uid">user_id</FieldLabel>
+        <Input
+          id="own-uid"
+          inputMode="numeric"
           value={ownUID}
           onChange={(event) => setOwnUID(event.target.value)}
-          slotProps={{ htmlInput: { inputMode: 'numeric' } }}
         />
-        <TextField
-          fullWidth
-          size="small"
-          label="原因（可留空）"
+        <FieldLabel htmlFor="own-reason">原因（可留空）</FieldLabel>
+        <Input
+          id="own-reason"
           value={ownReason}
           onChange={(event) => setOwnReason(event.target.value)}
-          sx={{ mt: 1.5 }}
         />
       </FormDrawer>
 
@@ -780,23 +768,20 @@ export function ListsPage({ section }: { section?: string }) {
         submitDisabled={adminUID.trim() === ''}
         onSubmit={submitAdmin}
       >
-        <TextField
-          fullWidth
-          size="small"
-          label="user_id"
+        <FieldLabel htmlFor="admin-uid">user_id</FieldLabel>
+        <Input
+          id="admin-uid"
+          inputMode="numeric"
           value={adminUID}
           onChange={(event) => setAdminUID(event.target.value)}
-          slotProps={{ htmlInput: { inputMode: 'numeric' } }}
         />
-        <TextField
-          fullWidth
-          size="small"
-          label="备注（可留空）"
+        <FieldLabel htmlFor="admin-note">备注（可留空）</FieldLabel>
+        <Input
+          id="admin-note"
           value={adminNote}
           onChange={(event) => setAdminNote(event.target.value)}
-          sx={{ mt: 1.5 }}
         />
       </FormDrawer>
-    </Box>
+    </div>
   )
 }

@@ -1,12 +1,12 @@
 // 运行日志（主管理员）：进程内 slog 环形缓冲的只读视图。级别按不低于所选级别筛选。
 import { useState } from 'react'
-import { Box, Button, FormControl, InputLabel, MenuItem, Select, Typography } from '@mui/material'
 import { useInfiniteSysLogs, useMiniState } from '../../api/hooks'
 import { displayTz, fmtTSFull } from '../../lib/format'
 import { logLevelInfo } from '../../lib/status'
+import { Button, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui'
+import { SearchField } from '../../components/mobile'
 import { CardBlock, DataTable, MonoText, PageHeader, StatusBadge, Toolbar } from '../components'
 import { useDebouncedValue } from '../nav'
-import { SearchField } from '../../ui'
 import type { Column } from '../components'
 import type { SysLogRow } from '../../api/types'
 
@@ -17,6 +17,10 @@ const LEVELS = [
   { value: 'warn', label: '警告及以上' },
   { value: 'error', label: '仅错误' },
 ]
+
+/** EMPTY_VALUE 是「全部」（值为空串）在下拉里的占位 key。
+ *  Base UI 的 Select 用 null 表示未选中，空串会被当成「没选」，所以映射成一个哨兵值。 */
+const ALL = '__all__'
 
 export function SysLogView() {
   const state = useMiniState(true)
@@ -29,7 +33,7 @@ export function SysLogView() {
   if (!main) {
     return (
       <CardBlock>
-        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>运行日志只对主管理员开放。</Typography>
+        <span className="text-sm text-muted-foreground">运行日志只对主管理员开放。</span>
       </CardBlock>
     )
   }
@@ -65,37 +69,45 @@ export function SysLogView() {
             : '进程内缓冲（最近 2000 条，重启清空）'
         }
         actions={
-          <Button variant="outlined" disabled={logs.isFetching} onClick={() => void logs.refetch()}>
+          <Button variant="outline" disabled={logs.isFetching} onClick={() => void logs.refetch()}>
             刷新
           </Button>
         }
       />
       <Toolbar>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>级别</InputLabel>
-          <Select label="级别" value={level} onChange={(e) => setLevel(e.target.value)}>
-            {LEVELS.map((l) => (
-              <MenuItem key={l.value} value={l.value}>
-                {l.label}
-              </MenuItem>
-            ))}
+        <div className="flex min-w-[160px] flex-col gap-1">
+          <Label htmlFor="syslog-level">级别</Label>
+          <Select
+            value={level === '' ? ALL : level}
+            onValueChange={(v) => setLevel(v === ALL ? '' : v)}
+          >
+            <SelectTrigger id="syslog-level" aria-label="级别">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LEVELS.map((l) => (
+                <SelectItem key={l.value} value={l.value === '' ? ALL : l.value}>
+                  {l.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
-        </FormControl>
-        <SearchField value={q} onChange={setQ} placeholder="搜索消息 / 字段" sx={{ maxWidth: 320 }} />
+        </div>
+        <SearchField value={q} onChange={setQ} placeholder="搜索消息 / 字段" className="max-w-[320px]" />
       </Toolbar>
 
       <DataTable
         loading={logs.isPending}
         rows={rows}
         rowKey={(row) => row.seq}
-        empty={<Typography sx={{ fontSize: 13, color: 'text.secondary' }}>没有匹配的日志。</Typography>}
+        empty={<span className="text-[13px] text-muted-foreground">没有匹配的日志。</span>}
         columns={columns}
       />
 
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1.5, gap: 1 }}>
+      <div className="mt-1.5 flex justify-center gap-2">
         {logs.hasNextPage && (
           <Button
-            variant="outlined"
+            variant="outline"
             disabled={logs.isFetchingNextPage}
             onClick={() => void logs.fetchNextPage()}
           >
@@ -103,9 +115,9 @@ export function SysLogView() {
           </Button>
         )}
         {!logs.hasNextPage && rows.length > 0 && (
-          <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>已到末尾（{rows.length} 条）</Typography>
+          <span className="text-[13px] text-muted-foreground">已到末尾（{rows.length} 条）</span>
         )}
-      </Box>
+      </div>
     </>
   )
 }

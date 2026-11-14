@@ -2,20 +2,26 @@
 //
 // 与 Mini App 的 App.tsx 是两套独立应用：这里不加载 Telegram SDK，鉴权走
 // 会话 cookie（main.tsx 在挂载前注入 X-Web 与目标 bot）。
-import { CssBaseline } from '@mui/material'
-import { ThemeProvider } from '@mui/material/styles'
+//
+// 主题：全部走新设计系统 —— `<html class="dark">` + oklch token，
+// 不再需要 MUI 的 ThemeProvider / CssBaseline（视图已全部迁移完）。
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError } from '../api/client'
-import { ErrorBoundary, ToastProvider } from '../ui'
+import { ErrorBoundary, ToastProvider } from '../components/feedback'
+import { applyThemeMode, resolveThemeMode, subscribeResolvedTheme } from '../lib/theme-mode'
 import { AdminNavProvider } from './nav'
 import { AdminShell } from './shell'
-import { buildAdminTheme, prefersDark, subscribeSystemTheme } from './theme'
 
 export function AdminApp() {
-  const [dark, setDark] = useState(prefersDark)
-  useEffect(() => subscribeSystemTheme(setDark), [])
-  const theme = useMemo(() => buildAdminTheme(dark), [dark])
+  // 初值读用户显式选择 > 系统偏好（theme-mode 统一了这条规则）。
+  const [dark, setDark] = useState(() => resolveThemeMode() === 'dark')
+
+  useEffect(() => {
+    applyThemeMode(dark ? 'dark' : 'light')
+  }, [dark])
+
+  useEffect(() => subscribeResolvedTheme((mode) => setDark(mode === 'dark')), [])
 
   const [queryClient] = useState(
     () =>
@@ -36,17 +42,14 @@ export function AdminApp() {
   )
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <ErrorBoundary>
-            <AdminNavProvider>
-              <AdminShell />
-            </AdminNavProvider>
-          </ErrorBoundary>
-        </ToastProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <ErrorBoundary>
+          <AdminNavProvider>
+            <AdminShell />
+          </AdminNavProvider>
+        </ErrorBoundary>
+      </ToastProvider>
+    </QueryClientProvider>
   )
 }

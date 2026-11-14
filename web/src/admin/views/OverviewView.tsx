@@ -1,5 +1,4 @@
 // 概览：待办、近 24 小时指标、最近命中、机器人状态。桌面端用指标卡 + 表格。
-import { Box, Typography } from '@mui/material'
 import { useLogs, useMiniState } from '../../api/hooks'
 import { actionLabel, displayTz, fmtTS, kindLabel, verdictLabel } from '../../lib/format'
 import { botStatus, verdictInfo } from '../../lib/status'
@@ -16,11 +15,11 @@ export function OverviewView() {
   const { todo, stats, bots } = state.data
 
   return (
-    <Box>
+    <div>
       <PageHeader title="概览" subtitle="先看需要处理的事，再看近 24 小时的判定情况" />
 
       {(todo.open_appeals > 0 || todo.dryrun_chats > 0 || todo.disabled_bots > 0) && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 1.5, mb: 2 }}>
+        <div className="mb-2 grid gap-1.5 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
           {todo.open_appeals > 0 && (
             <StatCard
               label="未结申诉"
@@ -45,25 +44,25 @@ export function OverviewView() {
               onClick={() => nav.go({ k: 'bots' })}
             />
           )}
-        </Box>
+        </div>
       )}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 1.5, mb: 2 }}>
+      <div className="mb-2 grid gap-1.5 [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))]">
         <StatCard label="已判定" value={stats.checked} hint="近 24 小时" />
         <StatCard label="命中广告" value={stats.hits} hint="近 24 小时" />
         <StatCard label="模型开销" value={stats.cost_text} hint="近 24 小时" />
         <StatCard label="生效群组" value={stats.chats} hint="已启用的群" />
-      </Box>
+      </div>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.25fr 0.75fr' }, gap: 2 }}>
+      <div className="grid gap-2 lg:grid-cols-[1.25fr_0.75fr]">
         <CardBlock title="最近命中">
           <RecentHits rows={hits.data?.logs ?? []} loading={hits.isPending} tz={displayTz(state.data)} onOpen={(id) => nav.go({ k: 'log', id })} />
         </CardBlock>
         <CardBlock title="机器人状态">
           <BotStatusTable bots={bots} onOpen={(id) => nav.go({ k: 'bot', id })} />
         </CardBlock>
-      </Box>
-    </Box>
+      </div>
+    </div>
   )
 }
 
@@ -84,7 +83,7 @@ function RecentHits({
       rows={rows.slice(0, 6)}
       rowKey={(row) => row.id}
       onRowClick={(row) => onOpen(row.id)}
-      empty={<Typography sx={{ fontSize: 13, color: 'text.secondary' }}>近 24 小时没有命中记录。</Typography>}
+      empty={<span className="text-[13px] text-muted-foreground">近 24 小时没有命中记录。</span>}
       columns={[
         { key: 'time', header: '时间', width: 110, render: (row) => fmtTS(row.created_at, tz) },
         {
@@ -99,7 +98,7 @@ function RecentHits({
         {
           key: 'verdictText',
           header: '摘要',
-          render: (row) => <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>{verdictLabel(row.verdict)}</Typography>,
+          render: (row) => <span className="text-[12.5px] text-muted-foreground">{verdictLabel(row.verdict)}</span>,
         },
       ]}
     />
@@ -112,18 +111,16 @@ function BotStatusTable({ bots, onOpen }: { bots: Bot[]; onOpen: (id: number) =>
       rows={bots}
       rowKey={(row) => row.bot_id}
       onRowClick={(row) => onOpen(row.bot_id)}
-      empty={<Typography sx={{ fontSize: 13, color: 'text.secondary' }}>还没有接入机器人。</Typography>}
+      empty={<span className="text-[13px] text-muted-foreground">还没有接入机器人。</span>}
       columns={[
         {
           key: 'name',
           header: '机器人',
           render: (row) => (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-              <Typography sx={{ fontSize: 13.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {row.label}
-              </Typography>
+            <div className="flex min-w-0 items-center gap-1">
+              <span className="truncate text-[13.5px]">{row.label}</span>
               {row.is_main && <StatusBadge info={{ label: '主 bot', tone: 'neutral' }} />}
-            </Box>
+            </div>
           ),
         },
         { key: 'status', header: '状态', width: 96, render: (row) => <StatusBadge info={botStatus(row)} /> },

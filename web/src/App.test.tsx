@@ -39,7 +39,7 @@ function makeBridge() {
     available: true,
     initData: 'test-init-data',
     botId: '0',
-    getTheme: () => ({ colorScheme: 'light', themeParams: {} }),
+    getTheme: () => ({ colorScheme: 'light' }),
     onThemeChanged: (cb) => {
       listeners.add(cb)
       return () => listeners.delete(cb)
@@ -117,7 +117,7 @@ describe('App', () => {
     expect(await screen.findByText('主管理员 · @menshen_admin')).toBeInTheDocument()
   })
 
-  it('themeChanged 后 ThemeProvider 用新 themeParams 实时重建（CssBaseline 生效）', async () => {
+  it('themeChanged 后 <html> 的 dark 类跟随 colorScheme（只读亮/暗，忽略主题色）', async () => {
     const { bridge, emitTheme } = makeBridge()
     mockInit.mockResolvedValue(bridge)
     mockApiByOp()
@@ -126,10 +126,17 @@ describe('App', () => {
     await screen.findByText('门神')
 
     act(() => {
-      emitTheme({ colorScheme: 'dark', themeParams: { bg_color: '#101010' } })
+      emitTheme({ colorScheme: 'dark' })
     })
     await waitFor(() => {
-      expect(window.getComputedStyle(document.body).backgroundColor).toBe('rgb(16, 16, 16)')
+      expect(document.documentElement.classList.contains('dark')).toBe(true)
+    })
+
+    act(() => {
+      emitTheme({ colorScheme: 'light' })
+    })
+    await waitFor(() => {
+      expect(document.documentElement.classList.contains('dark')).toBe(false)
     })
     // 主题变化后外壳仍在
     expect(screen.getByText('门神')).toBeInTheDocument()

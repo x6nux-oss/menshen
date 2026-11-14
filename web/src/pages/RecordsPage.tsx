@@ -2,24 +2,16 @@
 // - 判定记录：服务端搜索（300ms 防抖 + 回车立即）、筛选 chips、无限滚动（每页 20）；
 // - 申诉：未结（默认）/全部 chips、无限滚动；
 // - 导航意图 'appeals'（概览待办进入）只消费一次，之后往返不再强制切段。
-import { Box, Chip, Typography } from '@mui/material'
 import { useEffect, useRef, useState } from 'react'
 import { errorStatus } from '../api/client'
 import { useInfiniteAppeals, useInfiniteLogs, useMiniState } from '../api/hooks'
 import type { AppealRow, LogRow } from '../api/types'
+import { EmptyState, ErrorState, Skeletons } from '../components/feedback'
+import { ChatRef, ListRow, SearchField, Segmented } from '../components/mobile'
+import { Badge } from '../components/ui'
 import { actionLabel, displayTz, fmtTS } from '../lib/format'
 import { appealStatusInfo, appealSummary, verdictInfo } from '../lib/status'
 import { useNav, usePageParam } from '../nav'
-import {
-  Badge,
-  ChatRef,
-  EmptyState,
-  ErrorState,
-  ListRow,
-  SearchField,
-  Segmented,
-  Skeletons,
-} from '../ui'
 import { InfiniteFooter, ListCount, ListLoading, UserLink } from './shared'
 
 type Section = 'logs' | 'appeals'
@@ -37,7 +29,6 @@ const APPEAL_FILTERS: { value: string; label: string }[] = [
   { value: 'all', label: '全部' },
 ]
 
-const MONO = 'ui-monospace, Menlo, monospace'
 const SEARCH_DEBOUNCE_MS = 300
 
 /** 分段与筛选进 URL 时的合法取值；地址栏被手改成别的值时退回默认。 */
@@ -113,43 +104,31 @@ export function RecordsPage() {
     {
       value: 'appeals',
       label: (
-        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+        <span className="inline-flex items-center gap-1">
           申诉
           {openAppeals > 0 && (
-            <Box
-              component="span"
+            <span
               data-testid="appeals-count"
-              sx={{
-                minWidth: 16,
-                height: 16,
-                px: '4px',
-                borderRadius: '8px',
-                bgcolor: 'error.main',
-                color: 'error.contrastText',
-                fontSize: 10,
-                fontWeight: 600,
-                lineHeight: '16px',
-                textAlign: 'center',
-              }}
+              className="h-4 min-w-4 rounded-full bg-destructive px-1 text-center text-[10px] leading-4 font-semibold text-destructive-foreground"
             >
               {openAppeals}
-            </Box>
+            </span>
           )}
-        </Box>
+        </span>
       ),
     },
   ]
 
   return (
-    <Box data-testid="records-page">
-      <Box sx={{ mb: 1 }}>
+    <div data-testid="records-page">
+      <div className="mb-2">
         <Segmented
           value={section}
           onChange={(next) => setSection(next as Section)}
           options={sectionOptions}
           ariaLabel="记录分段"
         />
-      </Box>
+      </div>
 
       {section === 'logs' ? (
         <>
@@ -160,18 +139,14 @@ export function RecordsPage() {
             placeholder="搜原文 / 理由 / 记录号 / uid / 群号"
             ariaLabel="搜索记录"
           />
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1, mb: 0.5 }}>
-            {LOG_FILTERS.map((item) => (
-              <Chip
-                key={item.value}
-                size="small"
-                label={item.label}
-                color={logFilter === item.value ? 'primary' : 'default'}
-                variant={logFilter === item.value ? 'filled' : 'outlined'}
-                onClick={() => setLogFilter(item.value)}
-              />
-            ))}
-          </Box>
+          <div className="mt-2 mb-1">
+            <Segmented
+              value={logFilter}
+              onChange={setLogFilter}
+              options={LOG_FILTERS}
+              ariaLabel="判定记录筛选"
+            />
+          </div>
           {logs.isError && logs.data === undefined ? (
             <ErrorState status={errorStatus(logs.error)} onRetry={() => void logs.refetch()} />
           ) : (
@@ -187,7 +162,7 @@ export function RecordsPage() {
                 )
               ) : (
                 <>
-                  <Box sx={{ mt: 0.5 }}>
+                  <div className="mt-1">
                     {logRows.map((log) => (
                       <LogListRow
                         key={log.id}
@@ -197,7 +172,7 @@ export function RecordsPage() {
                         onUser={() => nav.push({ k: 'user', id: log.user_id })}
                       />
                     ))}
-                  </Box>
+                  </div>
                   <InfiniteFooter
                     hasNextPage={logs.hasNextPage}
                     isFetchingNextPage={logs.isFetchingNextPage}
@@ -213,18 +188,14 @@ export function RecordsPage() {
         </>
       ) : (
         <>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 0.5 }}>
-            {APPEAL_FILTERS.map((item) => (
-              <Chip
-                key={item.value}
-                size="small"
-                label={item.label}
-                color={appealFilter === item.value ? 'primary' : 'default'}
-                variant={appealFilter === item.value ? 'filled' : 'outlined'}
-                onClick={() => setAppealFilter(item.value)}
-              />
-            ))}
-          </Box>
+          <div className="mb-1">
+            <Segmented
+              value={appealFilter}
+              onChange={setAppealFilter}
+              options={APPEAL_FILTERS}
+              ariaLabel="申诉筛选"
+            />
+          </div>
           {appeals.isError && appeals.data === undefined ? (
             <ErrorState status={errorStatus(appeals.error)} onRetry={() => void appeals.refetch()} />
           ) : (
@@ -240,7 +211,7 @@ export function RecordsPage() {
                 )
               ) : (
                 <>
-                  <Box sx={{ mt: 0.5 }}>
+                  <div className="mt-1">
                     {appealRows.map((appeal) => (
                       <AppealListRow
                         key={appeal.id}
@@ -248,7 +219,7 @@ export function RecordsPage() {
                         onOpen={() => nav.push({ k: 'appeal', id: appeal.id })}
                       />
                     ))}
-                  </Box>
+                  </div>
                   <InfiniteFooter
                     hasNextPage={appeals.hasNextPage}
                     isFetchingNextPage={appeals.isFetchingNextPage}
@@ -263,7 +234,7 @@ export function RecordsPage() {
           )}
         </>
       )}
-    </Box>
+    </div>
   )
 }
 
@@ -283,26 +254,22 @@ function LogListRow({
   return (
     <ListRow
       primary={
-        <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-          <Box component="span" sx={{ fontFamily: MONO, fontSize: 14 }}>
+        <span className="flex flex-wrap items-center gap-1">
+          <span className="font-mono text-sm">
             #{log.id} · {fmtTS(log.created_at, tz)}
-          </Box>
+          </span>
           <Badge tone={verdict.tone}>{verdict.label}</Badge>
           <Badge>{actionLabel(log.action)}</Badge>
-        </Box>
+        </span>
       }
       secondary={
-        <Box component="span" sx={{ display: 'block' }}>
+        <span className="block">
           <UserLink userId={log.user_id} onClick={onUser} testId={`log-user-${log.id}`} />
           {' · 群 '}
           <ChatRef name={log.chat} url={log.chat_url} fallback={log.chat_id} />
           {` · ${Math.round(log.confidence * 100)}% · ${log.cost_text}`}
-          {log.text !== '' && (
-            <Box component="span" sx={{ display: 'block' }}>
-              {log.text.slice(0, 50)}
-            </Box>
-          )}
-        </Box>
+          {log.text !== '' && <span className="block">{log.text.slice(0, 50)}</span>}
+        </span>
       }
       chevron
       onClick={onOpen}
@@ -316,17 +283,17 @@ function AppealListRow({ appeal, onOpen }: { appeal: AppealRow; onOpen: () => vo
   return (
     <ListRow
       primary={
-        <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-          <Box component="span" sx={{ fontFamily: MONO, fontSize: 14 }}>
+        <span className="flex flex-wrap items-center gap-1">
+          <span className="font-mono text-sm">
             #{appeal.id} · uid {appeal.user_id}
-          </Box>
+          </span>
           <Badge tone={status.tone}>{status.label}</Badge>
-        </Box>
+        </span>
       }
       secondary={
-        <Typography component="span" sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.4 }}>
+        <span className="text-[13px] leading-[1.4] text-muted-foreground">
           {appealSummary(appeal.ai_result, appeal.ai_reason)}
-        </Typography>
+        </span>
       }
       chevron
       onClick={onOpen}

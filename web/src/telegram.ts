@@ -2,7 +2,6 @@
 // 不依赖官方 CDN）；这里轮询等待就绪，随后 ready/expand，并把 BackButton、
 // themeChanged、openLink 收成一个对象，供导航栈与主题重建使用。
 // 不在 Telegram 内（或 SDK 始终未出现）时返回 available=false，不抛错。
-import type { MiniThemeParams } from './theme'
 
 /** Telegram WebApp 里用到的部分；只声明用得上的方法，便于测试注入。 */
 export interface TelegramWebAppLike {
@@ -24,10 +23,16 @@ export interface TelegramWebAppLike {
   }
 }
 
-/** 主题的一次实时读数；themeChanged 事件后由 getTheme 重新读取。 */
+/**
+ * 主题的一次实时读数。
+ *
+ * **只有 colorScheme**（设计文档 §6）：玻璃效果依赖可控的底色，而 Telegram
+ * 允许用户自定义任意主题色。读 themeParams 会让每套自定义主题都要单独调玻璃
+ * 参数，且白玻璃叠在自选深蓝上会发脏 —— 这是无法收敛的维护路径。
+ * 所以主题只跟随亮/暗，主题色一律忽略。
+ */
 export interface TelegramTheme {
   colorScheme: string
-  themeParams: MiniThemeParams
 }
 
 /** BackButtonLike 与导航栈对接的最小接口（NavProvider 只依赖它）。 */
@@ -45,8 +50,8 @@ export interface TelegramBridge {
   /** URL ?bot= 指定要管理的 bot，缺省 '0'（主 bot）。 */
   botId: string
   /**
-   * getTheme 每次现读 SDK 的 colorScheme/themeParams（SDK 会先更新属性
-   * 再派发 themeChanged），因此主题必须通过它取，不能缓存成静态快照。
+   * getTheme 每次现读 SDK 的 colorScheme（SDK 会先更新属性再派发
+   * themeChanged），因此主题必须通过它取，不能缓存成静态快照。
    */
   getTheme(): TelegramTheme
   /** 订阅主题切换；回调参数是事件触发时的最新主题，返回取消订阅函数。 */
@@ -100,11 +105,11 @@ function tryGetWebApp(getter: () => TelegramWebAppLike | undefined): TelegramWeb
   }
 }
 
-/** readTheme 从 SDK 对象现读主题；对象缺失时给出空主题兜底。 */
+/** readTheme 从 SDK 对象现读主题；对象缺失时给出空 colorScheme 兜底。
+ *  只读 colorScheme —— themeParams 的主题色不参与（设计文档 §6）。 */
 function readTheme(app: TelegramWebAppLike | undefined): TelegramTheme {
   return {
     colorScheme: app?.colorScheme ?? '',
-    themeParams: { ...(app?.themeParams ?? {}) },
   }
 }
 
