@@ -9,6 +9,7 @@
 dev
 docs
 data
+models
 config.yaml
 *.db
 *.db-wal
@@ -27,3 +28,13 @@ web/node_modules
 web/.vite
 web/coverage
 internal/panel/webdist
+
+# Python 虚拟环境、解释器缓存与模型文件：镜像里统一安装固定版本依赖，
+# 模型则按需下载或由 PRELOAD_LOCAL_MODELS 在构建阶段获取。
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache

@@ -23,6 +23,7 @@ import {
   SwitchRow,
   useConfirm,
   useToast,
+  LocalModelsCard,
 } from "../ui";
 
 const MONO = "ui-monospace, Menlo, monospace";
@@ -100,6 +101,8 @@ export function ModelsPage() {
 
   return (
     <Box data-testid="models-page">
+      <LocalModelsCard />
+
       <Box sx={{ mb: 1 }}>
         <SearchField
           value={q}

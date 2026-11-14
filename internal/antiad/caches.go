@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"menshen/internal/core"
+	"menshen/internal/localvision"
 )
 
 // caches 是反广告的进程级内存状态，挂在 Shared 上（见 core.Ext），
@@ -45,7 +46,9 @@ type caches struct {
 	vision core.TTLMap[string, string]
 	// ocr 是 OCR 结果，键为 "模型file_unique_id"：OCR 优先于识图，空串
 	// 表示「这张图没有文字」（已确认过，下次直接回落识图，不再重复烧 OCR）。
-	ocr core.TTLMap[string, string]
+	ocr         core.TTLMap[string, string]
+	localVision core.TTLMap[string, localvision.Result]
+	localMedia  chan struct{}
 	// doomedAlbums 记下已判成广告的相册，判定之后才到的那几张照删。
 	doomedAlbums core.TTLMap[string, struct{}]
 	// unbanGate 是申诉的重试闸，键为 uid。
@@ -97,7 +100,7 @@ type caches struct {
 type cachesKey struct{}
 
 func cachesOf(sh *core.Shared) *caches {
-	return core.Ext(sh, cachesKey{}, func() *caches { return &caches{} })
+	return core.Ext(sh, cachesKey{}, func() *caches { return &caches{localMedia: make(chan struct{}, 4)} })
 }
 
 // GCCaches 回收全部过期条目，防止 map 无限增长。
@@ -113,6 +116,7 @@ func GCCaches(sh *core.Shared) {
 	c.linkPreview.GC(now)
 	c.vision.GC(now)
 	c.ocr.GC(now)
+	c.localVision.GC(now)
 	c.doomedAlbums.GC(now)
 	c.unbanGate.GC(now)
 	c.joinNotice.GC(now)

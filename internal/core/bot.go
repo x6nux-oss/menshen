@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"menshen/internal/config"
+	"menshen/internal/localvision"
 	"menshen/internal/logbuf"
 	"menshen/internal/ratelimit"
 	"menshen/internal/store"
@@ -40,9 +42,10 @@ const pendingTTL = 5 * time.Minute
 //
 // Bot 以匿名字段嵌入它，故 b.Store / b.Cache / b.Cfg 可直接访问。
 type Shared struct {
-	Cfg   *config.Config
-	Store *store.Store
-	Cache *store.Cache
+	Cfg         *config.Config
+	Store       *store.Store
+	Cache       *store.Cache
+	LocalModels *localvision.Manager
 
 	// StartedAt 是进程启动时刻，/status 的「已运行」由它算。
 	// 进程级而不是 bot 级：重启后所有 bot 一起重新开始。
@@ -105,8 +108,16 @@ type Shared struct {
 }
 
 func NewShared(cfg *config.Config, s *store.Store, c *store.Cache) *Shared {
+	modelsDir := cfg.LocalModelsDir
+	if modelsDir == "" {
+		modelsDir = filepath.Join(filepath.Dir(cfg.DBPath), "models")
+	}
 	return &Shared{Cfg: cfg, Store: s, Cache: c,
 		StartedAt: time.Now(),
+		LocalModels: localvision.New(localvision.Config{Dir: modelsDir,
+			BundledDir: cfg.LocalModelsBundledDir, Python: cfg.LocalModelsPython,
+			Threads: cfg.LocalModelsThreads, Client: &http.Client{
+				Timeout: 15 * time.Minute, Transport: config.ProxyTransport(cfg.AIProxy)}}),
 		AdLimits:  ratelimit.New(),
 		Logs:      logbuf.New(logbuf.DefaultCapacity),
 		reviewSem: make(chan struct{}, adReviewConcurrency),

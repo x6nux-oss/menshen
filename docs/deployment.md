@@ -101,7 +101,7 @@ cp config.example.yaml config.yaml   # 填 bot_token 与 admin_ids
 docker compose up -d
 ```
 
-或者把 `docker-compose.yml` 里的 `build: .` 换成发布镜像
+或者把 `docker-compose.yml` 里的整个 `build:` 段换成发布镜像
 `image: ghcr.io/x6nux/menshen:latest`（或钉一个版本号）。
 
 容器里有三个与 `127.0.0.1` 有关的坑，镜像已经替你处理好前两个：
@@ -138,3 +138,41 @@ bot 时自动设置（`setChatMenuButton`，只挂在管理员私聊里）。
 参数、白名单、管理员、联合封禁、判定记录与申诉单。鉴权用 Telegram WebApp
 的 `initData` 验签（24 小时有效期），权限与面板一致。前端由 `docker build`
 的 web 阶段构建并默认嵌入二进制（无需 build tag），部署无需手工构建前端。
+
+## 本地 OCR / NSFW（可选）
+
+默认镜像带 CPU 版 Python 3.12、ONNX Runtime 与 RapidOCR，但不含模型权重，
+也不会在启动时自动下载或启用。默认部署行为与以前一致；管理员在桌面管理面板
+或 Telegram Mini App 的模型页点一键下载后，才会下载、预热并启用 PP-OCRv6
+small 与 Marqo 色情识别。
+
+Docker 里有两种准备模型的方式：
+
+- **运行时下载（默认）**：首次在桌面面板或 Mini App 模型页点一键下载，文件存进
+  `/app/data/models`，随 `./data:/app/data` 卷持久化。宿主机需要能访问模型源。
+- **构建时预加载**：
+
+  ```bash
+  PRELOAD_LOCAL_MODELS=1 docker compose build
+  docker compose up -d
+  ```
+
+  构建阶段执行同一个 `menshen -download-models`，把校验过的文件放到
+  `/opt/menshen/models`。预加载**不会**自动启用模型，也不代替模型页开关。
+
+模型管理器按「下载目录 → 镜像预加载目录」查找，所以挂载空数据卷不会盖住
+预加载文件；更新版本后清单里的 SHA-256 / 大小不匹配时，仍可在模型页重新下载。
+运行时下载目录默认是数据库同级的 `models/`（容器内 `/app/data/models`），可用
+`MENSHEN_LOCAL_MODELS_DIR` 覆盖；预加载目录用
+`MENSHEN_LOCAL_MODELS_BUNDLED_DIR` 覆盖。Python 解释器与 CPU 线程数分别由
+`MENSHEN_LOCAL_MODELS_PYTHON`（默认 `python3`）和
+`MENSHEN_LOCAL_MODELS_THREADS`（默认 `2`）控制。
+
+本地阶段只走进程内的 Python 子进程，不访问外部推理 HTTP，也没有额外监听端口。
+若配置了远程 OCR / 视觉回退，本地失败时现有链路仍可能把图片上传到远程上游；
+本地成功时则不需要这次上传。模型卡片里的“就绪”只表示模型文件齐全且校验通过，
+不代表 Python / ONNX 运行时可用；运行时依赖不可用会在启用或下载后预热时报错，
+并显示在模型页/日志中。首次下载需要出网，下载完成后的本地推理可完全离线。
+
+非 Docker 部署、临时 Python 虚拟环境、`-models-dir`、模型来源与许可见
+[本地 OCR / NSFW](local-models.md)。

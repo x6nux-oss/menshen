@@ -4,11 +4,17 @@
 #      删掉即可。适合把 token 交给 secret / CI 变量管理的部署。
 #   B. 配置文件 —— 挂 config.yaml，个别项再用 environment 覆盖。
 #
-# 环境变量**优先于**配置文件：镜像里已经烤好了容器内固定的 db_path 与
-# listen_addr（见 Dockerfile），这两项无需再配置。
+# 环境变量**优先于**配置文件：镜像里已经烤好了容器内固定的 db_path、
+# listen_addr 与本地模型默认路径（见 Dockerfile），这些无需再配置。
 services:
   menshen:
-    build: .
+    build:
+      context: .
+      args:
+        # 1 = 构建时下载并校验 OCR/NSFW 模型，烤进 /opt/menshen/models。
+        # 默认 0；模型文件仍在数据卷 /app/data/models，首次下载需要出网。
+        # 预加载只准备文件，不自动启用模型。
+        PRELOAD_LOCAL_MODELS: "${PRELOAD_LOCAL_MODELS:-0}"
     restart: unless-stopped
 
     environment:
@@ -30,11 +36,21 @@ services:
       #    宿主机在 docker0 上的地址）。
       # MENSHEN_TG_PROXY: "http://host.docker.internal:7890"
       # MENSHEN_AI_PROXY: ""
+      #
+      # 本地 OCR / NSFW（可选）。默认值已由镜像设好：
+      # MENSHEN_LOCAL_MODELS_DIR=/app/data/models
+      # MENSHEN_LOCAL_MODELS_BUNDLED_DIR=/opt/menshen/models
+      # MENSHEN_LOCAL_MODELS_PYTHON=python3
+      # MENSHEN_LOCAL_MODELS_THREADS=2
+      # 需要改时在这里覆盖，例如限制 CPU 线程数：
+      # MENSHEN_LOCAL_MODELS_THREADS: "1"
 
     volumes:
       # A 方案删掉这行。文件不存在不算错误，服务会全部从环境变量读。
       - ./config.yaml:/app/config.yaml:ro
       # 数据卷必须挂：库里有上游 api_key 明文，且重启后要保住判定历史。
+      # 运行时下载的模型在 /app/data/models；镜像内预加载的模型在
+      # /opt/menshen/models，不会被这个卷盖住。
       - ./data:/app/data
 
     # 仅 webhook 模式需要。长轮询模式把这两行删掉，不开任何端口。

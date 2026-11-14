@@ -1,0 +1,30 @@
+[
+  {
+    "group": "ocr",
+    "file": "ocr_det.onnx",
+    "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx/resolve/28fe5895c24fd108c19eb3e8479f4ab385fbfc62/inference.onnx",
+    "sha256": "d73e0058b7a8086bbd57f3d10b8bcd4ff95363f67e06e2762b5e814fe9c9410e",
+    "size": 9880512
+  },
+  {
+    "group": "ocr",
+    "file": "ocr_rec.onnx",
+    "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx/resolve/b8f84f0b80c529de40b4fbb3544b84fa7233a513/inference.onnx",
+    "sha256": "5435fd747c9e0efe15a96d0b378d5bd157e9492ed8fd80edf08f30d02fa24634",
+    "size": 21159378
+  },
+  {
+    "group": "ocr",
+    "file": "ppocrv6_dict.txt",
+    "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/7d0781614ca1a83d5ad9603f713acb2e74855d72/paddle/PP-OCRv6/rec/PP-OCRv6_rec_small/ppocrv6_dict.txt",
+    "sha256": "b5f2bfe2bdd9448429e3e82b51c789775d9b42f2403d082b00662eb77e401c5d",
+    "size": 74947
+  },
+  {
+    "group": "nsfw",
+    "file": "marqo-nsfw-384.onnx",
+    "url": "https://huggingface.co/ICIJ/nsfw-image-detection-384-onnx/resolve/4f63fac119fb24a9d98393e57549b1427530ca52/marqo-nsfw-384.onnx",
+    "sha256": "50256dde930a4ceeb8953246ba7345158e02cc0a201a173402ab3e6e3a76f40a",
+    "size": 22450955
+  }
+]

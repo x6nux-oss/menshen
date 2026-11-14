@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"menshen/internal/antiad"
 	"menshen/internal/config"
 	"menshen/internal/core"
+	"menshen/internal/localvision"
 	"menshen/internal/logbuf"
 	"menshen/internal/panel"
 	"menshen/internal/store"
@@ -32,10 +34,39 @@ var (
 func main() {
 	cfgPath := flag.String("config", "config.yaml", "配置文件路径")
 	showVer := flag.Bool("version", false, "打印版本信息并退出")
+	downloadModels := flag.Bool("download-models", false, "下载并校验内置 OCR 和色情检测模型后退出")
+	modelsDir := flag.String("models-dir", "", "模型下载目录（默认数据库同目录下 models/）")
 	flag.Parse()
 
 	if *showVer {
 		slog.Info("menshen", "version", version, "built", buildTime)
+		return
+	}
+	if *downloadModels {
+		cfg, err := config.LoadModelDownload(*cfgPath)
+		if err != nil {
+			slog.Error("加载模型下载配置失败", "err", err)
+			os.Exit(1)
+		}
+		directory := *modelsDir
+		if directory == "" {
+			directory = cfg.LocalModelsDir
+		}
+		if directory == "" {
+			directory = filepath.Join(filepath.Dir(cfg.DBPath), "models")
+		}
+		manager := localvision.New(localvision.Config{Dir: directory,
+			BundledDir: cfg.LocalModelsBundledDir, Client: &http.Client{
+				Timeout: 15 * time.Minute, Transport: config.ProxyTransport(cfg.AIProxy)}})
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		err = manager.Download(ctx)
+		stop()
+		manager.Close()
+		if err != nil {
+			slog.Error("下载本地模型失败", "err", err)
+			os.Exit(1)
+		}
+		slog.Info("本地模型已就绪", "directory", directory)
 		return
 	}
 
@@ -66,6 +97,7 @@ func main() {
 
 	sh := core.NewShared(cfg, db, cache)
 	sh.Version = version
+	defer sh.LocalModels.Close()
 
 	// 日志三路输出：标准输出、日志文件与进程内环形缓冲。上限从设置现读，
 	// 面板上改小立刻生效；文件写不进去只丢这一行并退避重试，绝不打断业务。

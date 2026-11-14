@@ -325,6 +325,8 @@ func miniDispatch(sh *core.Shared, w http.ResponseWriter, r *http.Request, uid i
 		miniUpstream(sh, w, uid, body)
 	case "model":
 		miniModel(sh, w, uid, body)
+	case "localmodels":
+		miniLocalModels(sh, w, uid, body)
 	case "admin":
 		miniAdmin(sh, w, uid, body)
 	case "gban":

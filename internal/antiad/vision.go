@@ -209,7 +209,8 @@ func photoVisual(sizes []tg.PhotoSize, tag string) visual {
 
 // visionOn 报告是否配了 OCR 或识图模型。都没配时图片与贴纸不判，零额外开销。
 func visionOn(snap *store.Snapshot) bool {
-	return strings.TrimSpace(snap.Setting("antiad_ocr_model")) != "" ||
+	return snap.SettingInt("antiad_local_ocr", 0) == 1 || snap.SettingInt("antiad_local_nsfw", 0) == 1 ||
+		strings.TrimSpace(snap.Setting("antiad_ocr_model")) != "" ||
 		strings.TrimSpace(snap.Setting("antiad_vision_model")) != ""
 }
 
@@ -285,12 +286,13 @@ func seeVisual(b *core.Bot, snap *store.Snapshot, m *tg.Message, st adState,
 	return &cp, st, spend, true
 }
 
-// describeVisual 返回进正文的那一行：优先 OCR 的逐字转写
-// （`<ocr id=消息ID>原文</ocr>`），OCR 说没有文字或失败时回落到识图模型的
-// 描述。命中缓存时开销为零。
-func describeVisual(b *core.Bot, snap *store.Snapshot, v visual) (string, visionSpend, error) {
-	ocrModel := strings.TrimSpace(snap.Setting("antiad_ocr_model"))
+// describeRemoteVisual 返回远程 OCR 或识图内容，由调用方添加媒体标签。
+func describeRemoteVisual(b *core.Bot, snap *store.Snapshot, v visual, ocrModel string,
+	load func() ([]any, error)) (string, visionSpend, error) {
 	visionModel := strings.TrimSpace(snap.Setting("antiad_vision_model"))
+	if ocrModel == "" && visionModel == "" {
+		return "", visionSpend{}, nil
+	}
 	caches := cachesOf(b.Shared)
 
 	// OCR 命中直接出结果，连图都不用下载；没配 OCR 时沿用识图缓存。
@@ -302,33 +304,28 @@ func describeVisual(b *core.Bot, snap *store.Snapshot, v visual) (string, vision
 			ocrHit = true
 			ocrCached = text != ""
 			if ocrCached {
-				return ocrLine(v, text), visionSpend{}, nil
+				return tag("ocr", text), visionSpend{}, nil
 			}
 			// OCR 缓存说没有文字：接下来只会用识图，先看它的缓存 ——
 			// 命中就不必再下载一遍图。
 			if desc, ok := caches.vision.Get(v.uniqueID); ok {
-				return v.render(desc), visionSpend{}, nil
+				return desc, visionSpend{}, nil
 			}
 			if visionModel == "" {
 				return "", visionSpend{}, nil
 			}
 		}
 	} else if desc, ok := caches.vision.Get(v.uniqueID); ok {
-		return v.render(desc), visionSpend{}, nil
+		return desc, visionSpend{}, nil
 	}
-
 	if v.size > visionFileMax {
 		// 之前识过、且缓存仍在：体积上限只挡下载，不挡已经付过钱的描述。
 		if desc, ok := caches.vision.Get(v.uniqueID); ok {
-			return v.render(desc), visionSpend{}, nil
+			return desc, visionSpend{}, nil
 		}
 		return "", visionSpend{}, fmt.Errorf("文件超过 %d 字节", visionFileMax)
 	}
-	file, err := fetchTGFile(b, v.fileID)
-	if err != nil {
-		return "", visionSpend{}, err
-	}
-	parts, err := visualParts(file, v)
+	parts, err := load()
 	if err != nil {
 		return "", visionSpend{}, err
 	}
@@ -348,7 +345,7 @@ func describeVisual(b *core.Bot, snap *store.Snapshot, v visual) (string, vision
 			caches.ocr.Set(ocrKey, "", visionTTL)
 		default:
 			caches.ocr.Set(ocrKey, text, visionTTL)
-			return ocrLine(v, text), spend, nil
+			return tag("ocr", text), spend, nil
 		}
 	}
 
@@ -362,7 +359,7 @@ func describeVisual(b *core.Bot, snap *store.Snapshot, v visual) (string, vision
 		return "", spend, nil
 	}
 	if desc, ok := caches.vision.Get(v.uniqueID); ok {
-		return v.render(desc), spend, nil
+		return desc, spend, nil
 	}
 	line, s, err := visionVisual(b, v, visionModel, parts)
 	spend.merge(s)
@@ -375,12 +372,6 @@ func describeVisual(b *core.Bot, snap *store.Snapshot, v visual) (string, vision
 // ocrCacheKey 按模型分开缓存：换了 OCR 模型后，旧模型的「没有文字」结论
 // 不该继续压住新模型。
 func ocrCacheKey(model, uniqueID string) string { return model + "\x00" + uniqueID }
-
-// ocrLine 把 OCR 原文渲染成进正文的一段闭合标签：
-// `<image id=7><ocr>原文</ocr></image>`。
-func ocrLine(v visual, text string) string {
-	return v.render(tag("ocr", text))
-}
 
 // ocrVisual 调 OCR 模型逐字转写，返回压成一行的原文；图里没有文字时返回空串。
 func ocrVisual(b *core.Bot, v visual, model string, parts []any) (string, visionSpend, error) {
@@ -450,7 +441,7 @@ func visionVisual(b *core.Bot, v visual, model string, parts []any) (string, vis
 		if desc != "" {
 			desc = core.TruncateRunes(desc, visionDescMax)
 			cachesOf(b.Shared).vision.Set(v.uniqueID, desc, visionTTL)
-			return v.render(desc), spend, nil
+			return desc, spend, nil
 		}
 		if attempt == 0 {
 			slog.Warn("反广告：识图模型没有返回内容，重试一次", "模型", reply.Model)

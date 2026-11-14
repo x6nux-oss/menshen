@@ -30,6 +30,16 @@ web/node_modules/
 internal/panel/webdist/*
 !internal/panel/webdist/.gitkeep
 
+# 本地 OCR / NSFW 模型权重、Python 虚拟环境与测试缓存；只提交固定清单和代码
+/models/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
 # Cloudflare Worker 垫片（cloudflare/clef-gateway）：依赖与本地缓存不入库
 cloudflare/clef-gateway/node_modules/
 cloudflare/clef-gateway/.wrangler/

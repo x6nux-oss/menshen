@@ -26,6 +26,7 @@ export type MiniMutationOp =
   | 'logact'
   | 'appealact'
   | 'rules'
+  | 'localmodels'
 
 export interface MiniMutationOptions {
   /** 除 ['state'] 外还要失效的 queryKey 前缀。 */
@@ -64,6 +65,11 @@ export function useUpstreamMutation<TResp = OkResp>() {
 }
 export function useModelMutation() {
   return useMiniMutation('model')
+}
+export function useLocalModelsMutation() {
+  return useMiniMutation<Record<string, unknown>, OkResp>('localmodels', {
+    invalidate: [['localmodels']],
+  })
 }
 export function useAdminMutation() {
   return useMiniMutation('admin')

@@ -9,6 +9,7 @@ import {
   mockAppeals,
   mockLogDetail,
   mockLogs,
+  mockLocalModels,
   mockRuleAgent,
   mockRuleTest,
   mockRules,
@@ -97,6 +98,11 @@ function filterSysLogs(
 
 export const handlers = [
   http.post("*/miniapp/api/state", () => HttpResponse.json(mockState)),
+  http.post("*/miniapp/api/localmodels", async ({ request }) => {
+    const body = await bodyOf(request);
+    if (body.action === "status") return HttpResponse.json(mockLocalModels);
+    return HttpResponse.json({ ok: true, note: "（mock）已保存" });
+  }),
   http.post("*/miniapp/api/logs", async ({ request }) => {
     const body = await bodyOf(request);
     const filtered = searchLogs(

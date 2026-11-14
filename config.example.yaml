@@ -14,6 +14,10 @@
 #   ai_proxy     → MENSHEN_AI_PROXY
 #   db_path      → MENSHEN_DB_PATH
 #   archive_dir  → MENSHEN_ARCHIVE_DIR
+#   local_models_dir         → MENSHEN_LOCAL_MODELS_DIR
+#   local_models_bundled_dir → MENSHEN_LOCAL_MODELS_BUNDLED_DIR
+#   local_models_python      → MENSHEN_LOCAL_MODELS_PYTHON
+#   local_models_threads     → MENSHEN_LOCAL_MODELS_THREADS
 #
 # 环境变量**优先于**本文件，且本文件可以完全不存在（容器里常见的做法是
 # 不挂配置、全用环境变量）。两者混用时，本文件提供基线、环境变量覆盖个别项。
@@ -121,6 +125,21 @@ bot_token: "123456789:AA..."
 # 运行日志文件也落在数据库同目录（data.db → data.log，写满滚成 .1 备份），
 # 单文件与总大小上限（MB）在网页全局设置 → 护栏与成本处调整，
 # 0 = 关闭文件日志 —— 这里没有对应配置项，不用改本文件。
+
+# ---- 本地 OCR / 色情识别（可选）----
+#
+# 默认不启用，也不预下载。桌面管理面板 / Mini App 模型页的一键下载会
+# 下载、预热并启用两项；
+# 命令行 `./menshen -download-models` 只负责下载校验，不写数据库配置。
+#
+# 首次下载需要访问模型源；下载完成后推理完全离线，不开监听端口。
+# 模型文件未就绪或 Python 运行依赖不可用时，启用/预热会报错；
+# “就绪”本身只表示模型文件齐全且校验通过。
+#
+# local_models_dir: ""                 # 空 = 数据库同目录下的 models/
+# local_models_bundled_dir: "/opt/menshen/models"  # 镜像预加载目录
+# local_models_python: "python3"       # 非 Docker 可指向 .venv/bin/python
+# local_models_threads: 2              # 1 到 16；ONNX Runtime CPU 线程数
 
 # ---- 申诉网页（仅 webhook 模式）----
 #

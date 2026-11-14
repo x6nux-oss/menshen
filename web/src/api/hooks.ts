@@ -18,6 +18,7 @@ import type {
   AppealsResp,
   LogDetail,
   LogsResp,
+  LocalModelsStatus,
   RuleAgentStatusResp,
   RulesResp,
   State,
@@ -27,6 +28,7 @@ import type {
 
 export const miniQueryKeys = {
   state: ["state"] as const,
+  localModels: ["localmodels"] as const,
   logs: (filter: string, q: string, page: number) =>
     ["logs", filter, q, page] as const,
   log: (id: number) => ["log", id] as const,
@@ -77,6 +79,18 @@ export function useMiniState(enabled = true) {
     queryKey: miniQueryKeys.state,
     queryFn: ({ signal }) => api<State>("state", undefined, signal),
     enabled,
+  });
+}
+
+/** useLocalModels 拉取本地模型状态；下载中自动轮询，完成后停止。 */
+export function useLocalModels(enabled = true) {
+  return useQuery({
+    queryKey: miniQueryKeys.localModels,
+    queryFn: ({ signal }) =>
+      api<LocalModelsStatus>("localmodels", { action: "status" }, signal),
+    enabled,
+    refetchInterval: (query) =>
+      query.state.data?.downloading ? 1500 : false,
   });
 }
 

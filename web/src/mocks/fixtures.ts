@@ -6,6 +6,7 @@ import type {
   AppealDetail,
   AppealRow,
   LogRow,
+  LocalModelsStatus,
   Rule,
   RuleAgent,
   RuleTest,
@@ -337,6 +338,31 @@ export const mockState: State = {
     { user_id: 100, label: "主管理员" },
     { user_id: 200, label: "次级管理员 ·（mock）备用管理员" },
   ],
+};
+
+/** 本地模型默认未下载：卡片据此显示“一键下载并启用”。 */
+export const mockLocalModels: LocalModelsStatus = {
+  models: [
+    {
+      id: "ocr",
+      name: "PP-OCRv6 small",
+      ready: false,
+      size_bytes: 31_114_837,
+      enabled: false,
+    },
+    {
+      id: "nsfw",
+      name: "Marqo NSFW",
+      ready: false,
+      size_bytes: 22_450_955,
+      enabled: false,
+    },
+  ],
+  downloading: false,
+  downloaded_bytes: 0,
+  total_bytes: 53_565_792,
+  error: "",
+  nsfw_threshold: 85,
 };
 
 export const mockLogs: LogRow[] = [

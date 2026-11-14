@@ -11,6 +11,37 @@ import (
 // testToken 是格式合法但完全虚构的 token。
 const testToken = "123456789:AAEEfaketoken_ForUnitTestsOnly1234567"
 
+func TestLocalModelConfiguration(t *testing.T) {
+	t.Setenv("MENSHEN_LOCAL_MODELS_DIR", "/tmp/downloaded-models")
+	t.Setenv("MENSHEN_LOCAL_MODELS_PYTHON", "/tmp/venv/bin/python")
+	t.Setenv("MENSHEN_LOCAL_MODELS_THREADS", "2")
+	cfg, err := Load(writeConfig(t, "local_models_dir: /old/models\nlocal_models_bundled_dir: /opt/models\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.LocalModelsDir != "/tmp/downloaded-models" || cfg.LocalModelsBundledDir != "/opt/models" || cfg.LocalModelsPython != "/tmp/venv/bin/python" || cfg.LocalModelsThreads != 2 {
+		t.Fatalf("unexpected local model configuration: %+v", cfg)
+	}
+	t.Setenv("MENSHEN_LOCAL_MODELS_THREADS", "0")
+	if _, err := Load(writeConfig(t, "")); err == nil {
+		t.Fatal("zero CPU thread limit must be rejected")
+	}
+}
+
+func TestModelDownloadReadsPathsWithoutBotCredentials(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(filename, []byte("db_path: /var/lib/menshen/data.db\nai_proxy: http://127.0.0.1:7890\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadModelDownload(filename)
+	if err != nil || cfg.DBPath != "/var/lib/menshen/data.db" || cfg.AIProxy == nil {
+		t.Fatalf("model-only configuration = %+v, %v", cfg, err)
+	}
+	if _, err := Load(filename); err == nil {
+		t.Fatal("normal startup must still require bot credentials")
+	}
+}
+
 // writeConfig 把若干行写进临时 config.yaml 并返回路径。
 // 每个用例都补上 bot_token 与 admin_ids，否则 Load 会先因缺它们而失败。
 func writeConfig(t *testing.T, lines string) string {

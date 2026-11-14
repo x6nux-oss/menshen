@@ -31,7 +31,11 @@ type Config struct {
 	// ArchiveDir 是消息存档的根目录（见 internal/archive）。为空时取
 	// DBPath 同目录下的 archive/。存档完全独立于数据库：原文与图片都
 	// 按群写成普通文件，数据库只留一份去重索引。
-	ArchiveDir string
+	ArchiveDir            string
+	LocalModelsDir        string
+	LocalModelsBundledDir string
+	LocalModelsPython     string
+	LocalModelsThreads    int
 
 	// PublicURL 非空即启用 webhook 模式，否则走长轮询。
 	//
@@ -109,20 +113,30 @@ func (c *Config) IsAdmin(id int64) bool {
 	return false
 }
 
-// Load 读取并校验配置：先解析配置文件，再由环境变量覆盖。
+// LoadModelDownload 读取配置与环境变量，不要求 bot 凭据。
 //
 // 手写解析该格式而不引入 YAML 依赖，支持 "key: value" 与 admin_ids 的
 // "- N" / "[1, 2]" 写法。
-func Load(path string) (*Config, error) {
+func LoadModelDownload(path string) (*Config, error) {
 	c := &Config{DBPath: "data.db", TGAPIBase: defaultTGAPIBase,
-		ListenAddr: defaultListenAddr,
-		TGAPIID:    defaultTGAPIID, TGAPIHash: defaultTGAPIHash}
+		ListenAddr:        defaultListenAddr,
+		LocalModelsPython: "python3", LocalModelsThreads: 2,
+		LocalModelsBundledDir: "/opt/menshen/models",
+		TGAPIID:               defaultTGAPIID, TGAPIHash: defaultTGAPIHash}
 
 	if err := loadFile(path, c); err != nil {
 		return nil, err
 	}
 	// 环境变量在文件之后应用，因此压过文件。
 	if err := applyEnv(c); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func Load(path string) (*Config, error) {
+	c, err := LoadModelDownload(path)
+	if err != nil {
 		return nil, err
 	}
 
@@ -207,6 +221,10 @@ var envKeys = []struct{ env, key string }{
 	{"MENSHEN_AI_PROXY", "ai_proxy"},
 	{"MENSHEN_DB_PATH", "db_path"},
 	{"MENSHEN_ARCHIVE_DIR", "archive_dir"},
+	{"MENSHEN_LOCAL_MODELS_DIR", "local_models_dir"},
+	{"MENSHEN_LOCAL_MODELS_BUNDLED_DIR", "local_models_bundled_dir"},
+	{"MENSHEN_LOCAL_MODELS_PYTHON", "local_models_python"},
+	{"MENSHEN_LOCAL_MODELS_THREADS", "local_models_threads"},
 	{"MENSHEN_PUBLIC_URL", "public_url"},
 	{"MENSHEN_LISTEN_ADDR", "listen_addr"},
 	{"MENSHEN_TURNSTILE_SITE_KEY", "turnstile_site_key"},
@@ -263,6 +281,18 @@ func assign(c *Config, key, val string) error {
 		}
 	case "archive_dir":
 		c.ArchiveDir = strings.TrimSpace(val)
+	case "local_models_dir":
+		c.LocalModelsDir = val
+	case "local_models_bundled_dir":
+		c.LocalModelsBundledDir = val
+	case "local_models_python":
+		c.LocalModelsPython = val
+	case "local_models_threads":
+		threads, err := strconv.Atoi(val)
+		if err != nil || threads < 1 || threads > 16 {
+			return fmt.Errorf("local_models_threads 应为 1 到 16 的整数")
+		}
+		c.LocalModelsThreads = threads
 	case "public_url":
 		c.PublicURL = strings.TrimRight(val, "/")
 	case "listen_addr":

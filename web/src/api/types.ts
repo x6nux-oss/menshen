@@ -143,6 +143,24 @@ export interface Model {
   model_id: string;
 }
 
+export interface LocalModelStatus {
+  id: "ocr" | "nsfw";
+  name: string;
+  ready: boolean;
+  size_bytes: number;
+  enabled: boolean;
+}
+
+/** localmodels status：下载进度与每个模型的就绪/启用状态。 */
+export interface LocalModelsStatus {
+  models: LocalModelStatus[];
+  downloading: boolean;
+  downloaded_bytes: number;
+  total_bytes: number;
+  error: string;
+  nsfw_threshold: number;
+}
+
 /**
  * UpstreamTestResp 是 upstream {action:'test'} 的结果：请求本身失败（网络、
  * 鉴权、上游 5xx）时 HTTP 仍是 200，但 ok=false、error 是可读原因；

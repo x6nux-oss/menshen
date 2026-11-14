@@ -34,6 +34,7 @@ import { useRunFeedback } from "../feedback";
 import { useAdminNav } from "../nav";
 import { REASONING_EFFORTS } from "../../api/types";
 import type { Model } from "../../api/types";
+import { LocalModelsCard } from "../../ui";
 
 export function ModelsView() {
   const state = useMiniState(true);
@@ -107,6 +108,7 @@ export function ModelsView() {
           </Button>
         }
       />
+      {state.data.me.main && <LocalModelsCard />}
       <Toolbar>
         <SearchField
           value={q}

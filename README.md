@@ -25,6 +25,7 @@
 - 🚫 **联合封禁** —— 一处判到最高档或被人工标记，全平台所有接入群一起封。
 - 🔁 **内容哈希** —— 同一条广告换号再发不再花钱，直接删。
 - 🖼 **识图** —— 配 OCR 模型时优先逐字转写图里的文字（以 `<image id=消息ID><ocr>原文</ocr></image>` 进判定），图里没有文字才回落视觉模型描述画面；只配视觉模型时按描述判。图片和贴纸一样判。
+- 🧠 **本地识图** —— 可选 CPU 本地的 PP-OCRv6 small 与 Marqo 色情识别，在桌面管理面板或 Mini App 的模型页一键下载并启用；不启用时行为与以前完全一致，不自动下载或开启。
 - 🗂 **消息存档** —— 按群把文本、图片（含以文件发送的图片与用户头像）和判定流水写成普通文件，图片自动缩放压缩；历史 SQLite 留底可用 `/export` 补写进来。
 - 👥 **多租户** —— 主管理员管上游、模型与钱，次级管理员各接各的 bot、各管各的群。
 - 🔧 **主 bot / 工作 bot 分离** —— 配置里的 bot 只管面板与接入，群内判定由面板接入的工作 bot 执行；主 bot 被拉进群会自动退出。
@@ -89,8 +90,22 @@ docker compose up -d
 ```
 
 也可以直接用发布好的镜像（amd64 / arm64）：把 `docker-compose.yml` 里的
-`build: .` 换成 `image: ghcr.io/x6nux/menshen:latest`（或钉一个版本号），
+整个 `build:` 段换成 `image: ghcr.io/x6nux/menshen:latest`（或钉一个版本号），
 再 `docker compose up -d`。
+
+本地 OCR / NSFW 默认不启用，模型也不会在首次启动时自动下载。启动后在桌面
+管理面板或 Telegram Mini App 的模型页点一键下载即可（下载、预热并启用）。
+也可以把模型烤进镜像：
+
+```bash
+PRELOAD_LOCAL_MODELS=1 docker compose build
+docker compose up -d
+```
+
+预加载只把校验过的文件放到 `/opt/menshen/models`，仍需在桌面管理面板或
+Mini App 的模型页开启；运行时下载的文件落在数据卷 `/app/data/models`。
+本地阶段不访问外部推理服务；配置远程回退时，本地失败仍可能回退上传图片。
+模型页、离线部署与许可说明见[本地 OCR / NSFW](docs/local-models.md)。
 
 ### 单文件二进制
 
@@ -101,6 +116,9 @@ CGO_ENABLED=0 go build -o menshen .
 
 配置文件不是必需的：每一项都支持 `MENSHEN_*` 环境变量覆盖，
 详见 [config.example.yaml](config.example.yaml)。
+
+本地 OCR / NSFW 还需要 Python 3.12 与固定版本的运行依赖；非 Docker 的临时
+虚拟环境、下载命令和模型目录见[本地 OCR / NSFW](docs/local-models.md)。
 
 ### 第一次使用
 
@@ -231,6 +249,7 @@ archive/<chat_id>/
 | [判定链路](docs/how-it-works.md) | 两级判定、处置矩阵、内容哈希、冷判定、闭环学习、成本护栏 |
 | [入群时间接口](docs/join-time.md) | Bot API 的 curl 调用、MTProto 的 Python 示例、date 语义、限制与错误速查 |
 | [部署与接入](docs/deployment.md) | 长轮询 / Webhook、反代、多 bot、配置项与环境变量 |
+| [本地 OCR / NSFW](docs/local-models.md) | 离线模型、Docker 预加载、Python 运行依赖、许可与下载校验 |
 | [CF API 兼容层](docs/clef-gateway.md) | 把 Workers AI 包成 Cloudflare API v4 兼容入口（含单文件 Worker），CF SDK / 中转可直接接入，凭据不出 Worker |
 | [面板与租户](docs/panel.md) | 管理面板、多租户权限、群内命令与通知细节 |
 | [开发与发布](docs/development.md) | 构建测试、镜像发布流程、数据库表 |
