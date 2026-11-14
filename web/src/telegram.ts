@@ -10,11 +10,8 @@ export interface TelegramWebAppLike {
   themeParams?: Record<string, string>
   /** 运行平台；普通浏览器里 SDK 也会定义 WebApp，此时为 'unknown'。 */
   platform?: string
-  isVersionAtLeast?(version: string): boolean
-  isFullscreen?: boolean
   ready(): void
   expand(): void
-  requestFullscreen?(): void
   onEvent?(event: string, cb: () => void): void
   offEvent?(event: string, cb: () => void): void
   openLink?(url: string): void
@@ -172,17 +169,6 @@ export async function initTelegram(options: InitTelegramOptions = {}): Promise<T
   } catch {
     // 忽略：页面继续跑。
   }
-  try {
-    if (
-      (app.platform === 'tdesktop' || app.platform === 'macos') &&
-      app.requestFullscreen &&
-      app.isVersionAtLeast?.('8.0') &&
-      !app.isFullscreen
-    ) {
-      app.requestFullscreen()
-    }
-  } catch {}
-
   return {
     available: true,
     initData: app.initData ?? '',
