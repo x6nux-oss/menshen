@@ -101,6 +101,75 @@
   }
 }
 
+:root[data-app='miniapp'] {
+  --mini-inset-top: calc(max(env(safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px)) + var(--tg-content-safe-area-inset-top, 0px));
+  --mini-inset-bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px)) + var(--tg-content-safe-area-inset-bottom, 0px));
+  --mini-inset-left: calc(max(env(safe-area-inset-left, 0px), var(--tg-safe-area-inset-left, 0px)) + var(--tg-content-safe-area-inset-left, 0px));
+  --mini-inset-right: calc(max(env(safe-area-inset-right, 0px), var(--tg-safe-area-inset-right, 0px)) + var(--tg-content-safe-area-inset-right, 0px));
+  --mini-sidebar-width: 0px;
+  --mini-nav-clearance: calc(68px + var(--mini-inset-bottom));
+  scroll-padding-top: calc(6rem + var(--mini-inset-top));
+}
+
+.mini-app {
+  min-height: 100dvh;
+  padding: var(--mini-inset-top) var(--mini-inset-right) var(--mini-inset-bottom) var(--mini-inset-left);
+}
+
+.mini-shell {
+  padding-left: var(--mini-sidebar-width);
+}
+
+.mini-shell .mini-topbar {
+  top: var(--mini-inset-top);
+}
+
+.mini-navigation {
+  left: var(--mini-inset-left);
+  right: var(--mini-inset-right);
+  padding-bottom: var(--mini-inset-bottom);
+}
+
+.mini-action-bar {
+  left: calc(var(--mini-sidebar-width) + var(--mini-inset-left));
+  right: var(--mini-inset-right);
+  padding-bottom: calc(8px + var(--mini-inset-bottom));
+}
+
+.mini-sheet {
+  left: var(--mini-inset-left, 0px);
+  right: var(--mini-inset-right, 0px);
+  bottom: var(--mini-inset-bottom, 0px);
+  max-height: min(85dvh, calc(100dvh - var(--mini-inset-top, 0px) - var(--mini-inset-bottom, 0px)));
+}
+
+@media (min-width: 64rem) {
+  :root[data-app='miniapp'] {
+    --mini-sidebar-width: 14rem;
+    --mini-nav-clearance: var(--mini-inset-bottom);
+  }
+
+  .mini-navigation {
+    top: var(--mini-inset-top);
+    bottom: var(--mini-inset-bottom);
+    right: auto;
+    width: var(--mini-sidebar-width);
+    padding-bottom: 0;
+  }
+
+  .mini-action-bar {
+    padding-inline: 1.5rem;
+  }
+
+  .mini-sheet {
+    max-width: 36rem;
+    margin-inline: auto;
+    bottom: max(1.5rem, var(--mini-inset-bottom, 0px));
+    max-height: min(85dvh, calc(100dvh - var(--mini-inset-top, 0px) - max(1.5rem, var(--mini-inset-bottom, 0px))));
+    border-radius: var(--radius-xl);
+  }
+}
+
 @layer components {
   .overlay-surface {
     background: var(--popover);

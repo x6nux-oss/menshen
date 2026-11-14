@@ -80,7 +80,7 @@ export function ActionSheetProvider({ children }: ActionSheetProviderProps) {
           aria-modal="true"
           initialFocus={() => confirmButtonRef.current}
           finalFocus={restoreFocusTo}
-          className="rounded-t-2xl p-0"
+          className="mini-sheet rounded-t-2xl p-0"
         >
           <div className="px-4 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
             <div className="px-1 pt-1 pb-0.5 text-center">

@@ -1,6 +1,6 @@
 // App 外壳测试：三条主路径（不可用引导 / 就绪外壳 / 错误分流）+ 主题实时性。
 // telegram 与 api/client 只替换必要的导出（api 换成 spy，ApiError/setApiBridge 保真）。
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { ApiError, api } from './api/client'
@@ -175,6 +175,23 @@ describe('App', () => {
     expect(await screen.findByText('第二个群')).toBeInTheDocument()
     expect(screen.queryByText('测试群')).not.toBeInTheDocument()
     expect(screen.getByLabelText('搜索群组')).toHaveValue('第二个')
+  })
+
+  it('详情保留一份桌面主导航，切换模块保持 Mini App 入口与 bot 参数', async () => {
+    window.history.replaceState(null, '', '/miniapp/bots/1?bot=99')
+    mockInit.mockResolvedValue(makeBridge().bridge)
+    mockApiByOp()
+    render(<App />)
+
+    await screen.findByText('管理其群组')
+    const navigation = screen.getByRole('navigation', { name: '主导航' })
+    expect(within(navigation).getAllByRole('button')).toHaveLength(5)
+    expect(within(navigation).getByRole('button', { name: '机器人' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(within(navigation).getByRole('button', { name: '记录' }))
+    expect(await screen.findByTestId('records-page')).toBeInTheDocument()
+    expect(location.pathname).toBe('/miniapp/records')
+    expect(new URLSearchParams(location.search).get('bot')).toBe('99')
+    expect(screen.queryByRole('button', { name: '返回' })).not.toBeInTheDocument()
   })
 
   it('记录 Tab：判定/申诉分段、记录详情与用户页的动态标题', async () => {

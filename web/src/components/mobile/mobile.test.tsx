@@ -243,6 +243,15 @@ describe('TabBar', () => {
     expect(screen.getByTestId('ic')).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: '主导航' })).toBeInTheDocument()
   })
+
+  it.each(['ArrowDown', 'ArrowUp'])('侧栏支持 %s 切换与聚焦', async (key) => {
+    const onChange = vi.fn()
+    render(<TabBar tabs={tabs} active="overview" onChange={onChange} />)
+    screen.getByRole('button', { name: '概览' }).focus()
+    await userEvent.keyboard(`{${key}}`)
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('bots')
+    expect(screen.getByRole('button', { name: '机器人' })).toHaveFocus()
+  })
 })
 
 describe('TopBar', () => {

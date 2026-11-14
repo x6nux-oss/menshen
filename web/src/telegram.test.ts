@@ -12,6 +12,8 @@ function mockWebApp(overrides: Partial<TelegramWebAppLike> = {}) {
     platform: 'tdesktop',
     ready: () => calls.push('ready'),
     expand: () => calls.push('expand'),
+    isVersionAtLeast: () => false,
+    requestFullscreen: () => calls.push('fullscreen'),
     onEvent: (event, cb) => {
       const list = handlers.get(event) ?? []
       list.push(cb)
@@ -166,5 +168,78 @@ describe('initTelegram', () => {
     } finally {
       window.history.replaceState({}, '', original)
     }
+  })
+
+  describe('桌面端自动请求全屏', () => {
+    function desktopApp(overrides: Partial<TelegramWebAppLike> = {}) {
+      return mockWebApp({
+        isVersionAtLeast: (ver) => ver === '8.0',
+        ...overrides,
+      })
+    }
+
+    it.each(['tdesktop', 'macos'])('%s：expand 后 requestFullscreen 恰好一次', async (platform) => {
+      const { wa, calls } = desktopApp({ platform })
+      const bridge = await initTelegram({ getWebApp: () => wa })
+      expect(bridge.available).toBe(true)
+      expect(calls.filter((c) => c === 'fullscreen')).toHaveLength(1)
+      expect(calls.indexOf('fullscreen')).toBeGreaterThan(calls.indexOf('expand'))
+    })
+
+    it.each(['ios', 'android', 'web', 'weba', 'unknown'])(
+      '%s：不主动请求全屏',
+      async (platform) => {
+        const { wa, calls } = desktopApp({ platform })
+        await initTelegram({ getWebApp: () => wa })
+        expect(calls).not.toContain('fullscreen')
+      },
+    )
+
+    it('8.0 以下（isVersionAtLeast 返回 false）：不请求', async () => {
+      const { wa, calls } = desktopApp({ isVersionAtLeast: () => false })
+      await initTelegram({ getWebApp: () => wa })
+      expect(calls).not.toContain('fullscreen')
+    })
+
+    it('缺 requestFullscreen：不请求也不抛错', async () => {
+      const { wa } = desktopApp({ requestFullscreen: undefined })
+      const bridge = await initTelegram({ getWebApp: () => wa })
+      expect(bridge.available).toBe(true)
+    })
+
+    it('缺 isVersionAtLeast：不请求也不抛错', async () => {
+      const { wa, calls } = desktopApp({ isVersionAtLeast: undefined })
+      const bridge = await initTelegram({ getWebApp: () => wa })
+      expect(bridge.available).toBe(true)
+      expect(calls).not.toContain('fullscreen')
+    })
+
+    it('已在全屏：不请求', async () => {
+      const { wa, calls } = desktopApp({ isFullscreen: true })
+      await initTelegram({ getWebApp: () => wa })
+      expect(calls).not.toContain('fullscreen')
+    })
+
+    it('isVersionAtLeast 抛错：不阻塞就绪', async () => {
+      const { wa } = desktopApp({
+        isVersionAtLeast: () => {
+          throw new Error('版本判断崩了')
+        },
+      })
+      const bridge = await initTelegram({ getWebApp: () => wa })
+      expect(bridge.available).toBe(true)
+      expect(bridge.initData).toContain('query_id=AAA')
+    })
+
+    it('requestFullscreen 抛错：不阻塞就绪', async () => {
+      const { wa } = desktopApp({
+        requestFullscreen: () => {
+          throw new Error('WebAppMethodUnsupported')
+        },
+      })
+      const bridge = await initTelegram({ getWebApp: () => wa })
+      expect(bridge.available).toBe(true)
+      expect(bridge.initData).toContain('query_id=AAA')
+    })
   })
 })

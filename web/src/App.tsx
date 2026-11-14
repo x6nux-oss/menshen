@@ -57,9 +57,17 @@ export default function App() {
     }
   }, [])
 
-  if (boot.phase === 'booting') return <BootSkeleton />
-  if (boot.phase === 'unavailable') return <UnavailableGuide />
-  return <ReadyApp bridge={boot.bridge} />
+  return (
+    <div className="mini-app">
+      {boot.phase === 'booting' ? (
+        <BootSkeleton />
+      ) : boot.phase === 'unavailable' ? (
+        <UnavailableGuide />
+      ) : (
+        <ReadyApp bridge={boot.bridge} />
+      )}
+    </div>
+  )
 }
 
 /** colorScheme → 主题模式。缺省（空串/未知）按亮色。 */
@@ -131,7 +139,7 @@ function Shell() {
 
   if (state.isPending) {
     return (
-      <div className="px-4 pt-2">
+      <div className="mx-auto max-w-7xl px-4 pt-2 lg:px-6">
         <Skeleton className="mb-3 h-7 w-24" />
         <Skeleton className="mb-3 h-22 rounded-lg" />
         <Skeletons rows={3} />
@@ -144,7 +152,9 @@ function Shell() {
     return (
       <>
         <TopBar title="门神" />
-        <ErrorState status={status} onRetry={() => void state.refetch()} />
+        <div className="mx-auto max-w-lg">
+          <ErrorState status={status} onRetry={() => void state.refetch()} />
+        </div>
       </>
     )
   }
@@ -155,16 +165,16 @@ function Shell() {
   const section = top ? sectionOf(top) : tabSection(nav.tab)
 
   return (
-    <>
+    <div className="mini-shell">
       <TopBar
-        className="sticky top-0 z-20"
+        className="sticky top-0 z-20 lg:px-6"
         brand={top === null}
         title={top ? currentName : TAB_NAMES[nav.tab]}
         subtitle={top ? `${section} · 返回${TAB_NAMES[nav.tab]}` : `${role} · ${meLabel(me)}`}
         onBack={top ? nav.pop : undefined}
       />
       <main
-        className="mx-auto w-full max-w-lg px-4 pt-3"
+        className="mx-auto w-full max-w-lg px-4 pt-3 lg:max-w-7xl lg:px-6 lg:pt-6"
         style={{ paddingBottom: top ? '1rem' : 'calc(var(--mini-nav-clearance) + 24px)' }}
       >
         {/* Tab 根页常驻：push 二级页时只隐藏不卸载，返回后搜索词/批量选择等内存状态不丢。
@@ -184,22 +194,20 @@ function Shell() {
           </PageScope>
         )}
       </main>
-      {/* 二级页有自己的底部操作栏；Tab 栏只在 tab 根页出现（与旧实现一致）。 */}
-      {top === null && (
-        <TabBar
-          tabs={TABS}
-          active={nav.tab}
-          onChange={(key) => nav.switchTab(key as TabKey)}
-        />
-      )}
-    </>
+      <TabBar
+        tabs={TABS}
+        active={nav.tab}
+        onChange={(key) => nav.switchTab(key as TabKey)}
+        className={top ? 'hidden lg:block' : undefined}
+      />
+    </div>
   )
 }
 
 /** BootSkeleton 初始化阶段的整页骨架（此时还没有主题与导航）。 */
 function BootSkeleton() {
   return (
-    <div data-testid="boot-skeleton" className="mx-auto min-h-dvh max-w-lg px-4 pt-6">
+    <div data-testid="boot-skeleton" className="mx-auto max-w-lg px-4 pt-6 lg:max-w-7xl lg:px-6">
       <div className="mb-4 flex items-center gap-3">
         <Skeleton className="size-10 rounded-md" />
         <div className="space-y-1.5">
@@ -216,7 +224,7 @@ function BootSkeleton() {
 /** UnavailableGuide 在 SDK 未加载出来时给出可操作提示。 */
 function UnavailableGuide() {
   return (
-    <div data-testid="unavailable-guide" className="mx-auto min-h-dvh max-w-lg p-4 pt-12">
+    <div data-testid="unavailable-guide" className="mx-auto max-w-lg p-4 pt-12">
       <div className="mb-5 flex items-center gap-3">
         <span className="grid size-11 place-items-center rounded-md bg-primary/10 text-primary">
           <ShieldCheck className="size-6" aria-hidden />

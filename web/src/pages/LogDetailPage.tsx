@@ -182,7 +182,7 @@ export function LogDetailPage({ id }: { id: number }) {
       <div
         ref={barRef}
         data-testid="log-action-bar"
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]"
+        className="mini-action-bar fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]"
       >
         <div className="flex flex-wrap gap-1.5">
           {PRIMARY_ACTIONS.map((spec) => (

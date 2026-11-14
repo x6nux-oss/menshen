@@ -294,7 +294,7 @@ export function ChatsPage({ bulkLimit = BULK_CHAT_LIMIT }: { bulkLimit?: number 
         <div
           ref={barRef}
           data-testid="batch-bar"
-          className="fixed inset-x-0 z-20 border-t border-border bg-card px-3 py-2 shadow-[0_-1px_0_var(--border)]"
+          className="mini-action-bar fixed inset-x-0 z-20 border-t border-border bg-card px-3 py-2 shadow-[0_-1px_0_var(--border)]"
           style={{ bottom: 'calc(var(--mini-nav-clearance) + 8px)' }}
         >
           <p className="mb-1.5 text-center text-[12px] text-muted-foreground">

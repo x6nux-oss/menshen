@@ -28,7 +28,7 @@ function EmptyLine({ children }: { children: string }) {
 /** Stat 是防护数据的一格：大数字 + 小标签，值一眼可扫。 */
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="min-w-0 px-4 py-3">
+    <div className="min-w-0 bg-card px-4 py-3">
       <p className="text-xs leading-[1.4] text-muted-foreground">{label}</p>
       <p className="mt-1 truncate text-[24px] leading-[1.2] font-semibold tracking-tight tabular-nums">
         {value}
@@ -108,8 +108,11 @@ export function OverviewPage() {
   const recent = hits.data?.logs.slice(0, 3) ?? []
 
   return (
-    <div data-testid="overview-page" className="space-y-4">
-      <section className="overflow-hidden rounded-lg border border-border bg-card">
+    <div
+      data-testid="overview-page"
+      className="space-y-4 lg:grid lg:grid-cols-12 lg:items-start lg:gap-4 lg:space-y-0"
+    >
+      <section className="overflow-hidden rounded-lg border border-border bg-card lg:col-span-5 lg:row-span-2">
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <span className="grid size-9 place-items-center rounded-md bg-primary/10 text-primary">
             <ShieldCheck className="size-5" aria-hidden />
@@ -156,24 +159,20 @@ export function OverviewPage() {
         )}
       </section>
 
-      <section>
+      <section className="lg:col-span-7">
         <div className="mb-1.5 flex items-baseline justify-between px-0.5">
           <h2 className="text-sm font-semibold">近 24 小时防护</h2>
           <span className="text-xs text-muted-foreground">判定与处置概况</span>
         </div>
-        <div className="grid grid-cols-2 divide-x divide-border overflow-hidden rounded-lg border border-border bg-card">
-          <div className="divide-y divide-border">
-            <Stat label="送检" value={stats.checked} />
-            <Stat label="折算开销" value={stats.cost_text} />
-          </div>
-          <div className="divide-y divide-border">
-            <Stat label="命中" value={stats.hits} />
-            <Stat label="生效群" value={stats.chats} />
-          </div>
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border xl:grid-cols-4">
+          <Stat label="送检" value={stats.checked} />
+          <Stat label="命中" value={stats.hits} />
+          <Stat label="折算开销" value={stats.cost_text} />
+          <Stat label="生效群" value={stats.chats} />
         </div>
       </section>
 
-      <section>
+      <section className="lg:col-span-7">
         <div className="mb-1.5 px-0.5">
           <h2 className="text-sm font-semibold">业务入口</h2>
         </div>
@@ -215,65 +214,67 @@ export function OverviewPage() {
         </div>
       </section>
 
-      <SectionCard
-        title="最近命中"
-        meta="广告判定"
-        footer={<ListRow primary="全部记录" chevron onClick={() => nav.switchTab('records')} />}
-      >
-        {hits.isPending ? (
-          <Skeletons rows={2} />
-        ) : hits.isError ? (
-          <ErrorState status={errorStatus(hits.error)} onRetry={() => void hits.refetch()} />
-        ) : recent.length === 0 ? (
-          <EmptyLine>最近没有命中</EmptyLine>
-        ) : (
-          recent.map((log) => (
-            <ListRow
-              key={log.id}
-              primary={`#${log.id} ${verdictLabel(log.verdict)}`}
-              secondary={[actionLabel(log.action), kindLabel(log.kind)].join(' · ')}
-              value={fmtTS(log.created_at, tz)}
-              chevron
-              onClick={() => nav.push({ k: 'log', id: log.id })}
-            />
-          ))
-        )}
-      </SectionCard>
+      <div className="grid gap-4 lg:col-span-12 lg:grid-cols-2 lg:items-start lg:*:mb-0">
+        <SectionCard
+          title="最近命中"
+          meta="广告判定"
+          footer={<ListRow primary="全部记录" chevron onClick={() => nav.switchTab('records')} />}
+        >
+          {hits.isPending ? (
+            <Skeletons rows={2} />
+          ) : hits.isError ? (
+            <ErrorState status={errorStatus(hits.error)} onRetry={() => void hits.refetch()} />
+          ) : recent.length === 0 ? (
+            <EmptyLine>最近没有命中</EmptyLine>
+          ) : (
+            recent.map((log) => (
+              <ListRow
+                key={log.id}
+                primary={`#${log.id} ${verdictLabel(log.verdict)}`}
+                secondary={[actionLabel(log.action), kindLabel(log.kind)].join(' · ')}
+                value={fmtTS(log.created_at, tz)}
+                chevron
+                onClick={() => nav.push({ k: 'log', id: log.id })}
+              />
+            ))
+          )}
+        </SectionCard>
 
-      <SectionCard
-        title="机器人"
-        meta={`${bots.length} 台`}
-        footer={
-          <div className="px-3 py-2">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => nav.switchTab('bots')}
-            >
-              <Bot aria-hidden />
-              查看全部机器人
-            </Button>
-          </div>
-        }
-      >
-        {bots.length === 0 ? (
-          <EmptyLine>还没有可管理的机器人</EmptyLine>
-        ) : (
-          bots.map((bot) => (
-            <ListRow
-              key={bot.bot_id}
-              primary={bot.label}
-              secondary={`@${bot.username || '—'} · bot_id ${bot.bot_id}`}
-              badge={<BotStatusBadge bot={bot} />}
-              chevron
-              onClick={() => nav.push({ k: 'bot', id: bot.bot_id })}
-            />
-          ))
-        )}
-      </SectionCard>
+        <SectionCard
+          title="机器人"
+          meta={`${bots.length} 台`}
+          footer={
+            <div className="px-3 py-2">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => nav.switchTab('bots')}
+              >
+                <Bot aria-hidden />
+                查看全部机器人
+              </Button>
+            </div>
+          }
+        >
+          {bots.length === 0 ? (
+            <EmptyLine>还没有可管理的机器人</EmptyLine>
+          ) : (
+            bots.map((bot) => (
+              <ListRow
+                key={bot.bot_id}
+                primary={bot.label}
+                secondary={`@${bot.username || '—'} · bot_id ${bot.bot_id}`}
+                badge={<BotStatusBadge bot={bot} />}
+                chevron
+                onClick={() => nav.push({ k: 'bot', id: bot.bot_id })}
+              />
+            ))
+          )}
+        </SectionCard>
+      </div>
 
       {todoTotal > 0 && (
-        <p className="flex items-start gap-1.5 px-1 pb-1 text-[11px] leading-[1.6] text-muted-foreground">
+        <p className="flex items-start gap-1.5 px-1 pb-1 text-[11px] leading-[1.6] text-muted-foreground lg:col-span-12">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
           待办数据来自当前账号可见范围；处置后列表会自动刷新。
         </p>

@@ -44,7 +44,7 @@ export function FormDrawer({
         if (!next && !pending) onClose()
       }}
     >
-      <SheetContent side="bottom" hideClose className="p-0 pb-[env(safe-area-inset-bottom)]">
+      <SheetContent side="bottom" hideClose className="mini-sheet p-0 pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-center px-4 pt-4 pb-4">
           <h2 className="flex-1 text-[17px] leading-tight font-semibold">{title}</h2>
           <SheetClose

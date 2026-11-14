@@ -23,9 +23,9 @@ export function TabBar({ tabs, active, onChange, ariaLabel, className }: TabBarP
   function onKeyDown(event: KeyboardEvent<HTMLElement>) {
     const index = tabs.findIndex((tab) => tab.key === active)
     const next =
-      event.key === 'ArrowRight'
+      event.key === 'ArrowRight' || event.key === 'ArrowDown'
         ? (index + 1) % tabs.length
-        : event.key === 'ArrowLeft'
+        : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
           ? (index - 1 + tabs.length) % tabs.length
           : event.key === 'Home'
             ? 0
@@ -43,12 +43,14 @@ export function TabBar({ tabs, active, onChange, ariaLabel, className }: TabBarP
       aria-label={ariaLabel ?? '主导航'}
       onKeyDown={onKeyDown}
       className={cn(
-        'fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card',
+        'mini-navigation fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card',
         'pb-[env(safe-area-inset-bottom)]',
+        'lg:overflow-y-auto lg:border-t-0 lg:border-r lg:border-sidebar-border lg:bg-sidebar lg:text-sidebar-foreground',
         className,
       )}
     >
-      <div className="mx-auto flex h-17 max-w-lg items-stretch">
+      <p className="hidden px-5 pt-7 pb-5 text-xs font-medium tracking-wider text-sidebar-muted lg:block">工作空间</p>
+      <div className="mx-auto flex h-17 max-w-lg items-stretch lg:h-auto lg:flex-col lg:gap-2 lg:px-3">
         {tabs.map((tab) => {
           const selected = tab.key === active
           return (
@@ -60,13 +62,16 @@ export function TabBar({ tabs, active, onChange, ariaLabel, className }: TabBarP
               className={cn(
                 'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] outline-none',
                 'transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset',
-                selected ? 'font-semibold text-primary' : 'text-muted-foreground hover:text-foreground',
+                'lg:min-h-12 lg:flex-none lg:flex-row lg:justify-start lg:gap-3 lg:rounded-md lg:px-3 lg:text-sm lg:focus-visible:ring-sidebar-foreground',
+                selected
+                  ? 'font-semibold text-primary lg:bg-sidebar-accent lg:text-sidebar-foreground'
+                  : 'text-muted-foreground hover:text-foreground lg:text-sidebar-muted lg:hover:bg-sidebar-accent lg:hover:text-sidebar-foreground',
               )}
             >
               {selected && (
                 <span
                   aria-hidden
-                  className="absolute top-0 h-0.5 w-7 rounded-full bg-primary"
+                  className="absolute top-0 h-0.5 w-7 rounded-full bg-primary lg:hidden"
                 />
               )}
               {tab.icon !== undefined && (

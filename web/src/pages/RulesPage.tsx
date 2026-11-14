@@ -166,7 +166,7 @@ function TpFpValue({ rule }: { rule: Rule }) {
   }
   const cov = pct(rule.last_tp, rule.last_ads_total)
   return (
-    <span data-testid={`rule-tpfp-${rule.id}`} className="text-xs whitespace-nowrap">
+    <span data-testid={`rule-tpfp-${rule.id}`} className="text-xs">
       TP {rule.last_tp} ·{' '}
       <span className={rule.last_fp > 0 ? 'text-destructive' : undefined}>FP {rule.last_fp}</span>
       {cov !== null && <> · 覆盖 {cov}</>}
