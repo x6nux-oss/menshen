@@ -85,7 +85,7 @@ export function LocalModelsCard() {
       <div className="p-4">
         <p className="text-[13px] leading-[1.7] text-muted-foreground">
           离线 OCR（PP-OCRv6 small）与 NSFW 分类（Marqo）。下载和启用仅主管理员可操作；
-          已配置的远程模型仍作为失败回退。
+          已配置的远程模型仍可用于回退或补充画面描述。
         </p>
 
         {data.error !== '' && (

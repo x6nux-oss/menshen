@@ -18,6 +18,7 @@ import {
   Chip,
   FormDrawer,
   ListRow,
+  LocalModelsCard,
   SectionCard,
   SettingRow,
   SwitchRow,
@@ -93,10 +94,10 @@ const MODEL_ROWS: { which: ModelWhich; key: string; label: string; hint: string 
   {
     which: 'ocr',
     key: 'antiad_ocr_model',
-    label: 'OCR 模型',
-    hint: '优先逐字识别图里的文字；留空 = 跳过 OCR',
+    label: '远程 OCR 模型（可选）',
+    hint: '本地 OCR 未启用或失败时使用；留空关闭远程 OCR',
   },
-  { which: 'vision', key: 'antiad_vision_model', label: '识图模型', hint: '留空 = 图片与贴纸不判' },
+  { which: 'vision', key: 'antiad_vision_model', label: '远程识图模型（可选）', hint: '用于补充画面描述或本地识别失败时回退；留空关闭远程识图' },
   {
     which: 'rule',
     key: 'antiad_rule_model',
@@ -445,6 +446,8 @@ export function SettingsPage() {
         ))}
       </SectionCard>
 
+      <LocalModelsCard />
+
       <SectionCard title="默认模型">
         {MODEL_ROWS.map((row) => (
           <SettingRow
@@ -621,9 +624,9 @@ export function SettingsPage() {
             />
             <FieldHint>
               {modelEdit === 'ocr'
-                ? '留空 = 跳过 OCR，直接使用识图模型'
+                ? '留空不调用远程 OCR，不影响本地 OCR'
                 : modelEdit === 'vision'
-                  ? '留空 = 图片与贴纸不判'
+                  ? '留空不调用远程识图，不影响本地 OCR／NSFW'
                   : '形如 上游名/模型ID；留空 = 复判模型列表里第一个 OpenAI 兼容模型'}
             </FieldHint>
           </>

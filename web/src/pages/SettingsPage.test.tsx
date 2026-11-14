@@ -6,6 +6,7 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { describe, expect, it } from 'vitest'
+import { SettingsView } from '../admin/views/SettingsView'
 import type { State } from '../api/types'
 import { mockState } from '../mocks/fixtures'
 import { renderPage } from '../test/renderPage'
@@ -31,6 +32,22 @@ async function renderSettings() {
   renderPage(<SettingsPage />)
   expect(await screen.findByText('总开关')).toBeInTheDocument()
 }
+
+describe.each([
+  ['Mini App', SettingsPage],
+  ['桌面', SettingsView],
+] as const)('%s 设置页的本地视觉模型', (_surface, Settings) => {
+  it('直接提供本地 OCR/NSFW 配置，并标清可选远程模型', async () => {
+    renderPage(<Settings />)
+
+    expect(await screen.findByText('PP-OCRv6 small')).toBeInTheDocument()
+    expect(screen.getByText('Marqo NSFW')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '一键下载并启用' })).toBeInTheDocument()
+    expect(screen.getByLabelText('NSFW 阈值（%）')).toHaveValue('85')
+    expect(screen.getByText('远程 OCR 模型（可选）')).toBeInTheDocument()
+    expect(screen.getByText('远程识图模型（可选）')).toBeInTheDocument()
+  })
+})
 
 describe('SettingsPage 总开关（迁移不变量：字符串 1/0 + 成功后刷新）', () => {
   it('三个开关提交字符串值，成功后失效刷新 state', async () => {
