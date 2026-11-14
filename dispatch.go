@@ -192,6 +192,11 @@ func handleMessage(b *core.Bot, m *tg.Message) {
 		strings.HasPrefix(text, "/log@"):
 		panel.HandleLogCommand(b, m, text)
 		return
+	case text == "/status" || strings.HasPrefix(text, "/status ") ||
+		strings.HasPrefix(text, "/status@"):
+		// 运行状态与近 24 小时统计：只读快照与库，除回复本身外不产生开销。
+		panel.HandleStatusCommand(b, m)
+		return
 	case text == "/user" || strings.HasPrefix(text, "/user ") ||
 		strings.HasPrefix(text, "/user@"):
 		panel.HandleUserCommand(b, m, text)

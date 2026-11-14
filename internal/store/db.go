@@ -167,7 +167,8 @@ CREATE TABLE IF NOT EXISTS models (
   cache_read_price    REAL    NOT NULL DEFAULT 0,
   cache_write_price   REAL    NOT NULL DEFAULT 0,
   enabled             INTEGER NOT NULL DEFAULT 1,
-  simple_instructions INTEGER NOT NULL DEFAULT 0
+  simple_instructions INTEGER NOT NULL DEFAULT 0,
+  reasoning_effort    TEXT    NOT NULL DEFAULT ''  -- 思考强度，空 = 不传
 );
 
 -- ai_log 是每次大模型调用的原始流水：请求体（已剥离固定提示词）、响应体、
@@ -600,6 +601,9 @@ func migrate(db *sql.DB) error {
 		// 的初判模型（如 laya 私有版）不吃长口径；同一列表里标没标混着时，
 		// 每次尝试按当前模型各自生效（见 antiad.aiAttempt）。老库默认 0。
 		{"models", "simple_instructions", "INTEGER NOT NULL DEFAULT 0"},
+		// reasoning_effort：思考强度（low / medium / high …），按模型填；
+		// 空串 = 不传，由模型按自己的默认思考。老库默认空串。
+		{"models", "reasoning_effort", "TEXT NOT NULL DEFAULT ''"},
 	}
 	for _, c := range cols {
 		has, err := hasColumn(db, c.table, c.col)

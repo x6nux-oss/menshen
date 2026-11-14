@@ -61,8 +61,8 @@ func (t *einoStreamRT) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// forceStreamBody 把 JSON 请求体里的 stream 置为 true，并去掉上游不接受的
-// temperature（见 dropUnsupportedTemperature）。
+// forceStreamBody 把 JSON 请求体里的 stream 置为 true，去掉上游不接受的
+// temperature（见 dropUnsupportedTemperature），没写上限时补默认上限。
 // 非 JSON 体原样放行（Eino 的 chat 请求都是 JSON，兜底而已）。
 func forceStreamBody(req *http.Request) error {
 	if req.Body == nil || req.Method != http.MethodPost {
@@ -77,6 +77,7 @@ func forceStreamBody(req *http.Request) error {
 	if json.Unmarshal(raw, &body) == nil {
 		body["stream"] = true
 		dropUnsupportedTemperature(body)
+		defaultMaxTokens(body)
 		if nb, merr := json.Marshal(body); merr == nil {
 			raw = nb
 		}
@@ -101,6 +102,18 @@ func dropUnsupportedTemperature(body map[string]any) {
 	id, _ := body["model"].(string)
 	if upstream.TemperatureUnsupported(id) {
 		delete(body, "temperature")
+	}
+}
+
+// defaultMaxTokens 给没写上限的请求补默认上限（见 upstream/maxtokens.go）；
+// 被拒过的模型不补。判定链路在 upstream.BuildBody 里做同一件事。
+func defaultMaxTokens(body map[string]any) {
+	if body["max_tokens"] != nil || body["max_completion_tokens"] != nil {
+		return
+	}
+	id, _ := body["model"].(string)
+	if n := upstream.DefaultMaxTokensFor(id, false); n > 0 {
+		body["max_tokens"] = n
 	}
 }
 

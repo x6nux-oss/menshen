@@ -95,6 +95,9 @@ type Model struct {
 	// 的初判模型用（不吃长口径提示词）；按模型标记而不是按 bot —— 同一
 	// 判定列表里标没标混着时，每次尝试按当前模型各自生效。
 	SimpleInstructions bool
+	// ReasoningEffort：思考强度（low / medium / high …），chat 请求按渠道
+	// 翻成各家的字段（见 effort.go）。空 = 不传，由模型按自己的默认思考。
+	ReasoningEffort string
 }
 
 // SplitModelName 把模型名切成（上游名, 模型ID）。

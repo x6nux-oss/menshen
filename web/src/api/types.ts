@@ -116,6 +116,17 @@ export interface Upstream {
 export type UpstreamKind =
   "openai" | "openai-responses" | "anthropic" | "gemini" | "cloudflare";
 
+/** 思考强度可选值，与后端 upstream.Efforts 一致（OpenAI 与 Anthropic 取值的并集）。 */
+export const REASONING_EFFORTS = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
+
 export interface Model {
   name: string;
   enabled: boolean;
@@ -125,6 +136,8 @@ export interface Model {
   cache_write_price: number;
   /** 初判提示词简化为一句话（微调初判模型专用）。 */
   simple_instructions: boolean;
+  /** 思考强度，取值见 REASONING_EFFORTS；空串 = 不传，模型按自己的默认思考。 */
+  reasoning_effort: string;
   /** 由模型名解析出的上游展示名；解析不出时为空串。 */
   upstream: string;
   model_id: string;

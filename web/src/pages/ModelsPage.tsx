@@ -7,6 +7,7 @@ import { useState } from "react";
 import { errorStatus } from "../api/client";
 import { useMiniState } from "../api/hooks";
 import { useModelMutation, useOptimisticMiniMutation } from "../api/mutations";
+import { REASONING_EFFORTS } from "../api/types";
 import type { Model, State } from "../api/types";
 import { filterRows } from "../lib/filters";
 import { useNav, usePageParam } from "../nav";
@@ -375,6 +376,25 @@ export function ModelDetailPage({ name }: { name: string }) {
     );
   }
 
+  function setEffort(next: string) {
+    enableMut.mutate(
+      {
+        body: { action: "update", name, reasoning_effort: next },
+        apply: (s: State) => ({
+          ...s,
+          models: (s.models ?? []).map((m) =>
+            m.name === name ? { ...m, reasoning_effort: next } : m,
+          ),
+        }),
+      },
+      {
+        onSuccess: (resp) =>
+          toast(resp.note ?? (next ? `思考强度 ${next}` : "不传思考强度")),
+        onError: (err) => toast(err.message),
+      },
+    );
+  }
+
   async function removeModel() {
     const ok = await confirm({
       title: "删除该模型？",
@@ -433,6 +453,25 @@ export function ModelDetailPage({ name }: { name: string }) {
           disabled={enableMut.isPending}
           onChange={toggleSimple}
         />
+        <Box sx={{ p: 1.5 }}>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            label="思考强度"
+            value={model.reasoning_effort}
+            disabled={enableMut.isPending}
+            onChange={(event) => setEffort(event.target.value)}
+            helperText="不填不发，模型按自己的默认思考；模型不认时自动去掉"
+          >
+            <MenuItem value="">不填</MenuItem>
+            {REASONING_EFFORTS.map((e) => (
+              <MenuItem key={e} value={e}>
+                {e}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Box>
       </SectionCard>
 
       <PriceCard key={model.name} model={model} />

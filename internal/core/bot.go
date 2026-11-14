@@ -44,6 +44,12 @@ type Shared struct {
 	Store *store.Store
 	Cache *store.Cache
 
+	// StartedAt 是进程启动时刻，/status 的「已运行」由它算。
+	// 进程级而不是 bot 级：重启后所有 bot 一起重新开始。
+	StartedAt time.Time
+	// Version 是构建版本（main 的 ldflags 注入值）。空表示未注入。
+	Version string
+
 	// adLimits 是送检前的滥用护栏（重复文本去重、每群送检上限、
 	// 告警节流），窗口长度 1 分钟。
 	//
@@ -100,6 +106,7 @@ type Shared struct {
 
 func NewShared(cfg *config.Config, s *store.Store, c *store.Cache) *Shared {
 	return &Shared{Cfg: cfg, Store: s, Cache: c,
+		StartedAt: time.Now(),
 		AdLimits:  ratelimit.New(),
 		Logs:      logbuf.New(logbuf.DefaultCapacity),
 		reviewSem: make(chan struct{}, adReviewConcurrency),
@@ -673,6 +680,7 @@ func (b *Bot) registerMiniAppButton() {
 
 var adminCmds = []map[string]string{
 	{"command": "start", "description": "打开管理面板"},
+	{"command": "status", "description": "运行状态与近 24 小时统计"},
 	{"command": "log", "description": "查看某条判定记录（/log 记录号）"},
 	{"command": "user", "description": "查看某人的资料与处置记录（/user user_id）"},
 	{"command": "check", "description": "查看解禁码对应用户的封禁原因（/check 解禁码）"},

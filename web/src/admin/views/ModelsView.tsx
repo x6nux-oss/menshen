@@ -32,6 +32,7 @@ import {
 import type { Column } from "../components";
 import { useRunFeedback } from "../feedback";
 import { useAdminNav } from "../nav";
+import { REASONING_EFFORTS } from "../../api/types";
 import type { Model } from "../../api/types";
 
 export function ModelsView() {
@@ -344,6 +345,43 @@ function ModelDetailBody({
           给微调过的初判模型用：is_ad 的 instructions
           换成一句「是不是广告」，判定选项与 state 不变。
           同一判定列表里标没标混着时，每次尝试按当前模型各自生效；复判提示词不受影响。
+        </Typography>
+      </CardBlock>
+
+      <CardBlock
+        title="思考强度"
+        actions={
+          <Select
+            size="small"
+            displayEmpty
+            value={model.reasoning_effort}
+            disabled={mut.isPending}
+            onChange={(e) =>
+              run(
+                mut.mutateAsync({
+                  action: "update",
+                  name: model.name,
+                  reasoning_effort: e.target.value,
+                }),
+                e.target.value ? `思考强度 ${e.target.value}` : "不传思考强度",
+              )
+            }
+            sx={{ minWidth: 120 }}
+          >
+            <MenuItem value="">不填</MenuItem>
+            {REASONING_EFFORTS.map((e) => (
+              <MenuItem key={e} value={e}>
+                {e}
+              </MenuItem>
+            ))}
+          </Select>
+        }
+      >
+        <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+          不填不发，模型按自己的默认思考。按渠道翻成各家字段：OpenAI 的
+          reasoning_effort、Responses 的 reasoning.effort、Anthropic 的
+          output_config.effort（Gemini / Cloudflare 原生渠道不支持）。
+          模型不认这个参数时自动去掉重发，并记一条警告日志。
         </Typography>
       </CardBlock>
 

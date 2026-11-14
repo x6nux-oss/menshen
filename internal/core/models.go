@@ -2,9 +2,11 @@ package core
 
 import (
 	"math"
+	"slices"
 	"strings"
 
 	"menshen/internal/store"
+	"menshen/internal/upstream"
 )
 
 // ---- 模型定价的增删改 ----
@@ -85,6 +87,8 @@ type ModelPatch struct {
 	// SimpleInstructions：初判 is_ad 的 instructions 简化为一句话（微调
 	// 初判模型专用，见 upstream.Model）。
 	SimpleInstructions *bool
+	// ReasoningEffort：思考强度，取值见 upstream.Efforts；空串 = 不传。
+	ReasoningEffort *string
 }
 
 func (sh *Shared) UpdateModel(name string, p ModelPatch) error {
@@ -110,6 +114,14 @@ func (sh *Shared) UpdateModel(name string, p ModelPatch) error {
 	if p.SimpleInstructions != nil {
 		cols = append(cols, "simple_instructions=?")
 		args = append(args, boolInt(*p.SimpleInstructions))
+	}
+	if p.ReasoningEffort != nil {
+		e := strings.ToLower(strings.TrimSpace(*p.ReasoningEffort))
+		if e != "" && !slices.Contains(upstream.Efforts, e) {
+			return Bad("思考强度只能是 %s 之一，留空 = 不传", strings.Join(upstream.Efforts, " / "))
+		}
+		cols = append(cols, "reasoning_effort=?")
+		args = append(args, e)
 	}
 	if len(cols) == 0 {
 		return nil

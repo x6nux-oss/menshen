@@ -116,16 +116,17 @@ func retryableModelError(err error) bool {
 // Stream 只重试建立阶段，流一旦返回，消费中的错误无法透明重试。
 //
 // 另有一类不是网络故障的失败也在这里就地自愈：上游拒绝 temperature 参数
-// （见 upstream.TemperatureUnsupported）。Eino 把 temperature 写在模型配置
-// 里，建好之后改不掉，所以在传输层按模型去掉该参数 —— 这里记下模型后立刻
-// 重发一次，重发会经过那条去掉参数的路。
+// （见 upstream.TemperatureUnsupported）或默认输出上限（见
+// upstream.DefaultMaxTokensFor）。两者都由传输层按模型改写请求体 —— 这里
+// 记下模型后立刻重发一次，重发会经过那条改写的路。
 type retryChatModel struct {
 	inner   model.ToolCallingChatModel
 	modelID string // 发给上游的模型名，用于登记「不接受 temperature」
 	// stripped 表示本实例已经为 temperature 重发过一次：重发仍然被拒说明
 	// 去参数没生效（例如上游文案里另有 temperature 字样），再快速重发没有
-	// 意义，交回常规重试与失败处理。
+	// 意义，交回常规重试与失败处理。uncapped 是输出上限的同一个标记。
 	stripped bool
+	uncapped bool
 }
 
 // withModelRetry 包装模型；nil 原样返回。
@@ -146,9 +147,9 @@ func (m *retryChatModel) Generate(ctx context.Context, in []*schema.Message,
 			return out, nil
 		}
 		lastErr = err
-		// 模型不接受 temperature：记下来，下一轮传输层会去掉它，这里立即
-		// 重发 —— 参数问题重发就解决，等 5 秒退避纯属浪费。
-		if m.noteTemperatureRejection(err) {
+		// 模型不接受 temperature / 默认上限：记下来，下一轮传输层会改写，
+		// 这里立即重发 —— 参数问题重发就解决，等 5 秒退避纯属浪费。
+		if m.noteParamRejection(err) {
 			continue
 		}
 		if attempt >= ruleAgentRetryCount || !retryableModelError(err) || ctx.Err() != nil {
@@ -170,7 +171,7 @@ func (m *retryChatModel) Stream(ctx context.Context, in []*schema.Message,
 			return out, nil
 		}
 		lastErr = err
-		if m.noteTemperatureRejection(err) {
+		if m.noteParamRejection(err) {
 			continue
 		}
 		if attempt >= ruleAgentRetryCount || !retryableModelError(err) || ctx.Err() != nil {
@@ -187,23 +188,32 @@ func (m *retryChatModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingC
 	if err != nil {
 		return nil, err
 	}
-	return &retryChatModel{inner: inner, modelID: m.modelID, stripped: m.stripped}, nil
+	return &retryChatModel{inner: inner, modelID: m.modelID,
+		stripped: m.stripped, uncapped: m.uncapped}, nil
 }
 
-// noteTemperatureRejection 报告这次失败是否为「模型不接受 temperature」。
-// 是则记下模型并返回 true，让调用方立即重发；同一个实例只认一次。
-func (m *retryChatModel) noteTemperatureRejection(err error) bool {
-	if m.stripped {
-		return false
-	}
+// noteParamRejection 报告这次失败是否为「模型不接受 temperature / 默认
+// 输出上限」。是则记下模型并返回 true，让调用方立即重发；每种参数同一个
+// 实例只认一次。
+func (m *retryChatModel) noteParamRejection(err error) bool {
 	status, msg, ok := apiErrorInfo(err)
-	if !ok || !upstream.TemperatureRejected(status, msg) {
+	if !ok {
 		return false
 	}
-	m.stripped = true
-	upstream.MarkTemperatureUnsupported(m.modelID)
-	slog.Warn("规则发现：模型不接受 temperature 参数，去掉后重试",
-		"模型", m.modelID, "状态", status)
+	switch {
+	case !m.stripped && upstream.TemperatureRejected(status, msg):
+		m.stripped = true
+		upstream.MarkTemperatureUnsupported(m.modelID)
+		slog.Warn("规则发现：模型不接受 temperature 参数，去掉后重试",
+			"模型", m.modelID, "状态", status)
+	case !m.uncapped && upstream.MaxTokensRejected(status, msg):
+		m.uncapped = true
+		upstream.MarkMaxTokensRejected(m.modelID)
+		slog.Warn("规则发现：模型不接受默认输出上限，退回后重试",
+			"模型", m.modelID, "状态", status)
+	default:
+		return false
+	}
 	return true
 }
 
