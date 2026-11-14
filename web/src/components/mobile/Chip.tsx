@@ -28,7 +28,7 @@ export function Chip({ label, selected = false, className, ...props }: ChipProps
       aria-pressed={selected}
       data-selected={selected ? 'true' : undefined}
       className={cn(
-        'inline-flex shrink-0 items-center rounded-full px-3 py-1 text-[13px] leading-[1.4] whitespace-nowrap',
+        'inline-flex max-w-full shrink-0 items-center rounded-full px-3 py-1 text-[13px] leading-[1.4] whitespace-normal wrap-anywhere',
         'transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
         selected
           ? 'bg-primary font-medium text-primary-foreground'
@@ -47,7 +47,7 @@ export function ChipStatic({ label, className }: { label: ReactNode; className?:
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center rounded-full bg-muted px-3 py-1 text-[13px] leading-[1.4] whitespace-nowrap text-muted-foreground',
+        'inline-flex max-w-full shrink-0 items-center rounded-full bg-muted px-3 py-1 text-[13px] leading-[1.4] whitespace-normal wrap-anywhere text-muted-foreground',
         className,
       )}
     >

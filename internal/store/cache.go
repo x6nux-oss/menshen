@@ -545,7 +545,7 @@ func listOrSingle(list, single string) []string {
 	if v := strings.TrimSpace(single); v != "" {
 		return []string{v}
 	}
-	return nil
+	return []string{}
 }
 
 // botsOwnedBy 返回某人名下的 bot。主管理员传 mainAdmin 取全部。

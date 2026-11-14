@@ -152,6 +152,68 @@ func TestMiniAPIAuthAndState(t *testing.T) {
 	}
 }
 
+func TestMiniStateBotModelsAlwaysArrays(t *testing.T) {
+	env := newMiniEnv(t)
+	const secondaryToken = "43:AAEEfaketoken_ForUnitTestsOnly1234567"
+	testutil.RegisterTestBot(t, env.sh, secondaryToken, 43, 777)
+	if err := env.sh.SetBotModels(43, "so", []string{"up2/m2", "up1/m1"}); err != nil {
+		t.Fatal(err)
+	}
+
+	type botState struct {
+		BotID     int64    `json:"bot_id"`
+		SoModels  []string `json:"so_models"`
+		LLMModels []string `json:"llm_models"`
+	}
+	var state struct {
+		Bots []botState `json:"bots"`
+	}
+	stateOf := func() {
+		t.Helper()
+		response := miniDo(t, env.h, testutil.TestToken, env.adminInit(),
+			testutil.TestBotID, "state", nil)
+		if response.Code != http.StatusOK {
+			t.Fatalf("state 应 200，得到 %d：%s", response.Code, response.Body.String())
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &state); err != nil {
+			t.Fatal(err)
+		}
+	}
+	botOf := func(id int64) botState {
+		t.Helper()
+		for _, bot := range state.Bots {
+			if bot.BotID == id {
+				return bot
+			}
+		}
+		t.Fatalf("state 缺少 bot %d：%+v", id, state.Bots)
+		return botState{}
+	}
+
+	stateOf()
+	unset := botOf(testutil.TestBotID)
+	if unset.SoModels == nil || unset.LLMModels == nil {
+		t.Fatalf("未覆盖模型应下发 []，得到 so=%#v llm=%#v",
+			unset.SoModels, unset.LLMModels)
+	}
+	ordered := botOf(43)
+	if !slices.Equal(ordered.SoModels, []string{"up2/m2", "up1/m1"}) {
+		t.Errorf("覆盖模型顺序应保留，得到 %#v", ordered.SoModels)
+	}
+	if ordered.LLMModels == nil {
+		t.Errorf("未覆盖的复判模型应下发 []，得到 %#v", ordered.LLMModels)
+	}
+
+	if err := env.sh.SetBotModels(43, "so", nil); err != nil {
+		t.Fatal(err)
+	}
+	stateOf()
+	cleared := botOf(43)
+	if cleared.SoModels == nil || len(cleared.SoModels) != 0 {
+		t.Errorf("清空模型应下发 []，得到 %#v", cleared.SoModels)
+	}
+}
+
 // TestMiniSetPermissions：次级管理员不能改全局，只能改自己 bot 的参数。
 func TestMiniSetPermissions(t *testing.T) {
 	_, b := testutil.NewTestRegistry(t, nil)

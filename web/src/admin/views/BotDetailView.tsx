@@ -191,7 +191,7 @@ function ModelsCard({
   useEffect(() => setLlm(bot.llm_models.join(', ')), [bot.llm_models])
   return (
     <CardBlock title="判定模型">
-      <p className="mb-3 text-[12.5px] leading-relaxed text-muted-foreground">
+      <p className="mb-3 text-[12.5px] leading-relaxed wrap-anywhere text-muted-foreground">
         逗号分隔的有序列表，格式 <code>上游名/模型ID</code>。留空表示跟随全局默认。
         {models.length > 0 &&
           ` 已启用模型：${models.slice(0, 6).join('、')}${models.length > 6 ? '…' : ''}`}

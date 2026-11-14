@@ -181,6 +181,41 @@ describe('BotDetailPage', () => {
     })
   })
 
+  it('模型列表为空数组：按跟随全局渲染并可编辑、清空提交', async () => {
+    useState(
+      stateWith({
+        bots: mockState.bots.map((bot) => ({
+          ...bot,
+          so_models: [],
+          llm_models: [],
+        })),
+      }),
+    )
+    const bodies: Record<string, unknown>[] = []
+    capturePost('bot', bodies)
+    renderPage(<BotDetailPage botId={1} />)
+
+    expect(await screen.findByText('判定模型')).toBeInTheDocument()
+    expect(screen.getAllByText('跟随全局（全局未配置）')).toHaveLength(2)
+    fireEvent.click(screen.getAllByRole('button', { name: '编辑' })[0])
+    expect(await screen.findByRole('textbox', { name: /模型列表/ })).toHaveValue('')
+
+    fireEvent.click(screen.getByText('demo/gpt-5-mini'))
+    expect(screen.getByRole('textbox', { name: /模型列表/ })).toHaveValue('demo/gpt-5-mini')
+    fireEvent.change(screen.getByRole('textbox', { name: /模型列表/ }), {
+      target: { value: '' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(bodies).toHaveLength(1))
+    expect(bodies[0]).toEqual({
+      bot_id: 1,
+      action: 'models',
+      which: 'so',
+      value: '',
+    })
+  })
+
   it('次级管理员：模型卡只读，没有编辑入口', async () => {
     useState(
       stateWith({

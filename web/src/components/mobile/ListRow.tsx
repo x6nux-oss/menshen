@@ -39,7 +39,7 @@ export function ListRow({
   const content = (
     <>
       <span className="min-w-0 flex-1 text-left">
-        <span className="block text-[16px] leading-[1.4]">{primary}</span>
+        <span className="block text-[16px] leading-[1.4] wrap-anywhere">{primary}</span>
         {secondary !== undefined && (
           <span
             className={cn(
@@ -51,11 +51,17 @@ export function ListRow({
           </span>
         )}
       </span>
-      <span className="flex shrink-0 items-center gap-1.5 pl-1">
+      <span className="flex min-w-0 max-w-1/2 shrink-0 items-center gap-1.5 pl-1">
         {badge}
-        {value !== undefined && <span className="text-[14px] text-muted-foreground">{value}</span>}
+        {value !== undefined && (
+          <span className="min-w-0 text-right text-[14px] text-muted-foreground wrap-anywhere">
+            {value}
+          </span>
+        )}
         {trailing}
-        {chevron && <ChevronRight className="size-5 text-muted-foreground/60" aria-hidden />}
+        {chevron && (
+          <ChevronRight className="size-5 shrink-0 text-muted-foreground/60" aria-hidden />
+        )}
       </span>
     </>
   )
