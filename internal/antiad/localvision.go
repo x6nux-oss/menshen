@@ -84,8 +84,17 @@ func describeVisual(bot *core.Bot, snapshot *store.Snapshot, media visual) (stri
 		if err != nil {
 			return localvision.Result{}, err
 		}
+		inferStart := time.Now()
 		result, err := bot.LocalModels.Infer(ctx, localvision.Request{
 			Images: images, OCR: group == "ocr", NSFW: group == "nsfw"})
+		if bot.Metrics != nil {
+			outcome := "ok"
+			if err != nil {
+				outcome = "error"
+			}
+			bot.Metrics.LocalVisionRequests.With(group, outcome).Inc()
+			bot.Metrics.LocalVisionDuration.With(group).Observe(time.Since(inferStart).Seconds())
+		}
 		if err == nil && key != "" {
 			cache.Set(key, result, visionTTL)
 		}

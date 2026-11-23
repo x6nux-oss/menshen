@@ -294,3 +294,7 @@ func (manager *Manager) Close() {
 	manager.stopWorker()
 	manager.gate <- struct{}{}
 }
+
+// Busy 返回当前占用的推理槽位（上限 4）。抓取 /metrics 时只读，
+// 不改变队列状态。
+func (manager *Manager) Busy() int { return len(manager.slots) }

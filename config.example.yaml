@@ -64,13 +64,22 @@ bot_token: "123456789:AA..."
 # 必须是 https（Telegram 不接受 http），通常是反代对外的地址。
 # public_url: "https://ad.example.com"
 
-# webhook 模式下本进程的监听地址。默认只监听回环——
-# 该端口上的请求等同于以 bot 身份收发消息，不要直接暴露到公网，
-# 前面挂 nginx / caddy 做 TLS 终止。
+# HTTP 监听地址（默认只监听回环）。webhook 模式下该端口上的请求等同
+# 于以 bot 身份收发消息；长轮询模式下只提供 /healthz 与 /metrics。
+# 不要直接暴露到公网，前面挂 nginx / caddy 做 TLS 终止。
 #
 # ⚠️ 跑在容器里时必须改成 "0.0.0.0:8081"：默认值只监听容器自身的回环，
 #    端口映射过去也连不上。暴露面交给 compose 的端口绑定来收敛。
 # listen_addr: "127.0.0.1:8081"
+
+# ---- 运维端点（可选）----
+#
+# /metrics 是 Prometheus 文本格式。默认只允许回环访问；经反代或从别的
+# 机器抓时必须配 metrics_token 并用 Authorization: Bearer <token>。
+# pprof 默认关闭，显式开启后同样受回环/Bearer 约束。
+# 采集配置与告警阈值见 docs/operations.md。
+# metrics_token: "换成随机长串"
+# pprof_enabled: false
 
 # ---- 可选 ----
 

@@ -41,7 +41,8 @@ public_url: "https://ad.example.com/tg"
 - 路径解析锚在 token 自身的格式上，所以 `/bot<TOKEN>`（官方形态）
   与反代再套几层子路径都认得出来
 - 每个 bot 的更新由**一个** worker 串行消费，与长轮询语义完全一致
-- `GET /healthz` 供反代探活
+- `GET /healthz` 供反代探活（就绪检查，失败 503）；`/metrics` 与受控
+  pprof 见 [运维文档](operations.md)
 
 **多 bot 必须用 webhook。** 长轮询模式下接入子 bot 会被直接拒绝：getUpdates
 要为每个 bot 各开一条长连接，而 Telegram 的限速同时按 bot 和按出口 IP 算 ——
@@ -72,12 +73,14 @@ location / {
 | `admin_ids` | 主管理员 TG 数字 user_id，可多个 |
 | `bot_token` | 管理面板所在的 bot；长轮询模式下唯一工作的 bot |
 | `public_url` | 填了即 webhook 模式，多 bot 必填 |
-| `listen_addr` | webhook 模式监听地址，默认 `127.0.0.1:8081` |
+| `listen_addr` | HTTP 监听地址，默认 `127.0.0.1:8081`；两种模式都提供 `/healthz` 与 `/metrics` |
 | `tg_api_base` | Bot API 基址，默认走反代 |
 | `tg_proxy` / `ai_proxy` | 出网代理，TG 与 AI 分开配，可留空 |
 | `db_path` | SQLite 路径，库里有上游 api_key 明文，建议 `chmod 600` |
 | `turnstile_site_key` / `turnstile_secret` | 申诉网页验证的 Cloudflare Turnstile 密钥；不配则申诉降级为「联系群管理员」 |
 | `client_ip_header` | 取真实客户端 IP 的请求头，如 `CF-Connecting-IP`、`X-Real-IP` |
+| `metrics_token` | `/metrics` 与 pprof 的 Bearer；为空时只允许回环 |
+| `pprof_enabled` | 显式开启 `/debug/pprof/`，默认关闭 |
 
 ⚠️ 用申诉网页时，**Turnstile 后台的域名白名单必须包含 `public_url` 的主机名**，
 否则验证组件在页面上根本加载不出来，所有申诉都卡在网页这一步。

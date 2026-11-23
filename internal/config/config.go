@@ -82,6 +82,13 @@ type Config struct {
 	//
 	// 前提是 listen_addr 只绑回环、流量全部经过反代 —— 这个请求头才可信。
 	ClientIPHeader string
+
+	// MetricsToken 是 /metrics 与 /debug/pprof 的 Bearer 令牌。为空时
+	// 这两个端点只允许回环请求；不配又经反代暴露时一律 401。
+	MetricsToken string
+	// PprofEnabled 显式开启 /debug/pprof（默认关闭）。开启后仍需回环或
+	// MetricsToken。
+	PprofEnabled bool
 }
 
 const defaultListenAddr = "127.0.0.1:8081"
@@ -230,6 +237,8 @@ var envKeys = []struct{ env, key string }{
 	{"MENSHEN_TURNSTILE_SITE_KEY", "turnstile_site_key"},
 	{"MENSHEN_TURNSTILE_SECRET", "turnstile_secret"},
 	{"MENSHEN_CLIENT_IP_HEADER", "client_ip_header"},
+	{"MENSHEN_METRICS_TOKEN", "metrics_token"},
+	{"MENSHEN_PPROF_ENABLED", "pprof_enabled"},
 	{"MENSHEN_TG_API_ID", "tg_api_id"},
 	{"MENSHEN_TG_API_HASH", "tg_api_hash"},
 }
@@ -295,6 +304,14 @@ func assign(c *Config, key, val string) error {
 		c.LocalModelsThreads = threads
 	case "public_url":
 		c.PublicURL = strings.TrimRight(val, "/")
+	case "metrics_token":
+		c.MetricsToken = val
+	case "pprof_enabled":
+		on, err := strconv.ParseBool(val)
+		if err != nil {
+			return fmt.Errorf("pprof_enabled 应为 true/false")
+		}
+		c.PprofEnabled = on
 	case "listen_addr":
 		if val != "" {
 			c.ListenAddr = val
