@@ -116,7 +116,7 @@ func (f *RotatingFile) openLocked() bool {
 	if !f.failAt.IsZero() && time.Since(f.failAt) < reopenBackoff {
 		return false
 	}
-	file, err := os.OpenFile(f.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	file, err := os.OpenFile(f.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		if f.failAt.IsZero() || time.Since(f.failAt) >= reopenBackoff {
 			fmt.Fprintf(os.Stderr, "menshen: 打开日志文件失败（%s）：%v\n", f.path, err)
@@ -124,6 +124,8 @@ func (f *RotatingFile) openLocked() bool {
 		f.failAt = time.Now()
 		return false
 	}
+	// 日志里可能带群名、用户与上游错误详情；老部署留下的 0644 在这里纠正。
+	file.Chmod(0o600)
 	info, err := file.Stat()
 	if err != nil {
 		file.Close()

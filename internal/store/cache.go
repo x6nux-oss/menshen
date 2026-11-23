@@ -58,6 +58,16 @@ var settingDefaults = map[string]string{
 	"tz_offset":          "8",
 	"log_retention_days": "30",
 	"ai_log_days":        "14", // 模型调用流水（ai_log）保留天数：体积大，单独一档
+
+	// ---- 备份与归档保留 ----
+	// 备份默认开：单库承载全部租户数据，没有备份时磁盘损坏就是全量丢失。
+	// 周期从磁盘上最新一份备份算起，进程重启不会把每日备份一直往后推。
+	"backup_enabled":        "1",
+	"backup_interval_hours": "24",
+	"backup_keep":           "7",
+	// 归档文件（JSONL 与图片）的保留天数；0 = 永久保留。
+	// 索引 archive_items 与它同寿，否则 /export 会重复追加。
+	"archive_retention_days": "90",
 	// 运行日志文件（与数据库同目录）的大小上限（MB）。
 	// 任一为 0 关闭文件日志；总上限小于单文件时按单文件算（不留备份）。
 	"log_file_max_mb":   "10",

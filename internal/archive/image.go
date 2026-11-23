@@ -297,7 +297,7 @@ func fetchFile(b *core.Bot, fileID string) ([]byte, error) {
 
 // saveImage 压缩并写盘；压缩失败时保存原始字节，尽量不丢图。
 func saveImage(dir, base string, data []byte, maxSide, quality int, fallbackExt string) (string, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
 	out, ext, err := compressImage(data, maxSide, quality)
@@ -308,7 +308,7 @@ func saveImage(dir, base string, data []byte, maxSide, quality int, fallbackExt 
 		ext = ".img"
 	}
 	path := filepath.Join(dir, base+ext)
-	if err := os.WriteFile(path, out, 0o644); err != nil {
+	if err := os.WriteFile(path, out, 0o600); err != nil {
 		return "", err
 	}
 	return path, nil

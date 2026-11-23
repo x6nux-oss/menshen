@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"menshen/internal/archive"
 	"menshen/internal/core"
 	"menshen/internal/store"
 	"menshen/internal/tg"
@@ -810,7 +811,8 @@ func GbanReasonLabel(r string) string {
 // 写锁，期间所有群消息的留底与流水都在排队（广告洪峰时影响最大）。
 // 分批之间会让出写连接，消息写入得以插队。
 func CleanupData(sh *core.Shared) {
-	days := sh.Cache.Snap().SettingInt("log_retention_days", 30)
+	snap := sh.Cache.Snap()
+	days := snap.SettingInt("log_retention_days", 30)
 	if days < 1 {
 		days = 30
 	}
@@ -835,12 +837,18 @@ func CleanupData(sh *core.Shared) {
 	if _, err := deleteBatched(sh, "group_messages", "at < ?", cut); err != nil {
 		slog.Error("清理群消息留底失败", "err", err)
 	}
-	// archive_items 只是文件存档的去重索引。它对应的时间窗与数据库留底
-	// 一致：行被清掉时源记录也已被清掉，之后不会再导出同一条，索引可以
-	// 一起回收，避免这张表随消息量无限增长。
-	if _, err := deleteBatched(sh, "archive_items", "at < ?", cut); err != nil {
-		slog.Error("清理存档去重索引失败", "err", err)
+	// archive_items 只是文件存档的去重索引。它必须与归档文件的寿命一致，
+	// 不能跟着数据库留底（log_retention_days）走：索引先删、文件还在时，
+	// 下一次 /export 会重新 claim 并向同一文件追加重复行。
+	// 0 = 归档永久保留，索引也一起保留。
+	arcDays := snap.SettingInt("archive_retention_days", 90)
+	if arcDays > 0 {
+		if _, err := deleteBatched(sh, "archive_items", "at < ?",
+			time.Now().Unix()-arcDays*86400); err != nil {
+			slog.Error("清理存档去重索引失败", "err", err)
+		}
 	}
+	archive.Sweep(sh.Cfg, int(arcDays), snap.Location())
 	// archive_fetches 记录 MTProto 历史图片回捞的尝试。过期行没有保留价值：
 	// 对应消息的留底也已被清理，之后不会再进候选。
 	if _, err := deleteBatched(sh, "archive_fetches", "tried_at < ?", cut); err != nil {

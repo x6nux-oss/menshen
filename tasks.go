@@ -1,13 +1,17 @@
 package main
 
 import (
+	"fmt"
+	"html"
 	"log/slog"
 	"sync/atomic"
 	"time"
 
 	"menshen/internal/antiad"
+	"menshen/internal/backup"
 	"menshen/internal/core"
 	"menshen/internal/panel"
+	"menshen/internal/store"
 )
 
 // taskIntervals 是两档定时任务的周期。生产用 defaultTaskIntervals，
@@ -23,7 +27,65 @@ var defaultTaskIntervals = taskIntervals{
 }
 
 func runBackgroundTasks(stop <-chan struct{}, sh *core.Shared, reg *core.Registry) {
+	verifyDatabase(sh)
+	startBackup(stop, sh)
 	runBackgroundTasksEvery(stop, sh, reg, defaultTaskIntervals)
+}
+
+// backupKeep 与 backupEvery 把面板设置夹到合理范围：0 / 负数来自旧配置
+// 或手改库，不能让备份永久关闭或无限密集。
+func backupKeep(snap *store.Snapshot) int {
+	n := snap.SettingInt("backup_keep", 7)
+	if n < 1 {
+		n = 7
+	}
+	if n > 365 {
+		n = 365
+	}
+	return int(n)
+}
+
+func backupEvery(snap *store.Snapshot) time.Duration {
+	h := snap.SettingInt("backup_interval_hours", 24)
+	if h < 1 {
+		h = 24
+	}
+	if h > 8760 {
+		h = 8760
+	}
+	return time.Duration(h) * time.Hour
+}
+
+// startBackup 起进程内的定时备份。备份在读连接上执行（VACUUM INTO 是读
+// 事务，WAL 下不挡写），失败会私聊主管理员并在包内退避重试。
+func startBackup(stop <-chan struct{}, sh *core.Shared) {
+	go backup.Run(stop, sh.Store.Read,
+		func() (backup.Options, time.Duration, bool) {
+			snap := sh.Cache.Snap()
+			if snap.SettingInt("backup_enabled", 1) != 1 {
+				return backup.Options{}, 0, false
+			}
+			return backup.Options{
+				DBPath:     sh.Cfg.DBPath,
+				ArchiveDir: sh.Cfg.ArchiveDir,
+				Keep:       backupKeep(snap),
+			}, backupEvery(snap), true
+		}, sh.NotifyAdmins)
+}
+
+// verifyDatabase 在启动时跑一次 PRAGMA quick_check。失败只告警、不退出：
+// 能打开库通常还能读出数据，立刻停服会让恢复手段更少；管理员按文档从
+// 备份恢复。检查本身是同步的（库越大越久），但只是一次顺序读。
+func verifyDatabase(sh *core.Shared) {
+	if err := backup.QuickCheck(sh.Store.Read); err != nil {
+		slog.Error("数据库完整性校验失败", "db", sh.Cfg.DBPath, "err", err)
+		go sh.NotifyAdmins(fmt.Sprintf("⚠️ <b>数据库完整性校验失败</b>\n\n"+
+			"库: <code>%s</code>\n错误: %s\n\n"+
+			"请停止写入并按 docs/operations.md 从备份恢复。",
+			html.EscapeString(sh.Cfg.DBPath), html.EscapeString(err.Error())))
+		return
+	}
+	slog.Info("数据库完整性校验通过", "check", "quick_check")
 }
 
 func runBackgroundTasksEvery(stop <-chan struct{}, sh *core.Shared, reg *core.Registry,
@@ -107,6 +169,7 @@ func tickMinute(sh *core.Shared, reg *core.Registry) {
 
 func tickHourly(sh *core.Shared) {
 	antiad.CleanupData(sh)
+	reclaimSpace(sh)
 	// 规则发现自动运行只负责启动：同步扫一遍游标后就起后台 goroutine。
 	// 放在小时任务最前面，避免被下面可能长达几十分钟的禁言复查/形态总结堵住
 	// ——它一旦在下一小时 tick 时还没跑完，整轮小时任务都会被跳过。
@@ -145,5 +208,24 @@ func refreshChatTitles(b *core.Bot, onlyEmpty bool) {
 	for _, id := range ids {
 		b.RefreshChatMeta(id)
 		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// reclaimSpace 在保留期清理之后回收空闲页。日志里的「空闲页 × 页大小」
+// 就是删掉但没还给文件系统的字节数，也是备份体积持续变大的直接原因。
+func reclaimSpace(sh *core.Shared) {
+	before, err := sh.Store.SpaceStats()
+	if err != nil {
+		slog.Error("读取 SQLite 空闲页失败", "err", err)
+		return
+	}
+	after, err := sh.Store.ReclaimSpace()
+	if err != nil {
+		slog.Error("回收 SQLite 空闲页失败", "空闲页", before.FreePages, "err", err)
+		return
+	}
+	if before.FreePages != after.FreePages || after.FreePages > 0 {
+		slog.Info("数据空间统计", "页大小", after.PageSize,
+			"空闲页", after.FreePages, "auto_vacuum", after.AutoVacuum)
 	}
 }

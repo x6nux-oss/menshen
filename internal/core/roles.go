@@ -67,6 +67,29 @@ func (sh *Shared) CanManageChat(uid, botID, chatID int64) bool {
 	return ok
 }
 
+// NotifyAdmins 把一条运维告警私聊给全部主管理员。
+//
+// 备份失败、完整性校验失败这类进程级错误不属于任何一个群，也没有「归属人」
+// 可找：能修的是主管理员。没有已接入的 bot 时静默返回（进程刚启动、
+// webhook 还没注册），调用方已经在日志里留了同一件事。
+func (sh *Shared) NotifyAdmins(text string) {
+	if sh.Reg == nil || len(sh.Cfg.AdminIDs) == 0 {
+		return
+	}
+	var b *Bot
+	sh.Reg.Each(func(x *Bot) {
+		if b == nil {
+			b = x
+		}
+	})
+	if b == nil {
+		return
+	}
+	for _, id := range sh.Cfg.AdminIDs {
+		b.Send(id, text, nil)
+	}
+}
+
 // AddAdmin 添加次级管理员。
 func (sh *Shared) AddAdmin(uid int64, note string, by int64) error {
 	if sh.Cfg.IsAdmin(uid) {

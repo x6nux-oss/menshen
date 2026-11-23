@@ -130,6 +130,10 @@ sshpass -p '<密码>' ssh root@<dev-server-ip> \
   本仓库的 bd 状态在 `.beads/`（本机排除，未提交）。
 - **本地运行**：`CGO_ENABLED=0 go build -o menshen . && ./menshen -config config.yaml`；
   轮询模式只跑主 bot（而主 bot 不判定），要看完整功能需 webhook 模式。
+- **备份与恢复**：默认每日 `VACUUM INTO` 快照 + 归档打包到库同目录 `backups/`，
+  保留 7 份；启动 `quick_check`、备份后 `integrity_check`，失败私聊主管理员。
+  手动 `./menshen -backup-now`、校验 `-verify-db`，恢复与演练见
+  `docs/operations.md` 与 `scripts/restore.sh`、`scripts/backup-drill.sh`。
 - **Mini App API 手工调试**：用 bot token 按 Telegram WebApp 规则签一份 initData
   （`secret = HMAC_SHA256(key="WebAppData", msg=token)`，
   `hash = HMAC_SHA256(secret, data_check_string)`；`data_check_string` 是除 hash
@@ -150,5 +154,8 @@ sshpass -p '<密码>' ssh root@<dev-server-ip> \
 | `internal/core/registry.go` | `SetBotOwner` 改派 + 运行中实例同步 |
 | `main.go` | `webRouter`（`_w` → 网页、`/miniapp` → Mini App、其余 → webhook）；启动走 `FinishSetup` |
 | `internal/core/bot.go` | `IsMainBot`、群命令菜单、`registerMiniAppButton`、`JoinNotice` |
+| `internal/backup/` | 备份快照、`VACUUM INTO`、归档打包、完整性校验、保留轮转与定时重试 |
+| `internal/store/db.go` | `auto_vacuum=INCREMENTAL`、`SpaceStats`/`ReclaimSpace`、库与 WAL 权限 |
+| `docs/operations.md` + `scripts/restore.sh` `scripts/backup-drill.sh` | 备份/恢复手册与恢复演练 |
 
 更多设计细节见 `CLAUDE.md`（本机）与 `docs/`、`README.md`。
