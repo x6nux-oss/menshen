@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -353,7 +354,7 @@ func startWebhook(cfg *config.Config, reg *core.Registry, sh *core.Shared) *http
 	router := webRouter{reg: reg, sh: sh, web: antiad.WebHandler(sh), mini: panel.MiniAppHandler(sh), public: panel.PublicShellHandler(sh), admin: panel.AdminPanelHandler(sh), cap: antiad.CapHandler(sh)}
 	srv := &http.Server{
 		Addr:    cfg.ListenAddr,
-		Handler: securityHeaders(router, strings.HasPrefix(cfg.PublicURL, "https://")),
+		Handler: securityHeaders(sh.Metrics.HTTPMiddleware(router), strings.HasPrefix(cfg.PublicURL, "https://")),
 		// 回调是小 JSON，握手后迟迟不发数据的连接没有留着的理由。
 		// 只设 ReadHeaderTimeout 挡不住慢速发 body 的连接：它会一直占着
 		// goroutine 与内存（暴露到回环之外时就是廉价的 slowloris）。
@@ -404,12 +405,11 @@ const (
 
 // allowRequest 对浏览器可直达的端点按 IP 限流；超限返回 429 与 Retry-After。
 // /healthz 不限：它是编排与监控的探针，限流会把「限流器满了」误判成实例不健康。
-func (h webRouter) allowRequest(w http.ResponseWriter, r *http.Request) bool {
+func (h webRouter) allowRequest(w http.ResponseWriter, r *http.Request, p string) bool {
 	if h.sh == nil || h.sh.AdLimits == nil {
 		return true
 	}
 	group, limit := "", int64(0)
-	p := r.URL.Path
 	switch {
 	case hasWebSegment(p):
 		group, limit = "w", webIPPerMinute
@@ -452,32 +452,36 @@ func securityHeaders(next http.Handler, hsts bool) http.Handler {
 }
 
 func (h webRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !h.allowRequest(w, r) {
+	// 限流与分发必须看同一条归一化路径：处理器用 path.Clean 后分发，
+	// 这里若用原始 r.URL.Path，/admin/./api 会在限流层落 default 放行，
+	// 随后被归一化成受保护端点。
+	p := path.Clean(r.URL.Path)
+	if !h.allowRequest(w, r, p) {
 		return
 	}
-	if hasWebSegment(r.URL.Path) {
+	if hasWebSegment(p) {
 		// 页面壳（GET/HEAD、无 json=1）先交给公开网页 SPA；数据与提交
 		// 仍走 antiad.WebHandler。壳不含数据，签名校验在接口里。
 		if h.public != nil &&
 			(r.Method == http.MethodGet || r.Method == http.MethodHead) &&
 			r.URL.Query().Get("json") != "1" &&
-			antiad.IsWebPagePath(r.URL.Path) {
+			antiad.IsWebPagePath(p) {
 			h.public.ServeHTTP(w, r)
 			return
 		}
 		h.web.ServeHTTP(w, r)
 		return
 	}
-	if strings.HasPrefix(r.URL.Path, "/admin") && h.admin != nil {
+	if strings.HasPrefix(p, "/admin") && h.admin != nil {
 		h.admin.ServeHTTP(w, r)
 		return
 	}
 	// 内置 Cap 服务的入口：Cap 无需外部实例，challenge/redeem 由本进程处理。
-	if strings.HasPrefix(r.URL.Path, "/cap/") && h.cap != nil {
+	if strings.HasPrefix(p, "/cap/") && h.cap != nil {
 		h.cap.ServeHTTP(w, r)
 		return
 	}
-	if strings.HasPrefix(r.URL.Path, "/miniapp") {
+	if strings.HasPrefix(p, "/miniapp") {
 		h.mini.ServeHTTP(w, r)
 		return
 	}

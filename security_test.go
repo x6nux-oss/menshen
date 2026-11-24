@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -55,18 +56,24 @@ func TestBrowserEndpointRateLimits(t *testing.T) {
 	router := webRouter{reg: reg, sh: b.Shared, web: ok, mini: ok, admin: ok, cap: ok}
 
 	const ip = "203.0.113.7:4242"
-	for _, tc := range []struct {
+	for i, tc := range []struct {
 		path  string
 		limit int
 	}{
 		{"/_w/ap/1/x", webIPPerMinute},
 		{"/admin/login/1/2/3/x", adminLoginPerMinute},
 		{"/admin/api/state", adminAPIPerMinute},
+		// 点段归一化后仍是同一端点，限流必须按归一化路径选组。
+		{"/admin/./api/state", adminAPIPerMinute},
+		{"/admin/../admin/api/state", adminAPIPerMinute},
 		{"/miniapp/api/state", miniAPIPerMinute},
+		{"/miniapp/./api/state", miniAPIPerMinute},
 		{"/cap/x/challenge", capIPPerMinute},
 	} {
+		// 每个用例独立 IP：同组共享窗口，复用 IP 会把上一个用例的额度耗光。
+		caseIP := fmt.Sprintf("198.51.100.%d:4242", i+1)
 		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
-		req.RemoteAddr = ip
+		req.RemoteAddr = caseIP
 		for i := range tc.limit {
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)

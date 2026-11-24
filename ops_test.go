@@ -143,6 +143,42 @@ func TestPprofGatedByConfig(t *testing.T) {
 	})
 }
 
+// TestWebhookServerRateLimitMetrics 走 startWebhook 组出来的真实 handler：
+// 浏览器端点上的 429 必须计入 rate_limited_total，文档承诺的指标不能只在
+// 运维端口生效。
+func TestWebhookServerRateLimitMetrics(t *testing.T) {
+	reg, b := testutil.NewTestRegistry(t, dispatch)
+	sh := b.Shared
+	sh.Cfg.ListenAddr = "127.0.0.1:0"
+	srv := startWebhook(sh.Cfg, reg, sh)
+	defer srv.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/api/state", nil)
+	req.RemoteAddr = "198.51.100.20:4242"
+	for i := range adminAPIPerMinute {
+		w := httptest.NewRecorder()
+		srv.Handler.ServeHTTP(w, req)
+		if w.Code == http.StatusTooManyRequests {
+			t.Fatalf("第 %d 次就 429，期望前 %d 次放行", i+1, adminAPIPerMinute)
+		}
+	}
+	w := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(w, req)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("第 %d 次应 429，得到 %d", adminAPIPerMinute+1, w.Code)
+	}
+
+	body := opsRequest(reg, "/metrics", "127.0.0.1:5000", "").Body.String()
+	for _, want := range []string{
+		`menshen_http_requests_total{route="admin",method="POST",status="429"} 1`,
+		`menshen_rate_limited_total{route="admin"} 1`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("指标输出缺少 %q", want)
+		}
+	}
+}
+
 // TestHTTPMiddlewareMetrics 走真实网络，确认路由/状态/耗时由中间件记录，
 // 429 同时计入 rate_limited_total。
 func TestHTTPMiddlewareMetrics(t *testing.T) {
