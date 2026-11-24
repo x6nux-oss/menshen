@@ -285,13 +285,13 @@ func renderCodeInspect(b *core.Bot, chatID int64, ap appealRec) string {
 				html.EscapeString(penaltyLabel(p.Type)), scope,
 				formatTS(b.Shared, p.At))
 			if r := clip(p.Reason, 200); r != "" {
-				fmt.Fprintf(&sb, "  %s\n", html.EscapeString(r))
+				fmt.Fprintf(&sb, "  %s\n", SensitiveHTML(r))
 			}
 		}
 	}
 
 	if r := clip(ap.AIReason, 300); r != "" {
-		fmt.Fprintf(&sb, "\n<b>判定原因</b>\n%s\n", html.EscapeString(r))
+		fmt.Fprintf(&sb, "\n<b>判定原因</b>\n%s\n", SensitiveHTML(r))
 	}
 
 	if chatID == 0 {

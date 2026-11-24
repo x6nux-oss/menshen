@@ -144,6 +144,24 @@ func (e *APIError) AdminRequired() bool {
 	return strings.Contains(strings.ToLower(e.Desc), "chat_admin_required")
 }
 
+// MessageGone 报告这是不是「要编辑的消息已不存在/不可编辑」的确定回答。
+//
+// 只有这类 400 才值得重发一条新消息；429、5xx 与网络故障都是临时的，
+// 重发会多出一张卡片。MESSAGE_ID_INVALID 与「message is not modified」
+// 不算：前者是调用参数错，后者说明原文还在、内容没变。
+func (e *APIError) MessageGone() bool {
+	if e == nil || e.Code != http.StatusBadRequest {
+		return false
+	}
+	d := strings.ToLower(e.Desc)
+	for _, frag := range [...]string{"message to edit not found", "message can't be edited"} {
+		if strings.Contains(d, frag) {
+			return true
+		}
+	}
+	return false
+}
+
 // retryAfter 从 429 响应体里取 parameters.retry_after（秒）。
 func retryAfter(raw []byte) (time.Duration, bool) {
 	var r struct {

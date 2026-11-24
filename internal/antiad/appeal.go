@@ -405,11 +405,11 @@ func penaltyLines(snap *store.Snapshot, penalties []appealPenalty) string {
 		}
 		if r := strings.TrimSpace(p.Reason); r != "" {
 			fmt.Fprintf(&sb, "　理由：%s\n",
-				html.EscapeString(core.TruncateRunes(r, 200)))
+				SensitiveHTML(core.TruncateRunes(r, 200)))
 		}
 		if t := strings.TrimSpace(p.Text); t != "" {
 			fmt.Fprintf(&sb, "　原消息：%s\n",
-				html.EscapeString(core.TruncateRunes(t, 200)))
+				SensitiveHTML(core.TruncateRunes(t, 200)))
 		}
 	}
 	return sb.String()
@@ -937,11 +937,11 @@ func pushAppealCard(b *core.Bot, ap appealRec, penalties []appealPenalty,
 		appealAIResultLabel(ap.AIResult), ap.AIConf*100, html.EscapeString(ap.AIModel))
 	if ap.Statement != "" {
 		fmt.Fprintf(&sb, "申诉理由：%s\n",
-			html.EscapeString(core.TruncateRunes(ap.Statement, 200)))
+			SensitiveHTML(core.TruncateRunes(ap.Statement, 200)))
 	}
 	if ap.AIReason != "" {
 		fmt.Fprintf(&sb, "AI 理由：%s\n",
-			html.EscapeString(core.TruncateRunes(ap.AIReason, 300)))
+			SensitiveHTML(core.TruncateRunes(ap.AIReason, 300)))
 	}
 	if len(extra.Hard) > 0 {
 		fmt.Fprintf(&sb, "硬信号：%s\n",

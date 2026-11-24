@@ -50,3 +50,25 @@ func TestModelShort(t *testing.T) {
 		}
 	}
 }
+
+// TestCheckReasonSpoilerAndMask：/check 的复判理由与证据要打码并用 spoiler
+// 收起；msgID 为 0（群内静默）时 step 不发送，但仍会拼进消息正文。
+func TestCheckReasonSpoilerAndMask(t *testing.T) {
+	p := &checkProgress{}
+	p.judgeStep("llm", adVerdict{IsAd: true, Decider: "llm",
+		Reason:   "用户 5038355277 发 https://t.me/sondevstorebot?start=ref_5038355277",
+		Evidence: []string{"邀请码:WG9EWW"},
+	}, nil)
+	out := p.sb.String()
+	if !strings.Contains(out, `<span class="tg-spoiler">`) {
+		t.Errorf("理由与证据应包 spoiler：%s", out)
+	}
+	for _, leak := range []string{"5038355277", "WG9EWW"} {
+		if strings.Contains(out, leak) {
+			t.Errorf("不应出现完整敏感值 %q：%s", leak, out)
+		}
+	}
+	if !strings.Contains(out, "50****277") || !strings.Contains(out, "WG**WW") {
+		t.Errorf("应保留打码后的形态：%s", out)
+	}
+}

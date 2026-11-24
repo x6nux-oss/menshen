@@ -713,7 +713,7 @@ func gbanGuard(b *core.Bot, conf store.BotChat, u *tg.TGUser) bool {
 		b.Send(admin, fmt.Sprintf(
 			"🚫 <b>联合封禁拦截</b>\n\n用户 %s (<code>%d</code>) 进入群 %s 时%s。\n原因: %s",
 			html.EscapeString(senderName(u)), u.ID, chatRef(b.Cache.Snap(), conf.ChatID), verdict,
-			html.EscapeString(core.TruncateRunes(rec.Reason, 120))), nil)
+			SensitiveHTML(core.TruncateRunes(rec.Reason, 120))), nil)
 	}
 	return true
 }

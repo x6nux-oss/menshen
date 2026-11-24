@@ -209,7 +209,7 @@ func showAntiAdLog(b *core.Bot, chatID, msgID, botID int64, page int, all bool) 
 		}
 		fmt.Fprintf(&sb, "• %s <code>%s</code> #%d 群%s 用户<code>%d</code> %.0f%% %s%s\n  <i>%s</i>\n",
 			mark, when, id, chatTag(b, cid), uid, conf*100, html.EscapeString(actionLabel(action)),
-			kindSuffix, html.EscapeString(core.TruncateRunes(text, 60)))
+			kindSuffix, antiad.SensitiveHTML(core.TruncateRunes(text, 60)))
 	}
 	// 不查 rows.Err() 会把只扫到一半当成扫完了：拦截记录是合规/复盘的审计面，
 	// 静默截断会让 n < adLogPageSize，连下一页按钮也一起消失，
@@ -864,15 +864,15 @@ func showUserLogs(b *core.Bot, chatID, msgID, uid, target int64, page int, all b
 			case "join_profile":
 				fmt.Fprintf(&sb, "• 群 %s ｜ 进群限制（个人简介）｜ %s\n<i>%s</i>\n",
 					chatTag(b, p.ChatID), when,
-					html.EscapeString(core.TruncateRunes(p.Reason, 120)))
+					antiad.SensitiveHTML(core.TruncateRunes(p.Reason, 120)))
 			case "prewarm":
 				fmt.Fprintf(&sb, "• 群 %s ｜ 前置号识别限制 ｜ %s\n<i>%s</i>\n",
 					chatTag(b, p.ChatID), when,
-					html.EscapeString(core.TruncateRunes(p.Reason, 120)))
+					antiad.SensitiveHTML(core.TruncateRunes(p.Reason, 120)))
 			case "message":
 				fmt.Fprintf(&sb, "• 群 %s ｜ %s ｜ %s\n<i>%s</i>\n",
 					chatTag(b, p.ChatID), html.EscapeString(actionLabel(p.Action)), when,
-					html.EscapeString(core.TruncateRunes(p.Reason, 120)))
+					antiad.SensitiveHTML(core.TruncateRunes(p.Reason, 120)))
 			}
 		}
 		var gbans []antiad.PenaltyInfo
@@ -890,7 +890,7 @@ func showUserLogs(b *core.Bot, chatID, msgID, uid, target int64, page int, all b
 				}
 				fmt.Fprintf(&sb, "• %s ｜ %s\n<i>%s</i>\n", scope,
 					time.Unix(p.At, 0).In(loc).Format("01-02 15:04"),
-					html.EscapeString(core.TruncateRunes(p.Reason, 120)))
+					antiad.SensitiveHTML(core.TruncateRunes(p.Reason, 120)))
 			}
 			actionRows = append(actionRows, [][2]string{{"🚫 解除联合封禁",
 				fmt.Sprintf("a:ad:gbl:%d:%d%s", target, page, suffix)}})

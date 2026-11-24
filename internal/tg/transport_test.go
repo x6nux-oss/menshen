@@ -198,3 +198,29 @@ func TestCallServerErrorIncludesStatus(t *testing.T) {
 		t.Errorf("5xx 不该重试，得到 %d 次请求", n)
 	}
 }
+
+// TestAPIErrorMessageGone：只有「消息已不存在/不可编辑」的 400 才算确定
+// 答案，值得重发；其余（429/5xx/调用参数错/内容未变）都不是。
+func TestAPIErrorMessageGone(t *testing.T) {
+	cases := []struct {
+		err  *APIError
+		want bool
+	}{
+		{&APIError{Code: 400, Desc: "Bad Request: message to edit not found"}, true},
+		{&APIError{Code: 400, Desc: "Bad Request: message can't be edited"}, true},
+		{&APIError{Code: 400, Desc: "Bad Request: message is not modified"}, false},
+		{&APIError{Code: 400, Desc: "Bad Request: MESSAGE_ID_INVALID"}, false},
+		{&APIError{Code: 400, Desc: "Bad Request: chat not found"}, false},
+		{&APIError{Code: 429, Desc: "Too Many Requests: retry after 5"}, false},
+		{&APIError{Code: 500, Desc: "Internal Server Error"}, false},
+	}
+	for _, c := range cases {
+		if got := c.err.MessageGone(); got != c.want {
+			t.Errorf("%d %q: MessageGone=%v，期望 %v", c.err.Code, c.err.Desc, got, c.want)
+		}
+	}
+	var nilErr *APIError
+	if nilErr.MessageGone() {
+		t.Error("nil 不得判为 MessageGone")
+	}
+}

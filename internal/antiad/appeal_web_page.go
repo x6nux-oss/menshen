@@ -335,8 +335,8 @@ func appealPageDataOf(sh *core.Shared, ap appealRec) map[string]any {
 			"type": p.Type, "chat_id": p.ChatID,
 			"chat": r.Display(), "chat_url": r.URL(),
 			"time":   pageTS(loc, p.At),
-			"reason": core.TruncateRunes(strings.TrimSpace(p.Reason), 400),
-			"text":   core.TruncateRunes(strings.TrimSpace(p.Text), 400),
+			"reason": MaskSensitive(core.TruncateRunes(strings.TrimSpace(p.Reason), 400)),
+			"text":   MaskSensitive(core.TruncateRunes(strings.TrimSpace(p.Text), 400)),
 		})
 	}
 
@@ -378,8 +378,8 @@ func appealPageAI(ap appealRec) map[string]any {
 	return map[string]any{
 		"result": ap.AIResult, "label": label,
 		"conf": ap.AIConf, "model": ap.AIModel,
-		"reason":    core.TruncateRunes(strings.TrimSpace(ap.AIReason), 400),
-		"statement": core.TruncateRunes(strings.TrimSpace(ap.Statement), 200),
+		"reason":    MaskSensitive(core.TruncateRunes(strings.TrimSpace(ap.AIReason), 400)),
+		"statement": MaskSensitive(core.TruncateRunes(strings.TrimSpace(ap.Statement), 200)),
 	}
 }
 
@@ -426,7 +426,7 @@ func appealPageMessages(sh *core.Shared, ap appealRec, loc *time.Location) []map
 			}
 			out = append(out, map[string]any{
 				"chat_id": c.ChatID, "title": ref.Display(), "chat_url": ref.URL(),
-				"text": core.TruncateRunes(text, appealPageMsgLength),
+				"text": MaskSensitive(core.TruncateRunes(text, appealPageMsgLength)),
 				"at":   at, "time": time.Unix(at, 0).In(loc).Format("01-02 15:04"),
 			})
 			total++

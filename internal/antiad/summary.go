@@ -197,10 +197,9 @@ func RenderAdRecord(b *core.Bot, r AdLogRow) (string, map[string]any) {
 	// 原文与理由直接给管理员看：记录卡片的用途就是让他当场判断，
 	// 再让人去网页上翻一遍是把判断成本推给了他。
 	if r.Reason != "" {
-		fmt.Fprintf(&sb, "理由: %s\n", html.EscapeString(r.Reason))
+		fmt.Fprintf(&sb, "理由: %s\n", SensitiveHTML(r.Reason))
 	}
-	fmt.Fprintf(&sb, "\n原文:\n<code>%s</code>",
-		html.EscapeString(core.TruncateRunes(r.Text, 500)))
+	fmt.Fprintf(&sb, "\n原文:\n%s", sensitiveCode(core.TruncateRunes(r.Text, 500)))
 	// 判定翻转按钮看的是「当前是否按广告处置」：已标记误判（undone）的记录
 	// 判定结论虽仍是 ad，但已被管理员推翻，此时该给的是「广告」按钮。
 	rows := adAlertRows(act, r.Action, r.Reason, r.ID, dryrun,

@@ -128,6 +128,7 @@ var settingSpecs = []settingSpec{
 	{"antiad_mute_minutes", "禁言时长（分钟）", "非负整数，0 = 永久禁言（人留在群里、发不了言）；正整数 = 禁言这么多分钟（如 5、60、1440=1 天）", 0, 0, "antiad"},
 	{"antiad_rpm_chat", "每群每分钟送检上限", "非负整数，0 = 不限；防刷屏烧钱", 0, 0, "antiad"},
 	{"antiad_alert_rpm", "同一人每分钟告警上限", "非负整数，0 = 不限；防刷爆私聊", 0, 0, "antiad"},
+	{"antiad_alert_cooldown", "同一人告警合并窗口（秒）", "非负整数，窗口内同一 (群,人) 的重复命中只更新最早那条告警并累计次数；0 = 关闭合并、逐条发送。告警被撤回后编辑失败会自动重发一条", 0, 0, "antiad"},
 	{"antiad_cmd_rpm", "每人每分钟命令上限", "非负整数，0 = 不限；/check 一次要跑两个模型", 0, 0, "antiad"},
 	{"antiad_alert_ttl", "群内告警自动撤回（秒）", "非负整数，0 = 永不撤回；撤回后按钮也会消失", 0, 0, "antiad"},
 	{"antiad_alert_ttl_hard", "明显广告的短撤回（秒）", "非负整数，0 = 关闭；置信度 ≥ 处置线且危害度 ≥ 阈值时只弹这么久", 0, 0, "antiad"},
@@ -189,7 +190,7 @@ var settingSections = []struct {
 	{"通知与展示", []string{
 		"antiad_dm_admins", "antiad_alert_every",
 		"antiad_alert_ttl", "antiad_alert_ttl_hard", "antiad_alert_severe",
-		"antiad_group_silent", "antiad_alert_rpm",
+		"antiad_group_silent", "antiad_alert_rpm", "antiad_alert_cooldown",
 	}},
 	{"护栏与成本", []string{
 		"antiad_rpm_chat", "antiad_cmd_rpm",
