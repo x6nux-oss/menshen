@@ -214,6 +214,15 @@ func relatedAccounts(sh *core.Shared, fp, ip string, selfUID int64) (strong, wea
 // turnstileVerifyURL 是包级变量：测试时替换成 httptest 地址。
 var turnstileVerifyURL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
+// turnstileEndpoint 取本次校验用的 siteverify 地址：配置项优先（离线端到端
+// 测试指向本地假服务），否则用包级默认。
+func turnstileEndpoint(sh *core.Shared) string {
+	if u := strings.TrimSpace(sh.Cfg.TurnstileVerifyURL); u != "" {
+		return u
+	}
+	return turnstileVerifyURL
+}
+
 // turnstileResult 是 siteverify 的解析结果。入群验证只用 Success 与
 // Hostname；申诉页还要核对 Action 与 CData（把令牌绑到那一张申诉单上）。
 type turnstileResult struct {
@@ -229,7 +238,7 @@ type turnstileResult struct {
 // 令牌 5 分钟有效、只能校验一次，重放由 Cloudflare 拒绝。idem 是幂等键：
 // 同一次校验重发时 Cloudflare 返回同一结果，避免网络重试造成第二次校验
 // 同一个令牌。错误只表示请求/解析失败，success=false 不是 error。
-func turnstileSiteverify(secret, token, ip, idem string) (turnstileResult, error) {
+func turnstileSiteverify(endpoint, secret, token, ip, idem string) (turnstileResult, error) {
 	var out turnstileResult
 	if token == "" {
 		return out, fmt.Errorf("缺少令牌")
@@ -242,7 +251,7 @@ func turnstileSiteverify(secret, token, ip, idem string) (turnstileResult, error
 	}
 	// Transport 为 nil：读 HTTP_PROXY / HTTPS_PROXY 环境变量。
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.PostForm(turnstileVerifyURL, form)
+	resp, err := client.PostForm(endpoint, form)
 	if err != nil {
 		return out, fmt.Errorf("siteverify 请求失败: %w", err)
 	}
@@ -267,7 +276,7 @@ func publicHost(sh *core.Shared) string {
 // 核对 success、hostname（等于 public_url 的主机名）、action 与 cdata，
 // 任一不符即失败。用的是申诉专用的 TurnstileSecret。
 func verifyTurnstile(sh *core.Shared, token, ip string, appealID int64) (bool, string) {
-	out, err := turnstileSiteverify(sh.Cfg.TurnstileSecret, token, ip,
+	out, err := turnstileSiteverify(turnstileEndpoint(sh), sh.Cfg.TurnstileSecret, token, ip,
 		fmt.Sprintf("%d-%d", appealID, time.Now().UnixNano()))
 	if err != nil {
 		return false, err.Error()
@@ -290,7 +299,7 @@ func verifyTurnstile(sh *core.Shared, token, ip string, appealID int64) (bool, s
 // hostname。入群验证不绑定单个对象，没有 action / cdata 可比，用的是入群
 // 验证自己的 CaptchaSecret（与申诉的 TurnstileSecret 是两套配置）。
 func verifyTurnstileToken(sh *core.Shared, secret, token, ip string) (bool, string) {
-	out, err := turnstileSiteverify(secret, token, ip,
+	out, err := turnstileSiteverify(turnstileEndpoint(sh), secret, token, ip,
 		fmt.Sprintf("jv-%d", time.Now().UnixNano()))
 	if err != nil {
 		return false, err.Error()
