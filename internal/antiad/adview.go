@@ -119,10 +119,11 @@ func logViewDataOf(sh *core.Shared, id int64) (map[string]any, bool) {
 		"id": row.ID, "user_id": row.UserID, "user_name": row.UserName,
 		"chat_id": row.ChatID, "chat": ref.Display(), "chat_url": ref.URL(),
 		"message_id": row.MessageID,
-		"text":       row.Text, "verdict": row.Verdict, "confidence": row.Confidence,
-		"decider": row.Decider, "kind": row.Kind,
+		"text":       MaskSensitive(row.Text), "verdict": row.Verdict,
+		"confidence": row.Confidence,
+		"decider":    row.Decider, "kind": row.Kind,
 		"action": row.Action, "action_label": ActionLabel(row.Action),
-		"reason": row.Reason, "created": formatTS(sh, row.CreatedAt),
+		"reason": MaskSensitive(row.Reason), "created": formatTS(sh, row.CreatedAt),
 		// 初判与复判各自的原始结论分开给（见 verdictStage）：页面据此对照
 		// 两级，而不是只看被复判覆盖后的最终结论。历史行可能为空。
 		"so_verdict":  row.SoStage(),
@@ -152,7 +153,7 @@ func logViewDataOf(sh *core.Shared, id int64) (map[string]any, bool) {
 			var text string
 			if rows.Scan(&messageID, &text, &at) == nil {
 				history = append(history, map[string]any{
-					"message_id": messageID, "text": text, "at": at,
+					"message_id": messageID, "text": MaskSensitive(text), "at": at,
 					"time":    formatTS(sh, at),
 					"blocked": messageID == row.MessageID,
 				})
@@ -199,7 +200,7 @@ func appealViewDataOf(sh *core.Shared, id int64) (appealViewData, bool) {
 	data := appealViewData{
 		ID: ap.ID, UID: ap.UserID, Status: appealStatusLabel(ap.Status),
 		Statement: ap.Statement, AIResult: appealAIResultLabel(ap.AIResult),
-		AIConf: ap.AIConf * 100, AIReason: ap.AIReason, AIModel: ap.AIModel,
+		AIConf: ap.AIConf * 100, AIReason: MaskSensitive(ap.AIReason), AIModel: ap.AIModel,
 		WebAttempts: ap.WebAttempts, Code: ap.Code,
 		Created: formatTS(sh, ap.CreatedAt),
 		// 数组字段先给空切片：nil 切片会序列化成 null，前端 length/map

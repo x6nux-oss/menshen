@@ -315,7 +315,8 @@ func UserDossierText(b *core.Bot, d UserDossier, loc *time.Location) string {
 		add("昵称：（查不到）")
 	}
 	if d.Bio != "" {
-		add("个人简介：%s", escText(core.TruncateRunes(d.Bio, 200)))
+		// 简介是用户可控内容，可能带返利 ID / 邀请码；打码后再展示。
+		add("个人简介：%s", escText(MaskSensitive(core.TruncateRunes(d.Bio, 200))))
 	} else {
 		add("个人简介：（空或查不到）")
 	}

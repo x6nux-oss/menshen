@@ -483,14 +483,14 @@ func miniState(sh *core.Shared, w http.ResponseWriter, uid int64, username strin
 	gbans := []map[string]any{}
 	for _, g := range snap.Gban {
 		gbans = append(gbans, map[string]any{
-			"user_id": g.UserID, "reason": g.Reason,
+			"user_id": g.UserID, "reason": antiad.MaskSensitive(g.Reason),
 			"src_chat": g.SrcChat, "created_at": g.CreatedAt})
 	}
 	out["gban"] = gbans
 	ownBans := []map[string]any{}
 	for _, g := range snap.GbanOwnBans[uid] {
 		ownBans = append(ownBans, map[string]any{
-			"user_id": g.UserID, "reason": g.Reason,
+			"user_id": g.UserID, "reason": antiad.MaskSensitive(g.Reason),
 			"src_chat": g.SrcChat, "created_at": g.CreatedAt})
 	}
 	ownChats := []int64{}
@@ -680,7 +680,8 @@ func miniProfileOKRows(sh *core.Shared, uid int64, main bool) []map[string]any {
 		}
 		out = append(out, map[string]any{
 			"bot_id": p.BotID, "user_id": p.UserID, "hours": p.Hours,
-			"reason": p.Reason, "created_at": p.CreatedAt, "expires_at": p.ExpiresAt,
+			"reason": antiad.MaskSensitive(p.Reason), "created_at": p.CreatedAt,
+			"expires_at": p.ExpiresAt,
 		})
 	}
 	return out
@@ -1385,7 +1386,7 @@ func miniRuleTestJSON(sh *core.Shared, r antiad.RuleTestResult) map[string]any {
 			m := map[string]any{
 				"id": s.ID, "verdict": s.Verdict, "action": s.Action,
 				"kind": s.Kind, "user_id": s.UserID, "chat_id": s.ChatID,
-				"created_at": s.CreatedAt, "text": s.Text,
+				"created_at": s.CreatedAt, "text": antiad.MaskSensitive(s.Text),
 			}
 			addChatRef(m, sh, s.ChatID)
 			out = append(out, m)
@@ -1425,8 +1426,8 @@ func miniLogRow(out map[string]any, id, botID, chatID, userID, msgID, cost, at i
 	out["confidence"] = conf
 	out["kind"] = kind
 	out["action"] = action
-	out["reason"] = reason
-	out["text"] = text
+	out["reason"] = antiad.MaskSensitive(reason)
+	out["text"] = antiad.MaskSensitive(text)
 	out["decider"] = decider
 	out["cost_text"] = billing.FormatUSDFine(cost)
 	out["created_at"] = at
@@ -1507,7 +1508,8 @@ func miniUser(sh *core.Shared, w http.ResponseWriter, r *http.Request, uid int64
 		m := map[string]any{
 			"id": r.ID, "chat_id": r.ChatID, "verdict": r.Verdict,
 			"confidence": r.Conf, "kind": r.Kind, "action": r.Action,
-			"reason": r.Reason, "text": r.Text, "created_at": r.At,
+			"reason": antiad.MaskSensitive(r.Reason), "text": antiad.MaskSensitive(r.Text),
+			"created_at": r.At,
 		}
 		addChatRef(m, sh, r.ChatID)
 		logs = append(logs, m)
@@ -1773,7 +1775,7 @@ func miniAppeals(sh *core.Shared, w http.ResponseWriter, uid int64, body map[str
 				"id": id, "bot_id": botID, "user_id": userID, "status": status,
 				"statement": core.TruncateRunes(statement, 300),
 				"ai_result": aiResult, "ai_conf": conf,
-				"ai_reason":    core.TruncateRunes(aiReason, 300),
+				"ai_reason":    antiad.MaskSensitive(core.TruncateRunes(aiReason, 300)),
 				"ai_model":     aiModel,
 				"web_attempts": attempts,
 				"has_code":     code != "", "code_expires": codeExp,
@@ -1803,7 +1805,7 @@ func miniAppealDetail(sh *core.Shared, w http.ResponseWriter, uid int64, body ma
 	out := map[string]any{
 		"id": aid, "bot_id": botID, "user_id": userID, "status": status,
 		"statement": statement, "ai_result": aiResult, "ai_conf": conf,
-		"ai_reason": aiReason, "ai_model": aiModel,
+		"ai_reason": antiad.MaskSensitive(aiReason), "ai_model": aiModel,
 		"ai_cost":      billing.FormatUSDFine(cost),
 		"web_attempts": attempts, "has_code": code != "",
 		"code": code, "code_expires": codeExp,

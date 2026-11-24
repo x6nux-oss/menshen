@@ -156,7 +156,7 @@ func loadAppealDossier(sh *core.Shared, ap appealRec, data *appealViewData) {
 	if g, ok := snap.Gban[ap.UserID]; ok {
 		s := "已列入"
 		if r := strings.TrimSpace(g.Reason); r != "" {
-			s += "（" + clip(r, 60) + "）"
+			s += "（" + MaskSensitive(clip(r, 60)) + "）"
 		}
 		data.GBan = s
 	}
@@ -166,8 +166,9 @@ func loadAppealDossier(sh *core.Shared, ap appealRec, data *appealViewData) {
 	active := map[string]bool{}
 	for _, p := range effectivePenalties(sh, ap.BotID, ap.UserID) {
 		v := appealViewPenalty{Type: p.Type, ChatID: p.ChatID, Label: penaltyLabel(p.Type),
-			Text: clip(p.Text, dossierTextLen), Reason: clip(p.Reason, dossierNoteLen),
-			At: p.At, Time: formatTS(sh, p.At)}
+			Text:   MaskSensitive(clip(p.Text, dossierTextLen)),
+			Reason: MaskSensitive(clip(p.Reason, dossierNoteLen)),
+			At:     p.At, Time: formatTS(sh, p.At)}
 		switch p.Type {
 		case "gban":
 			v.Chat = "全平台"
@@ -204,8 +205,8 @@ func loadAppealDossier(sh *core.Shared, ap appealRec, data *appealViewData) {
 				r := ref(p.ChatID)
 				p.Chat, p.ChatURL = r.Display(), r.URL()
 				p.Time = formatTS(sh, p.At)
-				p.Text = clip(p.Text, dossierTextLen)
-				p.Reason = clip(p.Reason, dossierNoteLen)
+				p.Text = MaskSensitive(clip(p.Text, dossierTextLen))
+				p.Reason = MaskSensitive(clip(p.Reason, dossierNoteLen))
 				data.Penalties = append(data.Penalties, p)
 			}
 		}
@@ -261,7 +262,7 @@ func loadAppealDossier(sh *core.Shared, ap appealRec, data *appealViewData) {
 			}
 			m.ChatURL = r.URL()
 			m.Time = formatTS(sh, m.At)
-			m.Text = clip(m.Text, dossierTextLen)
+			m.Text = MaskSensitive(clip(m.Text, dossierTextLen))
 			m.Mark = marks[[2]int64{chatID, msgID}]
 			m.Blocked = m.Mark == "被拦"
 			data.History = append(data.History, m)
@@ -287,7 +288,7 @@ func loadAppealDossier(sh *core.Shared, ap appealRec, data *appealViewData) {
 				l.Chat, l.ChatURL = r.Display(), r.URL()
 				l.Time = formatTS(sh, l.At)
 				l.ActionLabel = ActionLabel(l.Action)
-				l.Reason = clip(l.Reason, dossierNoteLen)
+				l.Reason = MaskSensitive(clip(l.Reason, dossierNoteLen))
 				data.Logs = append(data.Logs, l)
 			}
 		}

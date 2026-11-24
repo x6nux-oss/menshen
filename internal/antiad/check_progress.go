@@ -49,12 +49,13 @@ func newCheckProgress(b *core.Bot, chatID, uid int64) *checkProgress {
 	return p
 }
 
-// step 追加一个小节并编辑消息。
+// step 追加一个小节并编辑消息。静默（msgID=0）时正文照常拼起来，
+// 只是不发送 —— 调用方与测试都能看到完整消息。
 func (p *checkProgress) step(section string) {
+	p.sb.WriteString("\n\n" + section)
 	if p.msgID == 0 {
 		return
 	}
-	p.sb.WriteString("\n\n" + section)
 	p.b.EditNoPreview(p.chatID, p.msgID, p.sb.String(), p.kb)
 }
 
@@ -106,12 +107,14 @@ func (p *checkProgress) judgeStep(stage string, v adVerdict, err error) {
 		fmt.Fprintf(&sb, "，危害度 %.1f", v.Severity)
 	}
 	if stage == "llm" && v.Reason != "" {
-		sb.WriteString("\n<i>" + html.EscapeString(core.TruncateRunes(v.Reason, 120)) + "</i>")
+		// 理由常引述广告原文（返利 ID、邀请码），打码后再用 spoiler 收起来：
+		// 群里默认不可见，点开才显示，避免把广告再发一遍。
+		sb.WriteString("\n<i>" + SensitiveHTML(core.TruncateRunes(v.Reason, 120)) + "</i>")
 	}
 	// 复判声明的证据单列一行：管理员需要看到判定依据。理由正文有 120 字
 	// 上限，证据跟在后面会被截掉，必须自己一行。
 	if stage == "llm" && len(v.Evidence) > 0 {
-		sb.WriteString("\n证据：<i>" + html.EscapeString(
+		sb.WriteString("\n证据：<i>" + SensitiveHTML(
 			core.TruncateRunes(strings.Join(v.Evidence, "、"), 100)) + "</i>")
 	}
 	p.step(sb.String())
