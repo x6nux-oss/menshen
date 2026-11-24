@@ -147,8 +147,11 @@ var settingDefaults = map[string]string{
 	// 窗口长度沿用 limiter.go 的 1 分钟。0 = 不限。
 	"antiad_rpm_chat":  "30", // 每群每分钟送检上限
 	"antiad_alert_rpm": "3",  // 同一 (群,人) 每分钟告警上限
-	"antiad_cmd_rpm":   "3",  // 每人每分钟 /check、/ban 次数上限
-	"antiad_ctx_msgs":  "6",
+	// 同一 (群,人) 的群内告警合并窗口（秒）：窗口内重复命中只更新最早那条。
+	// 0 = 关闭合并。撤回/删除后编辑失败会自动重发一条。
+	"antiad_alert_cooldown": "600",
+	"antiad_cmd_rpm":        "3", // 每人每分钟 /check、/ban 次数上限
+	"antiad_ctx_msgs":       "6",
 	// 链接预览：判定前展开正文里的 t.me 链接，把指向的帖子/频道简介一并
 	// 送检。只发一个链接、载荷全在对面的引流形态靠它才判得动。只取
 	// Telegram 自己的公开预览页，不抓其它站点。默认开。
