@@ -8,7 +8,7 @@
 - 一个 Telegram bot（从 [@BotFather](https://t.me/BotFather) 申请）与你的 TG 数字 user_id
 - 长轮询模式不需要公网地址，但只能做配置管理（主 bot 不入群、不判定）；
   要真正反广告需要 webhook 模式 + 一个 https 域名
-- 自建：Go 1.25+；也可以直接用 `ghcr.io/x6nux/menshen` 镜像（amd64 / arm64）
+- 自建：Go 1.26.11+；也可以直接用 `ghcr.io/x6nux/menshen` 镜像（amd64 / arm64）
 
 ## 两种接入方式
 
@@ -86,8 +86,10 @@ location / {
 否则验证组件在页面上根本加载不出来，所有申诉都卡在网页这一步。
 
 `client_ip_header` 的前提是 `listen_addr` 只绑回环、流量全部经过反代 ——
-这个请求头才可信。原始 IP 与浏览器特征只存在数据库里，不写进任何
-Telegram 消息、也不上任何网页。
+这个请求头才可信。公开端点的每 IP 限流也读这个头（见
+[运维 §1.3](operations.md#13-公开端点限流与安全头)）：反代后不配它时，
+所有访问共用一个限流窗口，可能误伤正常用户。原始 IP 与浏览器特征只存在
+数据库里，不写进任何 Telegram 消息、也不上任何网页。
 
 **每一项都可以改用环境变量**：键名加 `MENSHEN_` 前缀转大写，多个值用逗号分隔，
 例如 `MENSHEN_ADMIN_IDS="1,2,3"`、`MENSHEN_BOT_TOKEN="..."`。环境变量**压过**

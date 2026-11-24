@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  # Dockerfile 的基础镜像按 digest 固定，靠这里自动跟进补丁。
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly

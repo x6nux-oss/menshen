@@ -3,7 +3,7 @@
 **Telegram 群组反广告机器人。** AI 两级判定，先删后判，按「用户资历 × 置信度」
 自动删除 / 禁言（可改为封禁），并定时把处置结果汇总私聊给管理员。
 
-[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](go.mod)
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](go.mod)
 [![Image](https://img.shields.io/badge/ghcr.io-x6nux%2Fmenshen-2496ED?logo=docker&logoColor=white)](https://github.com/x6nux/menshen/pkgs/container/menshen)
 ![CGO](https://img.shields.io/badge/CGO-free-brightgreen)
 

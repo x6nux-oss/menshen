@@ -70,6 +70,39 @@ go tool pprof -top "https://ad.example.com/debug/pprof/heap"   # 需要 Bearer �
 
 排障结束关掉，不要长期常开。
 
+### 1.3 公开端点限流与安全头
+
+浏览器可直达的端点按「每 IP 每分钟」限流，超限返回 `429` 与
+`Retry-After: 60`，并计入 `menshen_rate_limited_total{route}`：
+
+| 端点 | 上限/分钟 | 说明 |
+|---|---|---|
+| `/_w/*` | 120 | 申诉、验证、原文查看的数据接口与页面壳 |
+| `/admin/login/*` | 30 | 登录链接本身一次性；限流挡暴力探测 |
+| `/admin/api/*` | 300 | 后台页面的一次加载会并发多个请求，留足余量 |
+| `/miniapp/api/*` | 300 | 同上 |
+| `/cap/*` | 120 | 内置 Cap 的 challenge/redeem/siteverify |
+| `/healthz` | 不限 | 编排与监控探针；限流会把它误判成实例不健康 |
+| webhook `/<token>/webhook` | 不限 | 投递量由群活跃度决定，按 IP 限流会丢真实更新 |
+
+「IP」取 `client_ip_header`（如 `CF-Connecting-IP`、`X-Real-IP`），未配置时取
+对端地址。**部署在反代后面却没配这个头时，所有外部请求共用一个窗口**——
+上表会变成全站总限额，高峰时可能误伤；此时必须让反代传入真实 IP，或直接
+把应用监听到回环、由反代补头。
+
+响应安全头由 HTTP 层统一添加：
+
+| 头 | 值 | 范围 |
+|---|---|---|
+| `X-Content-Type-Options` | `nosniff` | 全部 |
+| `Referrer-Policy` | `no-referrer` | 全部 |
+| `X-Frame-Options` | `DENY` | 除 `/miniapp` 外全部（Telegram Web 用 iframe 承载 Mini App） |
+| `Strict-Transport-Security` | `max-age=31536000` | `public_url` 是 `https://` 时 |
+| `Content-Security-Policy` | 按页面 | 公开页放行验证码来源；后台 `frame-ancestors 'none'`；Mini App 只允许 Telegram 框架 |
+
+CSP 的脚本来源都是同源产物（Telegram SDK 自托管），升级前端构建工具后
+若出现内联脚本，需要同步改 CSP，否则页面会白屏但接口仍正常。
+
 ## 2. 采集配置
 
 Prometheus 最小配置：
@@ -251,6 +284,41 @@ groups:
 启动时会把库、WAL/SHM、数据目录、日志文件的权限纠正到上表；归档目录由
 小时维护任务遍历纠正（文件 `0600`、目录 `0700`）。容器部署请给数据卷设
 `umask 077`，避免进程外写出的临时文件落到 `0644`。
+
+### 5.1 密钥与凭据
+
+库、日志与备份里都有明文凭据，按「等同生产密码」对待：备份外发前先加密，
+不要把 `data.db`、`data.db-wal`、`backups/` 或 `archive/` 直接发到聊天、工单
+或公开对象存储。
+
+| 凭据 | 存放 | 用途 | 轮换 |
+|---|---|---|---|
+| `web_secret` | `settings` 表，明文，32 字节随机 hex | 申诉/入群验证链接、后台登录链接与会话、内置 Cap 令牌的 HMAC 密钥 | 停服 → 删除该行 → 起服自动重生；所有已发链接、后台会话、未兑换的 Cap 令牌同时失效 |
+| bot token | `bots` 表，明文；日志只出现 `123456789:***` | bot 的完整控制权 | BotFather `/revoke` 后立即失效；在面板移除旧 bot、重新登记新 token，回调会重注册 |
+| Turnstile / 入群验证 Secret | `turnstile_secret` 在配置文件；`captcha_secret` 在 `settings` 表 | 服务端校验人机验证令牌 | 在各家后台轮换 → 更新配置/环境变量或面板 → 重启；旧令牌全部失效 |
+| 上游 API Key | `upstreams` 表，明文；面板只显示 `MaskKey` 结果 | 调用 AI 上游 | 在服务商后台轮换 → 面板更新对应上游 |
+
+`web_secret` 轮换（随机密钥只由进程生成，不要在面板或配置文件里手填）：
+
+```sh
+systemctl stop menshen            # 或 docker compose stop menshen
+sqlite3 /app/data/data.db "DELETE FROM settings WHERE k='web_secret';"
+systemctl start menshen           # webhook 启动时重新生成并写回
+```
+
+容器内没有 `sqlite3` CLI 时用 Python：`python3 -c "import sqlite3;c=sqlite3.connect('/app/data/data.db');c.execute(\"DELETE FROM settings WHERE k='web_secret'\");c.commit()"`。
+轮换后提醒用户从 bot 重新获取登录/申诉链接。
+
+登记 bot token 只在 bot 私聊里进行：收到后立即删除该条消息，落库后不再回显。
+webhook 路径本身含 token（`<public_url>/<token>/webhook`），反代访问日志要
+关闭路径记录或在日志层掩码 token；应用内日志已统一走 `config.MaskToken`。
+
+代码侧约束（新增日志时沿用）：
+
+- 不打印请求头、`initData`、申诉理由正文、验证码令牌或上游响应全文；
+- 错误响应只给通用中文提示，不回显 token、签名、会话 cookie；
+- `/metrics` 标签只用路由、bot 内部 ID、模型/上游名，不含原始路径或用户 ID；
+- 密钥类设置（`web_secret`、`captcha_secret`）永不下发给浏览器或 Mini App。
 
 ## 6. 备份
 

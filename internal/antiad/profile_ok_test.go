@@ -70,8 +70,13 @@ func TestProfileOKGrantLookupAndInvalidation(t *testing.T) {
 	}
 
 	// 上限：模型给多大都夹到 72 小时。
-	if u := GrantProfileOK(b, p, 500, "手滑给多了"); u > now+72*3600 || u <= now+71*3600 {
-		t.Errorf("放行时长应夹到 72 小时，得到 %d", u-now)
+	// 用调用前后的时刻夹住结果：这条用例在 -race 下前几步可能耗时 >1 秒，
+	// 拿测试开头的 now 做上界会误判成「超过 72 小时」。
+	before := time.Now().Unix()
+	u := GrantProfileOK(b, p, 500, "手滑给多了")
+	after := time.Now().Unix()
+	if u < before+72*3600 || u > after+72*3600 {
+		t.Errorf("放行时长应夹到 72 小时，得到 %d（调用窗口 %d–%d）", u-before, before, after)
 	}
 }
 

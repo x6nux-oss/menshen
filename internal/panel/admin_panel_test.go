@@ -146,3 +146,20 @@ func TestAdminPanelRoutes(t *testing.T) {
 		}
 	}
 }
+
+// TestAdminPanelShellCSP：后台入口页不被任何页面嵌套，脚本只允许同源。
+func TestAdminPanelShellCSP(t *testing.T) {
+	if _, ok := adminDistFS(); !ok {
+		t.Skip("前端未构建")
+	}
+	env := newMiniEnv(t)
+	w := httptest.NewRecorder()
+	AdminPanelHandler(env.sh).ServeHTTP(w,
+		httptest.NewRequest(http.MethodGet, "/admin/", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /admin/ = %d", w.Code)
+	}
+	if got := w.Header().Get("Content-Security-Policy"); got != adminShellCSP {
+		t.Errorf("后台入口页 CSP = %q，期望 %q", got, adminShellCSP)
+	}
+}

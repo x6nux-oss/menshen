@@ -19,27 +19,41 @@ permissions:
   contents: read
 
 jobs:
-  # 打包前的两项检查（见 CLAUDE.md）。不过就不构建，更不发布。
+  # 打包前的检查：格式、依赖漏洞、前后端测试与构建。不过就不构建，更不发布。
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      # Actions 固定到 commit SHA（tag 可被移动），升级由 Dependabot 提 PR。
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::以下文件未 gofmt，请运行 gofmt -w ."
+            echo "$unformatted"
+            exit 1
+          fi
       # 前端工程（web/）：先装依赖并构建。产物不入库，而 Go 侧默认
       # go:embed webdist，必须在 CI 里现构建。
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci --prefix web --no-audit --no-fund
+      # 生产依赖（--omit=dev）的安全门禁；dev 依赖的漏洞随 dependabot 处理。
+      - run: npm audit --prefix web --omit=dev --audit-level=high
       - run: npm --prefix web run lint
       - run: npm --prefix web run test
       - run: npm --prefix web run typecheck
       - run: npm --prefix web run build
       - run: go vet ./...
+      # 只阻断「本仓代码可达」的漏洞；不可达的依赖漏洞不红 CI，由 Dependabot 推动升级。
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
       # 默认嵌入上面构建好的前端产物，覆盖托管逻辑与产物内容。
       - run: go test ./...
       # 编译检查：没有产物（webdist 里只有 .gitkeep）的全新克隆也照常编译。
@@ -55,9 +69,65 @@ jobs:
             exit 1
           fi
 
+  # 竞态检测单独成 job：跑到 race 失败时不必等前端构建，也不拖慢 check 的反馈。
+  # 只覆盖并发最重的三个包，全仓 -race 会让 PR 反馈时间翻几倍。
+  race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+      - run: go test -race ./internal/core ./internal/antiad ./internal/store
+
+  # 镜像漏洞是发布门禁（有 fixable HIGH/CRITICAL 就红），SBOM 是同作业产出的
+  # 追溯材料。基线在 2026-11-24 扫描为 0（Go/Python/OS 全部无 fixable 高危）。
+  supply-chain:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      # 与发布镜像同一份 Dockerfile；只取 amd64，扫描结果按运行镜像的包集为准。
+      - name: 构建待扫描镜像
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: menshen:scan
+          cache-from: type=gha,scope=scan
+          cache-to: type=gha,mode=max,scope=scan
+      - name: 镜像漏洞扫描
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          image-ref: menshen:scan
+          format: sarif
+          output: trivy.sarif
+          severity: HIGH,CRITICAL
+          scanners: vuln
+          ignore-unfixed: true
+          # SARIF 默认会写入所有级别；不限制的话 exit-code 会被 MEDIUM 触发。
+          limit-severities-for-sarif: true
+          exit-code: '1'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: trivy-sarif
+          path: trivy.sarif
+          if-no-files-found: ignore
+      - name: SBOM
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: menshen:scan
+          format: spdx-json
+          output-file: menshen.spdx.json
+          artifact-name: menshen-sbom
+          upload-artifact: true
+
   # 一台 runner 一个架构，只构建、只按 digest 推送自己那一半。
   image:
-    needs: check
+    needs: [check, race, supply-chain]
     strategy:
       matrix:
         include:
@@ -76,9 +146,9 @@ jobs:
       IMAGE: ghcr.io/${{ github.repository }}
       PUBLISH: ${{ startsWith(github.ref, 'refs/tags/v') }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         if: env.PUBLISH == 'true'
         with:
           registry: ghcr.io
@@ -86,14 +156,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       # 这一作业不产出 tag，meta 只用来给镜像带上版本相关的 label。
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.IMAGE }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           platforms: ${{ matrix.platform }}
@@ -114,7 +184,7 @@ jobs:
         run: |
           mkdir -p /tmp/digests
           touch "/tmp/digests/${DIGEST#sha256:}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: env.PUBLISH == 'true'
         with:
           name: digest-${{ matrix.arch }}
@@ -133,20 +203,20 @@ jobs:
     env:
       IMAGE: ghcr.io/${{ github.repository }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: /tmp/digests
           pattern: digest-*
           merge-multiple: true
       # imagetools 要连 registry 改 manifest，用不着 docker 引擎，但要 buildx。
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.IMAGE }}
           tags: |

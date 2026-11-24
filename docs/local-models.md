@@ -79,7 +79,7 @@ docker compose run --rm --no-deps --entrypoint /app/menshen menshen \
 
 ## 非 Docker
 
-需要 Python **3.12**、Go 1.25+，以及各平台对应的 ONNX Runtime / OpenCV wheel。
+需要 Python **3.12**、Go 1.26+，以及各平台对应的 ONNX Runtime / OpenCV wheel。
 不要复用系统里版本不明的 Python 包；建议临时虚拟环境：
 
 ```bash
