@@ -108,10 +108,12 @@ func loadAppealDossier(sh *core.Shared, ap appealRec, data *appealViewData) {
 	ref := func(id int64) core.ChatRef { return core.LookupChatRef(snap, id) }
 
 	// 判定时记下的昵称。广告号被处置后常改名，现场查（也多半查不到：
-	// 没私聊过）没有意义。
+	// 没私聊过）没有意义。昵称本身可能是广告，打码后再展示。
+	var userName string
 	sh.Store.Read.QueryRow(`SELECT user_name FROM antiad_log
 		WHERE bot_id=? AND user_id=? ORDER BY id DESC LIMIT 1`,
-		ap.BotID, ap.UserID).Scan(&data.UName)
+		ap.BotID, ap.UserID).Scan(&userName)
+	data.UName = MaskSensitive(userName)
 
 	// 本 bot 名下的群；处罚流水里出现过、但群配置已删的也带上，否则
 	// 画像与留底会整段消失。

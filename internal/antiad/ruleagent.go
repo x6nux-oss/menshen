@@ -717,6 +717,15 @@ func (r *ruleAgentRun) finish(genErr, setupErr error) {
 			"请查看步骤日志了解它在哪一步停下。", r.model)
 	}
 
+	// 定时任务触发的运行：正常收尾或至少产出了规则时推进游标，避免同一批
+	// 广告每小时重复触发；超时/失败不推进，下一小时还有机会补跑。
+	//
+	// 必须先落库再标记结束：外部看到 running=false 时（面板轮询、测试）
+	// 游标应已推进，否则会把"已结束但游标没动"当成漏跑。
+	if r.autoWatermark > 0 && (errText == "" || len(created) > 0) {
+		advanceRuleAgentCursor(r.sh, r.autoWatermark)
+	}
+
 	ruleAgentRT.mu.Lock()
 	ruleAgentRT.running = false
 	ruleAgentRT.finishedAt = time.Now().Unix()
@@ -725,12 +734,6 @@ func (r *ruleAgentRun) finish(genErr, setupErr error) {
 	ruleAgentRT.createdRuleIDs = append([]int64{}, created...)
 	ruleAgentRT.cancel = nil
 	ruleAgentRT.mu.Unlock()
-
-	// 定时任务触发的运行：正常收尾或至少产出了规则时推进游标，避免同一批
-	// 广告每小时重复触发；超时/失败不推进，下一小时还有机会补跑。
-	if r.autoWatermark > 0 && (errText == "" || len(created) > 0) {
-		advanceRuleAgentCursor(r.sh, r.autoWatermark)
-	}
 
 	if errText != "" {
 		slog.Warn("规则发现：本轮结束", "结果", result, "错误", errText)

@@ -937,7 +937,7 @@ func pushAppealCard(b *core.Bot, ap appealRec, penalties []appealPenalty,
 		appealAIResultLabel(ap.AIResult), ap.AIConf*100, html.EscapeString(ap.AIModel))
 	if ap.Statement != "" {
 		fmt.Fprintf(&sb, "申诉理由：%s\n",
-			html.EscapeString(core.TruncateRunes(ap.Statement, 200)))
+			SensitiveHTML(core.TruncateRunes(ap.Statement, 200)))
 	}
 	if ap.AIReason != "" {
 		fmt.Fprintf(&sb, "AI 理由：%s\n",

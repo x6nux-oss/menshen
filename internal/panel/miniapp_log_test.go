@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -281,6 +282,32 @@ func TestMiniAppealAct(t *testing.T) {
 	}
 	if statusOf(3) != "lifted" {
 		t.Errorf("人工解除后状态应为 lifted，得到 %s", statusOf(3))
+	}
+}
+
+// TestMiniAppealStatementMasked：申诉陈述可能含返利链接/邀请码，列表与
+// 详情都只返回打码后的文本。
+func TestMiniAppealStatementMasked(t *testing.T) {
+	_, b := testutil.NewTestRegistry(t, nil)
+	sh := b.Shared
+	env := &miniTestEnv{t: t, h: MiniAppHandler(sh), now: time.Now().Unix()}
+	init := env.adminInit()
+	if _, err := sh.Store.Write.Exec(`INSERT INTO appeals
+		(bot_id,user_id,status,statement,created_at,updated_at)
+		VALUES (?,?,'noweb','我改好了 邀请码:WG9EWW',?,?)`,
+		testutil.TestBotID, 555, env.now, env.now); err != nil {
+		t.Fatal(err)
+	}
+	for _, op := range []string{"appeals", "appeal"} {
+		w := miniDo(t, env.h, testutil.TestToken, init, testutil.TestBotID, op,
+			map[string]any{"id": 1})
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s 应 200，得到 %d：%s", op, w.Code, w.Body.String())
+		}
+		body := w.Body.String()
+		if strings.Contains(body, "WG9EWW") || !strings.Contains(body, "WG**WW") {
+			t.Errorf("%s 的申诉陈述应打码后返回：%s", op, body)
+		}
 	}
 }
 

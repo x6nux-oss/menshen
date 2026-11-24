@@ -149,6 +149,28 @@ func TestAppealAIOverturnsAndLifts(t *testing.T) {
 	}
 }
 
+// TestAppealCardStatementSpoiler：申诉理由是用户可控文本，可能带返利 ID/
+// 邀请码。卡片发给管理员私聊时必须打码并包进 spoiler，不能原样再发一遍。
+func TestAppealCardStatementSpoiler(t *testing.T) {
+	b, fake := testutil.NewTestBot(t, 1)
+	ap := appealRec{ID: 7, UserID: 555, AIResult: "uphold", AIModel: "test/model",
+		Statement: "我改好了 邀请码:WG9EWW"}
+	pushAppealCard(b, ap, nil, appealCardBrief, false, appealCardExtra{})
+
+	last := fake.LastCall("sendMessage")
+	if last == nil {
+		t.Fatal("卡片应发给归属人")
+	}
+	text := fmt.Sprint(last["text"])
+	if strings.Contains(text, "WG9EWW") {
+		t.Errorf("申诉理由里的邀请码不该原样发出：%s", text)
+	}
+	if !strings.Contains(text, `<span class="tg-spoiler">`) ||
+		!strings.Contains(text, "WG**WW") {
+		t.Errorf("申诉理由应打码并包进 spoiler：%s", text)
+	}
+}
+
 // TestAppealUpholdFallsBackToNoWeb：AI 维持原判、网页不可用时进入 noweb，
 // 告知申诉人联系群管理员，并给归属人推卡片。
 func TestAppealUpholdFallsBackToNoWeb(t *testing.T) {

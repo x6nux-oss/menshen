@@ -370,7 +370,7 @@ func appealPageAI(ap appealRec) map[string]any {
 		"result": ap.AIResult, "label": label,
 		"conf": ap.AIConf, "model": ap.AIModel,
 		"reason":    MaskSensitive(core.TruncateRunes(strings.TrimSpace(ap.AIReason), 400)),
-		"statement": core.TruncateRunes(strings.TrimSpace(ap.Statement), 200),
+		"statement": MaskSensitive(core.TruncateRunes(strings.TrimSpace(ap.Statement), 200)),
 	}
 }
 

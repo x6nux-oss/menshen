@@ -1515,7 +1515,8 @@ func miniUser(sh *core.Shared, w http.ResponseWriter, r *http.Request, uid int64
 		logs = append(logs, m)
 	}
 	miniOK(w, map[string]any{
-		"user_id": target, "name": d.Name, "username": d.Username, "bio": d.Bio,
+		"user_id": target, "name": antiad.MaskSensitive(d.Name),
+		"username": antiad.MaskSensitive(d.Username), "bio": antiad.MaskSensitive(d.Bio),
 		"kept": d.Kept, "msgs": d.Msgs, "hits": d.Hits, "chats": d.ChatCount,
 		"first_seen": d.FirstSeen, "last_msg": d.LastMsg,
 		"total": d.Total, "processed": d.Processed, "shown": total,
@@ -1773,7 +1774,7 @@ func miniAppeals(sh *core.Shared, w http.ResponseWriter, uid int64, body map[str
 			&conf, &aiReason, &aiModel, &attempts, &code, &codeExp, &at, &upd) == nil {
 			out = append(out, map[string]any{
 				"id": id, "bot_id": botID, "user_id": userID, "status": status,
-				"statement": core.TruncateRunes(statement, 300),
+				"statement": antiad.MaskSensitive(core.TruncateRunes(statement, 300)),
 				"ai_result": aiResult, "ai_conf": conf,
 				"ai_reason":    antiad.MaskSensitive(core.TruncateRunes(aiReason, 300)),
 				"ai_model":     aiModel,
@@ -1804,7 +1805,7 @@ func miniAppealDetail(sh *core.Shared, w http.ResponseWriter, uid int64, body ma
 	}
 	out := map[string]any{
 		"id": aid, "bot_id": botID, "user_id": userID, "status": status,
-		"statement": statement, "ai_result": aiResult, "ai_conf": conf,
+		"statement": antiad.MaskSensitive(statement), "ai_result": aiResult, "ai_conf": conf,
 		"ai_reason": antiad.MaskSensitive(aiReason), "ai_model": aiModel,
 		"ai_cost":      billing.FormatUSDFine(cost),
 		"web_attempts": attempts, "has_code": code != "",

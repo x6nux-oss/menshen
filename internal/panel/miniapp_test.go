@@ -693,7 +693,7 @@ func TestMiniAppUserDossier(t *testing.T) {
 	botID := b.BotID()
 	fake := b.TG.(*testutil.FakeTG)
 	fake.Resp["getChat"] = `{"ok":true,"result":{"first_name":"白展堂",` +
-		`"username":"tgdsBZT","bio":"我的TG频道 @tgds100"}}`
+		`"username":"tgdsBZT","bio":"我的TG频道 @tgds100 邀请码:WG9EWW"}}`
 
 	paid := seedMiniLog(t, b, 555, "广告原文", "deleted_muted")
 	clean := seedMiniLog(t, b, 555, "日常闲聊", "none")
@@ -721,6 +721,10 @@ func TestMiniAppUserDossier(t *testing.T) {
 	if out.UserID != 555 || out.Name != "白展堂" || out.Username != "tgdsBZT" ||
 		!strings.Contains(out.Bio, "tgds100") {
 		t.Errorf("资料卡字段不对：%+v", out)
+	}
+	// 简介是用户可控内容，可能带返利链接/邀请码：接口只返回打码后的文本。
+	if strings.Contains(out.Bio, "WG9EWW") || !strings.Contains(out.Bio, "WG**WW") {
+		t.Errorf("简介应打码后返回：%q", out.Bio)
 	}
 	if out.Total != 2 || out.Processed != 1 {
 		t.Errorf("统计应为 共2/处置1，得到 共%d/处置%d", out.Total, out.Processed)
@@ -854,8 +858,10 @@ func TestMiniUserStoredNameFallback(t *testing.T) {
 		t.Fatalf("应返回用户页，得到 %d：%s", w.Code, w.Body.String())
 	}
 	body := w.Body.String()
-	if !strings.Contains(body, "Hohwhén") || !strings.Contains(body, "A89899999") {
-		t.Errorf("昵称/用户名应回落到流水里留存的 user_name：%s", body)
+	// 昵称也是用户可控内容：带 ID/邀请码的部分要打码，剩下的仍能认出是谁。
+	if !strings.Contains(body, "Hohwhén") || strings.Contains(body, "A89899999") ||
+		!strings.Contains(body, "A89****999") {
+		t.Errorf("昵称应回落到流水里留存的 user_name 并打码：%s", body)
 	}
 }
 

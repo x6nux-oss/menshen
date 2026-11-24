@@ -116,7 +116,7 @@ func logViewDataOf(sh *core.Shared, id int64) (map[string]any, bool) {
 	}
 	ref := core.LookupChatRef(sh.Cache.Snap(), row.ChatID)
 	record := map[string]any{
-		"id": row.ID, "user_id": row.UserID, "user_name": row.UserName,
+		"id": row.ID, "user_id": row.UserID, "user_name": MaskSensitive(row.UserName),
 		"chat_id": row.ChatID, "chat": ref.Display(), "chat_url": ref.URL(),
 		"message_id": row.MessageID,
 		"text":       MaskSensitive(row.Text), "verdict": row.Verdict,
@@ -199,7 +199,7 @@ func appealViewDataOf(sh *core.Shared, id int64) (appealViewData, bool) {
 	}
 	data := appealViewData{
 		ID: ap.ID, UID: ap.UserID, Status: appealStatusLabel(ap.Status),
-		Statement: ap.Statement, AIResult: appealAIResultLabel(ap.AIResult),
+		Statement: MaskSensitive(ap.Statement), AIResult: appealAIResultLabel(ap.AIResult),
 		AIConf: ap.AIConf * 100, AIReason: MaskSensitive(ap.AIReason), AIModel: ap.AIModel,
 		WebAttempts: ap.WebAttempts, Code: ap.Code,
 		Created: formatTS(sh, ap.CreatedAt),
