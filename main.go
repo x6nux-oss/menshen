@@ -18,6 +18,7 @@ import (
 	_ "time/tzdata"
 
 	"menshen/internal/antiad"
+	"menshen/internal/backup"
 	"menshen/internal/config"
 	"menshen/internal/core"
 	"menshen/internal/localvision"
@@ -36,10 +37,33 @@ func main() {
 	showVer := flag.Bool("version", false, "打印版本信息并退出")
 	downloadModels := flag.Bool("download-models", false, "下载并校验内置 OCR 和色情检测模型后退出")
 	modelsDir := flag.String("models-dir", "", "模型下载目录（默认数据库同目录下 models/）")
+	backupNow := flag.Bool("backup-now", false, "立即执行一次备份（库快照 + 归档打包）后退出")
+	verifyDB := flag.String("verify-db", "", "对指定 SQLite 文件执行 PRAGMA integrity_check 后退出")
 	flag.Parse()
 
 	if *showVer {
 		slog.Info("menshen", "version", version, "built", buildTime)
+		return
+	}
+	if *verifyDB != "" {
+		if err := backup.VerifyFile(*verifyDB); err != nil {
+			slog.Error("完整性校验失败", "db", *verifyDB, "err", err)
+			os.Exit(1)
+		}
+		slog.Info("完整性校验通过", "db", *verifyDB, "check", "integrity_check")
+		return
+	}
+	if *backupNow {
+		// 不要求 bot 凭据：备份是纯本地维护动作，token 失效时更需要它。
+		cfg, err := config.LoadModelDownload(*cfgPath)
+		if err != nil {
+			slog.Error("加载配置失败", "err", err)
+			os.Exit(1)
+		}
+		if err := runBackupNow(cfg); err != nil {
+			slog.Error("备份失败", "err", err)
+			os.Exit(1)
+		}
 		return
 	}
 	if *downloadModels {
@@ -148,6 +172,30 @@ func main() {
 		defer cancel()
 		srv.Shutdown(ctx)
 	}
+}
+
+// runBackupNow 是一次性备份入口（-backup-now）。走与定时任务相同的
+// Snapshot：库快照、integrity_check、归档打包、保留轮转都一致。
+func runBackupNow(cfg *config.Config) error {
+	db, err := store.Open(cfg.DBPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	cache, err := store.NewCache(db)
+	if err != nil {
+		return err
+	}
+	res, err := backup.Snapshot(db.Read, backup.Options{
+		DBPath:     cfg.DBPath,
+		ArchiveDir: cfg.ArchiveDir,
+		Keep:       backupKeep(cache.Snap()),
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Println(res.Dir)
+	return nil
 }
 
 // installLogging 把 slog 默认 logger 接到三路输出上：标准输出、与数据库

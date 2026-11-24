@@ -2,7 +2,11 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -475,9 +479,14 @@ func Open(path string) (*Store, error) {
 	// synchronous(NORMAL)：WAL 下它不会损坏库，只是断电时可能丢最后几笔写入；
 	// 默认的 FULL 让每次写都等一次 fsync，而每条群消息要写两次（画像 + 留底），
 	// 广告洪峰时这就是瓶颈。pragma 按连接生效，所以必须写在 DSN 里。
+	//
+	// auto_vacuum(INCREMENTAL)：清理只 DELETE 时，删掉的行会把页留成空闲页，
+	// 文件只增不减。新库必须在这里打开（建表之前），老库要一次 VACUUM 才
+	// 生效（见 ReclaimSpace）。
 	dsn := "file:" + path +
 		"?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)" +
-		"&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
+		"&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)" +
+		"&_pragma=auto_vacuum(INCREMENTAL)"
 
 	write, err := sql.Open("sqlite", dsn)
 	if err != nil {
@@ -510,7 +519,106 @@ func Open(path string) (*Store, error) {
 	}
 	read.SetMaxOpenConns(4)
 
+	// 库与归档里有上游密钥、群聊正文与申诉证据。创建时按 0600 收紧，
+	// 老部署留下的 0644 也在这里纠正；目录同样只留给属主。
+	if dir := filepath.Dir(path); dir != "." && dir != "" {
+		hardenPath(dir, 0o700, true)
+	}
+	hardenDBFiles(path)
+
 	return &Store{Read: read, Write: write}, nil
+}
+
+// hardenPath 尽力纠正权限：失败只告警，不让一个 chmod 阻止服务启动
+// （例如挂载卷由别的用户创建、进程只能写不能改属主）。
+func hardenPath(path string, mode os.FileMode, dir bool) {
+	info, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		if dir {
+			if err := os.MkdirAll(path, mode); err != nil {
+				slog.Warn("创建数据目录失败", "path", path, "err", err)
+			}
+		}
+		return
+	}
+	if err != nil {
+		slog.Warn("检查数据文件权限失败", "path", path, "err", err)
+		return
+	}
+	if info.Mode().Perm() == mode {
+		return
+	}
+	if err := os.Chmod(path, mode); err != nil {
+		slog.Warn("纠正数据文件权限失败", "path", path, "err", err)
+	}
+}
+
+// hardenDBFiles 收紧库文件与 WAL/SHM 边车。边车只有写到那个时刻才存在，
+// 所以每次启动都查一遍。
+func hardenDBFiles(path string) {
+	for _, p := range []string{path, path + "-wal", path + "-shm"} {
+		hardenPath(p, 0o600, false)
+	}
+}
+
+// SpaceStats 是 SQLite 的页占用概况。FreePages*PageSize 就是「删了但没
+// 还给文件系统」的字节数。
+type SpaceStats struct {
+	PageSize   int64
+	PageCount  int64
+	FreePages  int64
+	AutoVacuum int64
+}
+
+// SpaceStats 读取当前库的页统计。/status 与小时维护都会用到。
+func (s *Store) SpaceStats() (SpaceStats, error) {
+	var st SpaceStats
+	for _, q := range []struct {
+		pragma string
+		dst    *int64
+	}{
+		{"page_size", &st.PageSize},
+		{"page_count", &st.PageCount},
+		{"freelist_count", &st.FreePages},
+		{"auto_vacuum", &st.AutoVacuum},
+	} {
+		if err := s.Read.QueryRow(`PRAGMA ` + q.pragma).Scan(q.dst); err != nil {
+			return st, fmt.Errorf("PRAGMA %s: %w", q.pragma, err)
+		}
+	}
+	return st, nil
+}
+
+// ReclaimSpace 回收空闲页并返回回收后的统计。
+//
+// 新库开了 auto_vacuum=INCREMENTAL，每次只还一小批页，持锁时间可忽略。
+// 老库（auto_vacuum=0）只能 VACUUM：它会持写锁重写整个库，所以只在空闲
+// 页确实可观（≥32 MB 且 ≥25%）时才做，避免每小时白白卡一次写入。
+func (s *Store) ReclaimSpace() (SpaceStats, error) {
+	before, err := s.SpaceStats()
+	if err != nil {
+		return before, err
+	}
+	if before.FreePages <= 0 {
+		return before, nil
+	}
+	switch {
+	case before.AutoVacuum != 0:
+		// 1000 页 ≈ 4 MB：一小时一批，够追上保留期清理的速度，又不长时间占锁。
+		if _, err := s.Write.Exec(`PRAGMA incremental_vacuum(1000)`); err != nil {
+			return before, err
+		}
+	case before.FreePages*before.PageSize >= 32<<20 &&
+		before.FreePages*4 >= before.PageCount:
+		// 先永久打开增量回收，再 VACUUM 让老库真正生效。
+		if _, err := s.Write.Exec(`PRAGMA auto_vacuum=INCREMENTAL`); err != nil {
+			return before, err
+		}
+		if _, err := s.Write.Exec(`VACUUM`); err != nil {
+			return before, err
+		}
+	}
+	return s.SpaceStats()
 }
 
 // migrate 补齐老库缺失的列。

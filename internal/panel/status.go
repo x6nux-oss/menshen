@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"html"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
 	"menshen/internal/antiad"
+	"menshen/internal/backup"
 	"menshen/internal/billing"
 	"menshen/internal/core"
 	"menshen/internal/store"
@@ -98,6 +100,7 @@ func renderStatus(b *core.Bot, uid int64) string {
 	}
 	fmt.Fprintf(&sb, "判定队列 %d 条 ｜ 未结申诉 %d 个\n",
 		statusBusy(sh, botIDs), statusOpenAppeals(sh, uid, main))
+	sb.WriteString(spaceLine(sh) + "\n")
 
 	if n := sh.AIFailStreak.Load(); n > 0 {
 		fmt.Fprintf(&sb, "⚠️ 上游连续失败 %d 次，期间消息一律放行\n", n)
@@ -253,4 +256,38 @@ func formatUptime(d time.Duration) string {
 		return fmt.Sprintf("%d 分 %d 秒", int(d.Minutes()), int(d.Seconds())%60)
 	}
 	return fmt.Sprintf("%d 秒", int(d.Seconds()))
+}
+
+// spaceLine 给出数据面占用：库、WAL、备份目录与 SQLite 空闲页。备份目录
+// 单独统计是必要的——它会被 VACUUM INTO 与归档打包撑大，只盯着库文件
+// 会以为盘还够。空闲页 × 页大小就是「已删除但还没还给文件系统」的字节。
+func spaceLine(sh *core.Shared) string {
+	fileSize := func(path string) int64 {
+		if info, err := os.Stat(path); err == nil {
+			return info.Size()
+		}
+		return 0
+	}
+	dbBytes := fileSize(sh.Cfg.DBPath)
+	walBytes := fileSize(sh.Cfg.DBPath + "-wal")
+	bkBytes, bkCount := backup.DirUsage(backup.DirFor(sh.Cfg.DBPath))
+	var freeBytes int64
+	if st, err := sh.Store.SpaceStats(); err == nil {
+		freeBytes = st.FreePages * st.PageSize
+	}
+	return fmt.Sprintf("数据盘：库 %s · WAL %s · 备份 %d 份 %s · 空闲页 %s",
+		formatBytes(dbBytes), formatBytes(walBytes), bkCount,
+		formatBytes(bkBytes), formatBytes(freeBytes))
+}
+
+func formatBytes(n int64) string {
+	switch {
+	case n >= 1<<30:
+		return fmt.Sprintf("%.1f GB", float64(n)/(1<<30))
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%.1f KB", float64(n)/(1<<10))
+	}
+	return fmt.Sprintf("%d B", n)
 }

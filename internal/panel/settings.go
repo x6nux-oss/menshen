@@ -82,6 +82,10 @@ func stringSpecByKey(k string) *settingSpec {
 var settingSpecs = []settingSpec{
 	{"log_retention_days", "记录保留天数", "正整数，至少 1；同时作用于判定流水与群消息留底", 1, 0, ""},
 	{"ai_log_days", "模型调用流水保留天数", "正整数，至少 1；每次模型调用的输入输出都落库（固定提示词已剥离），体积比判定流水大，默认 14 天", 1, 0, ""},
+	{"backup_enabled", "定时备份", "1 = 开（默认），0 = 关；备份落在数据库同目录的 backups/，含 VACUUM INTO 库快照与归档目录打包", 0, 1, ""},
+	{"backup_interval_hours", "备份间隔（小时）", "1-8760 的整数，默认 24；周期从磁盘上最新一份备份算起，重启不会推迟", 1, 8760, ""},
+	{"backup_keep", "保留备份份数", "1-365 的整数，默认 7；超出部分从最旧的整目录删除", 1, 365, ""},
+	{"archive_retention_days", "归档文件保留天数", "0-3650 的整数；按文件日期清理 archive/ 下的 JSONL 与图片，0 = 永久保留。去重索引与它同寿。默认 90", 0, 3650, ""},
 	// 日志文件与数据库同目录，单文件写满滚成 .1 备份。
 	{"log_file_max_mb", "日志单文件上限（MB）", "非负整数；单个日志文件写到这么大就滚成备份。0 = 关闭文件日志", 0, 0, ""},
 	{"log_file_total_mb", "日志总大小上限（MB）", "非负整数；当前文件加全部备份超过它就从最旧的备份删起。0 = 关闭文件日志", 0, 0, ""},
@@ -193,6 +197,10 @@ var settingSections = []struct {
 		"max_bots_per_admin",
 		"subbot_autoleave_minutes",
 		"antiad_upstream_alert_after", "antiad_upstream_alert_minutes",
+	}},
+	{"备份与维护", []string{
+		"backup_enabled", "backup_interval_hours", "backup_keep",
+		"archive_retention_days",
 	}},
 	{"学习与名单", []string{
 		"antiad_digest_min", "antiad_digest_max",

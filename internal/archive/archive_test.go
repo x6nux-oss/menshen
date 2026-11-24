@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"menshen/internal/config"
 	"menshen/internal/core"
 	"menshen/internal/testutil"
 	"menshen/internal/tg"
@@ -27,6 +28,11 @@ func archiveBot(t *testing.T, chatID int64) (*core.Bot, *testutil.FakeTG, string
 	testutil.EnableAntiad(t, b, chatID)
 	if err := b.PutSetting("archive_enabled", "1"); err != nil {
 		t.Fatalf("开启存档: %v", err)
+	}
+	// 这些用例的消息时间戳固定在 2023 年；关闭保留期，避免它们随当前时间
+	// 漂移成「过期」而改变导出结果。保留期本身在 TestSweepAndExportRetention 里测。
+	if err := b.PutSetting("archive_retention_days", "0"); err != nil {
+		t.Fatalf("关闭归档保留期: %v", err)
 	}
 	root := t.TempDir()
 	b.Cfg.ArchiveDir = root
@@ -352,5 +358,101 @@ func TestCompressImageKeepsSmallFile(t *testing.T) {
 	}
 	if ext != ".jpg" && ext != ".jpeg" {
 		t.Errorf("ext=%q", ext)
+	}
+}
+
+// TestSweepRemovesExpiredAndHardens：过期文件按文件名日期删除，权限纠正为
+// 0600/0700，空日期目录一并回收。
+func TestSweepRemovesExpiredAndHardens(t *testing.T) {
+	root := t.TempDir()
+	cfg := &config.Config{DBPath: filepath.Join(root, "data.db"), ArchiveDir: root}
+	now := time.Now().In(time.UTC)
+	oldDay := now.AddDate(0, 0, -40).Format("2006-01-02")
+	newDay := now.Format("2006-01-02")
+	chat := filepath.Join(root, "-100")
+
+	oldJSONL := filepath.Join(chat, "messages-"+oldDay+".jsonl")
+	newJSONL := filepath.Join(chat, "messages-"+newDay+".jsonl")
+	oldImage := filepath.Join(chat, "images", oldDay, "1_0.jpg")
+	newImage := filepath.Join(chat, "images", newDay, "2_0.jpg")
+	oldAvatar := filepath.Join(chat, "avatars", "1.jpg")
+	newAvatar := filepath.Join(chat, "avatars", "2.jpg")
+	for _, p := range []string{oldJSONL, newJSONL, oldImage, newImage, oldAvatar, newAvatar} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(`{"type":"message"}`+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	past := now.AddDate(0, 0, -40)
+	os.Chtimes(oldAvatar, past, past)
+
+	Sweep(cfg, 30, time.UTC)
+
+	for _, p := range []string{oldJSONL, oldImage, oldAvatar} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("过期文件应删除: %s (%v)", p, err)
+		}
+	}
+	for _, p := range []string{newJSONL, newImage, newAvatar} {
+		info, err := os.Stat(p)
+		if err != nil {
+			t.Errorf("未过期文件被删: %s", p)
+			continue
+		}
+		if info.Mode().Perm() != 0o600 {
+			t.Errorf("%s 权限 = %o，期望 600", p, info.Mode().Perm())
+		}
+	}
+	if info, err := os.Stat(chat); err != nil || info.Mode().Perm() != 0o700 {
+		t.Errorf("群目录权限未纠正: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(chat, "images", oldDay)); !os.IsNotExist(err) {
+		t.Errorf("空日期目录应回收: %v", err)
+	}
+}
+
+// TestExportSkipsExpiredRecords：保留期之外的历史不补写进归档，避免刚清完
+// 又被 /export 写回来。
+func TestExportSkipsExpiredRecords(t *testing.T) {
+	const chatID = int64(-1001234)
+	b, _, root := archiveBot(t, chatID)
+	if err := b.PutSetting("archive_retention_days", "30"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Store.Write.Exec(`INSERT INTO group_messages
+		(chat_id,message_id,user_id,text,at) VALUES (?,?,?,?,?)`,
+		chatID, 1, 42, "很久以前", 1700000000); err != nil {
+		t.Fatal(err)
+	}
+	st, err := ExportChat(b, chatID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Messages != 0 || st.Skipped != 1 {
+		t.Fatalf("过期记录应跳过: %+v", st)
+	}
+	if _, err := os.Stat(filepath.Join(root, strconv.FormatInt(chatID, 10),
+		"messages-"+dayOf(1700000000)+".jsonl")); !os.IsNotExist(err) {
+		t.Errorf("不应为过期记录建归档文件: %v", err)
+	}
+}
+
+// TestFileKeys：去重兜底能认出文件里已有的消息与判定。
+func TestFileKeys(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "x.jsonl")
+	data := `{"type":"message","message_id":7}` + "\n" +
+		`{"type":"judgment","id":9}` + "\n" +
+		`垃圾行` + "\n"
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	keys := fileKeys(path)
+	if !keys["m:7"] || !keys["j:9"] {
+		t.Errorf("keys = %v", keys)
+	}
+	if len(keys) != 2 {
+		t.Errorf("应只有 2 个键，得到 %v", keys)
 	}
 }
