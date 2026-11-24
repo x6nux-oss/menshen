@@ -43,6 +43,26 @@ class ProbabilityTest(unittest.TestCase):
             worker._nsfw_probability([float("nan"), 0])
 
 
+class OcrPreprocessTest(unittest.TestCase):
+    def test_long_side_is_capped(self):
+        from PIL import Image
+
+        resized = worker._fit_for_ocr(Image.new("RGB", (4000, 2000)), Image)
+        self.assertEqual(resized.size, (1600, 800))
+
+    def test_small_image_is_unchanged(self):
+        from PIL import Image
+
+        image = Image.new("RGB", (1000, 800))
+        self.assertIs(worker._fit_for_ocr(image, Image), image)
+
+    def test_extreme_aspect_ratio_keeps_one_pixel(self):
+        from PIL import Image
+
+        resized = worker._fit_for_ocr(Image.new("RGB", (10000, 1)), Image)
+        self.assertEqual(resized.size, (1600, 1))
+
+
 class ModelResolutionTest(unittest.TestCase):
     def test_thread_count_is_bounded(self):
         instance = worker.Worker(threads=10**6)

@@ -14,6 +14,9 @@ _MAX_IMAGE_PIXELS = 40_000_000
 _MAX_QR_UPSCALE_PIXELS = 8_000_000
 _MAX_REQUEST_BYTES = 64 * 1024 * 1024
 _NSFW_SIZE = 384
+# OCR 前把长边缩到 1600：大图（手机原图、文档扫描）像素数常到 40 MP，
+# RapidOCR 的检测/识别耗时基本随像素线性增长，而 1600 长边足够看清字。
+_OCR_MAX_SIDE = 1600
 _GROUPS = {
     "ocr": ("ocr_det.onnx", "ocr_rec.onnx", "ppocrv6_dict.txt"),
     "nsfw": ("marqo-nsfw-384.onnx",),
@@ -74,6 +77,16 @@ def _nsfw_tensor(image, numpy, Image):
     cropped = resized.crop((left, top, left + _NSFW_SIZE, top + _NSFW_SIZE))
     tensor = numpy.asarray(cropped, dtype=numpy.float32) / 255.0
     return ((tensor - 0.5) / 0.5).transpose(2, 0, 1)[None, ...]
+
+
+def _fit_for_ocr(image, Image):
+    width, height = image.size
+    longest = max(width, height)
+    if longest <= _OCR_MAX_SIDE:
+        return image
+    scale = _OCR_MAX_SIDE / float(longest)
+    size = (max(1, int(round(width * scale))), max(1, int(round(height * scale))))
+    return image.resize(size, Image.Resampling.LANCZOS)
 
 
 def _error(message):
@@ -231,6 +244,7 @@ class Worker:
 
     def _ocr_text(self, image, engine):
         runtime = self._runtime()
+        image = _fit_for_ocr(image, runtime.Image)
         array = runtime.np.asarray(image)
         bgr = runtime.np.ascontiguousarray(array[:, :, ::-1])
         result = engine(bgr)

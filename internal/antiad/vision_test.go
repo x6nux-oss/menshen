@@ -17,6 +17,27 @@ import (
 
 var pngBytes = []byte("\x89PNG\r\n\x1a\n0000000000000000")
 
+// TestFetchTGFileHonorsVisionLimit：识图声明 20 MB，但下载曾走 5 MB 的
+// 默认上限，6 MB 的图会静默失败。这里用 6 MB 响应锁住修复。
+func TestFetchTGFileHonorsVisionLimit(t *testing.T) {
+	bot, fake := testutil.NewTestBot(t, 777)
+	body := bytes.Repeat([]byte("x"), 6<<20)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(body)
+	}))
+	defer server.Close()
+	bot.Cfg.TGAPIBase = server.URL
+	fake.Resp["getFile"] = `{"ok":true,"result":{"file_path":"documents/big.jpg"}}`
+
+	raw, err := fetchTGFile(bot, "big")
+	if err != nil {
+		t.Fatalf("6 MB 文件应在 20 MB 识图上限内：%v", err)
+	}
+	if len(raw) != len(body) {
+		t.Fatalf("下载长度 = %d，期望 %d", len(raw), len(body))
+	}
+}
+
 func fakeFiles(t *testing.T, bot *core.Bot, fake *testutil.FakeTG, status int) *atomic.Int32 {
 	t.Helper()
 	var downloads atomic.Int32

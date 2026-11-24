@@ -166,5 +166,7 @@ func fetchTGFile(bot *core.Bot, fileID string) ([]byte, error) {
 	if json.Unmarshal(raw, &resp) != nil || !resp.OK || resp.Result.FilePath == "" {
 		return nil, fmt.Errorf("getFile: %s", resp.Description)
 	}
-	return bot.DownloadFile(resp.Result.FilePath)
+	// 用识图自己的 20 MB 上限：DownloadFile 的默认上限是 5 MB（见
+	// core.fileMaxBytes），5~20 MB 的图会先过大小检查、再在下载时静默失败。
+	return bot.DownloadFileLimit(resp.Result.FilePath, visionFileMax)
 }

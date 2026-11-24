@@ -166,6 +166,16 @@ func TestMigrateOldDB(t *testing.T) {
 	if has, err := hasIndex(s.Write, "antiad_log", "idx_antiad_bot_id"); err != nil || !has {
 		t.Errorf("antiad_log(bot_id,id) 索引没建上（err=%v）", err)
 	}
+	// M3 面板筛选索引：老库也要在启动时补上，否则列表会退回全表扫。
+	for _, idx := range [][2]string{
+		{"antiad_log", "idx_antiad_action_id"},
+		{"antiad_log", "idx_antiad_verdict_id"},
+		{"appeals", "idx_appeal_bot_id"},
+	} {
+		if has, err := hasIndex(s.Write, idx[0], idx[1]); err != nil || !has {
+			t.Errorf("%s 索引 %s 没建上（err=%v）", idx[0], idx[1], err)
+		}
+	}
 	// 前置号复查的选人依赖 (chat_id,prewarm_next_at) 索引：老库的
 	// prewarm_next_at 是 migrate 才补的，索引必须建在 migrate 之后。
 	if has, err := hasIndex(s.Write, "group_members", "idx_gmember_pwnext"); err != nil || !has {
