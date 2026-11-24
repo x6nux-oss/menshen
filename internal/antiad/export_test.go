@@ -19,6 +19,10 @@ func TestExportCommandDM(t *testing.T) {
 	testutil.EnableAntiad(t, b, chatID)
 	root := t.TempDir()
 	b.Cfg.ArchiveDir = root
+	// 固定时间戳早于默认 90 天保留期；这个用例测的是命令链路，关掉保留期。
+	if err := b.PutSetting("archive_retention_days", "0"); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := b.Store.Write.Exec(`INSERT INTO group_messages
 		(chat_id,message_id,user_id,text,at) VALUES (?,?,?,?,?)`,

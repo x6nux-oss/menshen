@@ -301,11 +301,11 @@ func saveRecoveredImages(b *core.Bot, chatID int64, c msgCandidate,
 		if img.partial {
 			// 截断的图片解码器多半不认，也不再尝试压缩；原样保留，
 			// 用 .partial 标出来，日后补全或人工辨认时一眼能看出状态。
-			if err := os.MkdirAll(dir, 0o755); err != nil {
+			if err := os.MkdirAll(dir, 0o700); err != nil {
 				continue
 			}
 			path := filepath.Join(dir, base+".partial"+extOfMIME(img.mime))
-			if err := os.WriteFile(path, img.data, 0o644); err != nil {
+			if err := os.WriteFile(path, img.data, 0o600); err != nil {
 				slog.Warn("存档：保存截断图片失败", "chat", chatID, "msg", c.id, "err", err)
 				continue
 			}

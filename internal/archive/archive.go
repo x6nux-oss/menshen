@@ -14,16 +14,20 @@
 package archive
 
 import (
+	"bufio"
 	"encoding/json"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"menshen/internal/config"
 	"menshen/internal/core"
 	"menshen/internal/tg"
 )
@@ -118,11 +122,14 @@ type Stats struct {
 
 // Root 返回存档根目录。配置里没写 archive_dir 时，取数据库同目录的
 // archive/，与日志文件的落点一致，容器里挂一个卷即可。
-func Root(b *core.Bot) string {
-	if p := strings.TrimSpace(b.Cfg.ArchiveDir); p != "" {
+func Root(b *core.Bot) string { return RootDir(b.Cfg) }
+
+// RootDir 与 Root 相同，但不需要 bot 实例（清理任务按进程级配置走）。
+func RootDir(cfg *config.Config) string {
+	if p := strings.TrimSpace(cfg.ArchiveDir); p != "" {
 		return p
 	}
-	dir := filepath.Dir(b.Cfg.DBPath)
+	dir := filepath.Dir(cfg.DBPath)
 	if dir == "" {
 		dir = "."
 	}
@@ -363,14 +370,17 @@ func release(b *core.Bot, kind string, chatID, refID int64) {
 // 不同文件本可以并行，但本地追加的耗时可以忽略，简单更可靠。
 var writeMu sync.Mutex
 
-func appendRecord(b *core.Bot, chatID int64, prefix string, at int64, rec any) (string, error) {
+func recordPath(b *core.Bot, chatID int64, prefix string, at int64) string {
 	loc := b.Cache.Snap().Location()
 	day := time.Unix(at, 0).In(loc).Format("2006-01-02")
-	dir := chatDir(b, chatID)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", err
+	return filepath.Join(chatDir(b, chatID), prefix+"-"+day+".jsonl")
+}
+
+func appendRecord(b *core.Bot, chatID int64, prefix string, at int64, rec any) (string, error) {
+	path := recordPath(b, chatID, prefix, at)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return path, err
 	}
-	path := filepath.Join(dir, prefix+"-"+day+".jsonl")
 	line, err := json.Marshal(rec)
 	if err != nil {
 		return path, err
@@ -379,7 +389,7 @@ func appendRecord(b *core.Bot, chatID int64, prefix string, at int64, rec any) (
 
 	writeMu.Lock()
 	defer writeMu.Unlock()
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return path, err
 	}
@@ -388,6 +398,49 @@ func appendRecord(b *core.Bot, chatID int64, prefix string, at int64, rec any) (
 		return path, err
 	}
 	return path, f.Close()
+}
+
+// fileKeys 读出目标 JSONL 里已有记录的键（m:<message_id> / j:<id>），
+// 供导出判断「这条虽然去重索引丢了，但文件里已经有」。
+//
+// 索引寿命已与归档文件对齐，正常情况下用不到；它兜的是恢复后的窗口：
+// 备份先取库快照、再打包归档，那段窗口里写进文件的记录可能不在恢复后的
+// 索引里。没有它，/export 会向同一文件追加重复行。
+func fileKeys(path string) map[string]bool {
+	keys := map[string]bool{}
+	f, err := os.Open(path)
+	if err != nil {
+		return keys
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 64<<10), 1<<20)
+	for sc.Scan() {
+		var v struct {
+			Type      string `json:"type"`
+			MessageID int64  `json:"message_id"`
+			ID        int64  `json:"id"`
+		}
+		if json.Unmarshal(sc.Bytes(), &v) != nil {
+			continue
+		}
+		switch v.Type {
+		case "message":
+			keys["m:"+strconv.FormatInt(v.MessageID, 10)] = true
+		case "judgment":
+			keys["j:"+strconv.FormatInt(v.ID, 10)] = true
+		}
+	}
+	return keys
+}
+
+// retentionCutoff 返回归档文件保留的下限（unix 秒）。0 = 永久保留。
+func retentionCutoff(b *core.Bot) int64 {
+	days := b.Cache.Snap().SettingInt("archive_retention_days", 90)
+	if days <= 0 {
+		return 0
+	}
+	return time.Now().Unix() - days*86400
 }
 
 // ---- 后台队列 ----
@@ -491,11 +544,32 @@ func rawJSON(s string) json.RawMessage {
 // 判定流水。群消息表没有 bot_id 列，按群导出即可。
 func ExportChat(b *core.Bot, chatID int64, botIDs []int64) (Stats, error) {
 	st := Stats{Dir: chatDir(b, chatID)}
-	if err := os.MkdirAll(st.Dir, 0o755); err != nil {
+	if err := os.MkdirAll(st.Dir, 0o700); err != nil {
 		return st, err
 	}
 
 	var lastErr error
+	cutoff := retentionCutoff(b)
+
+	// 目标文件里已有的记录也当已导出：去重索引可能因恢复或历史清理缺失，
+	// 但文件里的行不能因此重复追加。
+	written := map[string]map[string]bool{}
+	appendOnce := func(prefix string, at int64, key string, rec any) (bool, error) {
+		path := recordPath(b, chatID, prefix, at)
+		seen := written[path]
+		if seen == nil {
+			seen = fileKeys(path)
+			written[path] = seen
+		}
+		if seen[key] {
+			return false, nil
+		}
+		if _, err := appendRecord(b, chatID, prefix, at, rec); err != nil {
+			return false, err
+		}
+		seen[key] = true
+		return true, nil
+	}
 
 	rows, err := b.Store.Read.Query(`SELECT chat_id,message_id,user_id,text,at,media_group,punished
 		FROM group_messages WHERE chat_id=? ORDER BY at,message_id`, chatID)
@@ -508,6 +582,10 @@ func ExportChat(b *core.Bot, chatID int64, botIDs []int64) (Stats, error) {
 		if err := rows.Scan(&rec.ChatID, &rec.MessageID, &rec.UserID, &rec.Text,
 			&rec.Date, &rec.MediaGroupID, &punished); err != nil {
 			lastErr = err
+			continue
+		}
+		if cutoff > 0 && rec.Date < cutoff {
+			st.Skipped++
 			continue
 		}
 		rec.Punished = punished == 1
@@ -523,12 +601,18 @@ func ExportChat(b *core.Bot, chatID int64, botIDs []int64) (Stats, error) {
 			// 旧库里的纯图片/贴纸只留了 message_id，原文早已取不回来。
 			rec.Kind = "media"
 		}
-		if _, err := appendRecord(b, rec.ChatID, "messages", rec.Date, rec); err != nil {
+		ok, err := appendOnce("messages", rec.Date,
+			"m:"+strconv.FormatInt(rec.MessageID, 10), rec)
+		if err != nil {
 			release(b, "message", rec.ChatID, rec.MessageID)
 			lastErr = err
 			continue
 		}
-		st.Messages++
+		if ok {
+			st.Messages++
+		} else {
+			st.Skipped++
+		}
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil && lastErr == nil {
@@ -567,6 +651,10 @@ func ExportChat(b *core.Bot, chatID int64, botIDs []int64) (Stats, error) {
 			lastErr = err
 			continue
 		}
+		if cutoff > 0 && rec.CreatedAt < cutoff {
+			st.Skipped++
+			continue
+		}
 		if !claim(b, "judgment", rec.ChatID, rec.ID, rec.CreatedAt) {
 			st.Skipped++
 			continue
@@ -575,12 +663,18 @@ func ExportChat(b *core.Bot, chatID int64, botIDs []int64) (Stats, error) {
 		rec.Source = "export"
 		rec.SoVerdict = rawJSON(so)
 		rec.LlmVerdict = rawJSON(llm)
-		if _, err := appendRecord(b, rec.ChatID, "judgments", rec.CreatedAt, rec); err != nil {
+		ok, err := appendOnce("judgments", rec.CreatedAt,
+			"j:"+strconv.FormatInt(rec.ID, 10), rec)
+		if err != nil {
 			release(b, "judgment", rec.ChatID, rec.ID)
 			lastErr = err
 			continue
 		}
-		st.Judgments++
+		if ok {
+			st.Judgments++
+		} else {
+			st.Skipped++
+		}
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil && lastErr == nil {
@@ -592,4 +686,91 @@ func ExportChat(b *core.Bot, chatID int64, botIDs []int64) (Stats, error) {
 	recoverAILogImages(b, chatID, &st)
 
 	return st, lastErr
+}
+
+// ---- 保留期与权限 ----
+
+// Sweep 按天清理过期归档，并把目录/文件权限纠正为 0700/0600。
+//
+// 归档文件没有数据库留底那样的行级删除：按文件名里的日期（JSONL 与
+// 图片目录）判断，头像与认不出日期的文件按 mtime。days <= 0 = 永久保留，
+// 只做权限纠正。删除后顺手移除空目录，避免群目录无限堆空日期目录。
+func Sweep(cfg *config.Config, days int, loc *time.Location) {
+	root := RootDir(cfg)
+	info, err := os.Stat(root)
+	if err != nil || !info.IsDir() {
+		return
+	}
+	if loc == nil {
+		loc = time.Local
+	}
+	cutoff := time.Time{}
+	if days > 0 {
+		cutoff = time.Now().In(loc).Add(-time.Duration(days) * 24 * time.Hour)
+	}
+
+	var dirs []string
+	var removed, freed int64
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, werr error) error {
+		if werr != nil {
+			return nil // 单个目录读不了不该中断整轮
+		}
+		info, ierr := d.Info()
+		if ierr != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if path != root {
+				dirs = append(dirs, path)
+				if info.Mode().Perm() != 0o700 {
+					os.Chmod(path, 0o700)
+				}
+			}
+			return nil
+		}
+		if info.Mode().Perm() != 0o600 {
+			os.Chmod(path, 0o600)
+		}
+		if cutoff.IsZero() || !info.Mode().IsRegular() {
+			return nil
+		}
+		if fileDay(path, info, loc).Before(cutoff) {
+			if os.Remove(path) == nil {
+				removed++
+				freed += info.Size()
+			}
+		}
+		return nil
+	})
+
+	// 深的先删；os.Remove 只删空目录，非空的自然保留。
+	sort.Sort(sort.Reverse(sort.StringSlice(dirs)))
+	for _, dir := range dirs {
+		os.Remove(dir)
+	}
+	if days > 0 {
+		slog.Info("归档清理完成", "root", root, "保留天数", days,
+			"删除文件", removed, "释放字节", freed)
+	}
+}
+
+// fileDay 取归档文件的日期：JSONL 与图片目录名里带着日期，头像没有，
+// 回落到 mtime。
+func fileDay(path string, info fs.FileInfo, loc *time.Location) time.Time {
+	base := filepath.Base(path)
+	if strings.HasSuffix(base, ".jsonl") {
+		// messages-2026-11-01.jsonl / judgments-2026-11-01.jsonl
+		if i := strings.IndexByte(base, '-'); i > 0 {
+			day := strings.TrimSuffix(base[i+1:], ".jsonl")
+			if t, err := time.ParseInLocation("2006-01-02", day, loc); err == nil {
+				return t
+			}
+		}
+	}
+	if dir := filepath.Base(filepath.Dir(path)); len(dir) == 10 {
+		if t, err := time.ParseInLocation("2006-01-02", dir, loc); err == nil {
+			return t
+		}
+	}
+	return info.ModTime()
 }
