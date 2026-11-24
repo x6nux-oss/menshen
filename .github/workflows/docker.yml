@@ -107,6 +107,8 @@ jobs:
           severity: HIGH,CRITICAL
           scanners: vuln
           ignore-unfixed: true
+          # SARIF 默认会写入所有级别；不限制的话 exit-code 会被 MEDIUM 触发。
+          limit-severities-for-sarif: true
           exit-code: '1'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
