@@ -110,7 +110,7 @@ jobs:
           # SARIF 默认会写入所有级别；不限制的话 exit-code 会被 MEDIUM 触发。
           limit-severities-for-sarif: true
           exit-code: '1'
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: trivy-sarif
@@ -184,7 +184,7 @@ jobs:
         run: |
           mkdir -p /tmp/digests
           touch "/tmp/digests/${DIGEST#sha256:}"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: env.PUBLISH == 'true'
         with:
           name: digest-${{ matrix.arch }}
