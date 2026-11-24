@@ -108,10 +108,12 @@ func loadAppealDossier(sh *core.Shared, ap appealRec, data *appealViewData) {
 	ref := func(id int64) core.ChatRef { return core.LookupChatRef(snap, id) }
 
 	// 判定时记下的昵称。广告号被处置后常改名，现场查（也多半查不到：
-	// 没私聊过）没有意义。
+	// 没私聊过）没有意义。昵称本身可能是广告，打码后再展示。
+	var userName string
 	sh.Store.Read.QueryRow(`SELECT user_name FROM antiad_log
 		WHERE bot_id=? AND user_id=? ORDER BY id DESC LIMIT 1`,
-		ap.BotID, ap.UserID).Scan(&data.UName)
+		ap.BotID, ap.UserID).Scan(&userName)
+	data.UName = MaskSensitive(userName)
 
 	// 本 bot 名下的群；处罚流水里出现过、但群配置已删的也带上，否则
 	// 画像与留底会整段消失。
@@ -156,7 +158,7 @@ func loadAppealDossier(sh *core.Shared, ap appealRec, data *appealViewData) {
 	if g, ok := snap.Gban[ap.UserID]; ok {
 		s := "已列入"
 		if r := strings.TrimSpace(g.Reason); r != "" {
-			s += "（" + clip(r, 60) + "）"
+			s += "（" + MaskSensitive(clip(r, 60)) + "）"
 		}
 		data.GBan = s
 	}
@@ -166,8 +168,9 @@ func loadAppealDossier(sh *core.Shared, ap appealRec, data *appealViewData) {
 	active := map[string]bool{}
 	for _, p := range effectivePenalties(sh, ap.BotID, ap.UserID) {
 		v := appealViewPenalty{Type: p.Type, ChatID: p.ChatID, Label: penaltyLabel(p.Type),
-			Text: clip(p.Text, dossierTextLen), Reason: clip(p.Reason, dossierNoteLen),
-			At: p.At, Time: formatTS(sh, p.At)}
+			Text:   MaskSensitive(clip(p.Text, dossierTextLen)),
+			Reason: MaskSensitive(clip(p.Reason, dossierNoteLen)),
+			At:     p.At, Time: formatTS(sh, p.At)}
 		switch p.Type {
 		case "gban":
 			v.Chat = "全平台"
@@ -204,8 +207,8 @@ func loadAppealDossier(sh *core.Shared, ap appealRec, data *appealViewData) {
 				r := ref(p.ChatID)
 				p.Chat, p.ChatURL = r.Display(), r.URL()
 				p.Time = formatTS(sh, p.At)
-				p.Text = clip(p.Text, dossierTextLen)
-				p.Reason = clip(p.Reason, dossierNoteLen)
+				p.Text = MaskSensitive(clip(p.Text, dossierTextLen))
+				p.Reason = MaskSensitive(clip(p.Reason, dossierNoteLen))
 				data.Penalties = append(data.Penalties, p)
 			}
 		}
@@ -261,7 +264,7 @@ func loadAppealDossier(sh *core.Shared, ap appealRec, data *appealViewData) {
 			}
 			m.ChatURL = r.URL()
 			m.Time = formatTS(sh, m.At)
-			m.Text = clip(m.Text, dossierTextLen)
+			m.Text = MaskSensitive(clip(m.Text, dossierTextLen))
 			m.Mark = marks[[2]int64{chatID, msgID}]
 			m.Blocked = m.Mark == "被拦"
 			data.History = append(data.History, m)
@@ -287,7 +290,7 @@ func loadAppealDossier(sh *core.Shared, ap appealRec, data *appealViewData) {
 				l.Chat, l.ChatURL = r.Display(), r.URL()
 				l.Time = formatTS(sh, l.At)
 				l.ActionLabel = ActionLabel(l.Action)
-				l.Reason = clip(l.Reason, dossierNoteLen)
+				l.Reason = MaskSensitive(clip(l.Reason, dossierNoteLen))
 				data.Logs = append(data.Logs, l)
 			}
 		}

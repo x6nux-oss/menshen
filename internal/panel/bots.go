@@ -914,7 +914,7 @@ func showGban(b *core.Bot, chatID, msgID int64, page int) {
 	for _, g := range list {
 		when := time.Unix(g.CreatedAt, 0).In(loc).Format("01-02 15:04")
 		fmt.Fprintf(&sb, "• <code>%d</code> <i>%s</i>\n  %s\n",
-			g.UserID, when, html.EscapeString(antiad.GbanReasonLabel(g.Reason)))
+			g.UserID, when, antiad.SensitiveHTML(antiad.GbanReasonLabel(g.Reason)))
 	}
 	if total == 0 {
 		sb.WriteString("（名单为空）\n")

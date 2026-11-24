@@ -108,7 +108,7 @@ func TestAppealDetailShowsUserDossier(t *testing.T) {
 	res, err := b.Store.Write.Exec(`INSERT INTO appeals
 		(bot_id,user_id,status,statement,ai_result,ai_conf,ai_reason,ai_model,
 		 web_attempts,code,code_expires,created_at,updated_at)
-		VALUES (?,?,'code','我是清白的','uphold',0.95,'资料里有推广话术',
+		VALUES (?,?,'code','我是清白的 邀请码:WG9EWW','uphold',0.95,'资料里有推广话术',
 		 'test/model',1,'MSU-AAAA',?,?,?)`,
 		botID, 555, now+86400, now, now)
 	if err != nil {
@@ -129,7 +129,7 @@ func TestAppealDetailShowsUserDossier(t *testing.T) {
 		 action,reason,prompt_tokens,completion_tokens,quota_cost,created_at,
 		 bot_id,user_name,lifted_at)
 		VALUES (-100,555,901,'上次那条','ad',0.9,'llm','scam',
-		 'deleted_muted','上一条已改判',0,0,0,?,?,'广告昵称',?)`,
+		 'deleted_muted','上一条已改判',0,0,0,?,?,'广告昵称 邀请码:WG9EWW',?)`,
 		now-3*86400, botID, now); err != nil {
 		t.Fatal(err)
 	}
@@ -191,13 +191,21 @@ func TestAppealDetailShowsUserDossier(t *testing.T) {
 		t.Fatalf("内容响应应是 JSON：%v（%s）", err, w.Body.String())
 	}
 	v := out.View
-	if v.UID != 555 || v.UName != "广告昵称" || v.Msgs != 3 || v.Hits != 1 {
+	// 昵称是用户可控内容：取判定时留底的那份，且带邀请码的部分已打码。
+	if v.UID != 555 || !strings.Contains(v.UName, "广告昵称") ||
+		strings.Contains(v.UName, "WG9EWW") || !strings.Contains(v.UName, "WG**WW") ||
+		v.Msgs != 3 || v.Hits != 1 {
 		t.Errorf("账号信息不对：uid=%d name=%q msgs=%d hits=%d", v.UID, v.UName, v.Msgs, v.Hits)
 	}
 	if !strings.Contains(v.Status, "解禁码") {
 		t.Errorf("状态应翻译成中文，得到 %q", v.Status)
 	}
-	if v.Statement != "我是清白的" || v.AIReason != "资料里有推广话术" {
+	// 申诉理由可能带邀请码/返利链接：出页面前必须打码。
+	if !strings.Contains(v.Statement, "我是清白的") ||
+		!strings.Contains(v.Statement, "WG**WW") || strings.Contains(v.Statement, "WG9EWW") {
+		t.Errorf("申诉理由应打码后输出：%q", v.Statement)
+	}
+	if v.AIReason != "资料里有推广话术" {
 		t.Errorf("申诉单字段不对：%+v", v)
 	}
 	if len(v.Limits) == 0 || !strings.Contains(v.Limits[0].Reason, "资料里写着引流") {

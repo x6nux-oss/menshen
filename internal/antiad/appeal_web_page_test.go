@@ -399,7 +399,7 @@ func TestAppealPageShowsEvidence(t *testing.T) {
 	res, err := b.Store.Write.Exec(`INSERT INTO appeals
 		(bot_id,user_id,status,statement,ai_result,ai_conf,ai_reason,ai_model,
 		 web_since,created_at,updated_at)
-		VALUES (?,?,'web','我改资料了','uphold',0.92,'资料仍写着推广','m1',?,?,?)`,
+		VALUES (?,?,'web','我改资料了 邀请码:WG9EWW','uphold',0.92,'资料仍写着推广','m1',?,?,?)`,
 		b.BotID(), 555, now, now, now)
 	if err != nil {
 		t.Fatal(err)
@@ -456,5 +456,10 @@ func TestAppealPageShowsEvidence(t *testing.T) {
 		!strings.Contains(data.AI.Reason, "资料仍写着推广") ||
 		!strings.Contains(data.AI.Statement, "我改资料了") {
 		t.Errorf("AI 复核结论不对：%+v", data.AI)
+	}
+	// 申诉陈述可能带返利 ID/邀请码：网页拿到的是打码后的文本。
+	if strings.Contains(data.AI.Statement, "WG9EWW") ||
+		!strings.Contains(data.AI.Statement, "WG**WW") {
+		t.Errorf("申诉陈述应打码后输出：%q", data.AI.Statement)
 	}
 }

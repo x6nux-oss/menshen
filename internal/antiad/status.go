@@ -2,7 +2,6 @@ package antiad
 
 import (
 	"fmt"
-	"html"
 	"strings"
 	"time"
 
@@ -30,7 +29,7 @@ func RestrictionStatusText(sh *core.Shared, botID, uid int64) (string, [][2]stri
 	sb.WriteString("⚠️ <b>当前生效的限制</b>\n")
 	for _, p := range pens {
 		when := time.Unix(p.At, 0).In(loc).Format("01-02 15:04")
-		reason := html.EscapeString(core.TruncateRunes(strings.TrimSpace(p.Reason), 120))
+		reason := SensitiveHTML(core.TruncateRunes(strings.TrimSpace(p.Reason), 120))
 		switch p.Type {
 		case "join_profile":
 			fmt.Fprintf(&sb, "• 进群限制（按个人简介判）｜ %s ｜ 群 %s\n  <i>%s</i>\n",
