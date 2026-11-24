@@ -1,6 +1,7 @@
 package antiad
 
 import (
+	"errors"
 	"fmt"
 	"html"
 	"log/slog"
@@ -66,7 +67,8 @@ func sendAdAlert(b *core.Bot, conf store.BotChat, m *tg.Message, v adVerdict, ac
 	}
 
 	am := alertMerges(b)
-	e := am.entry(alertMergeKey(b, m.Chat.ID, m.From.ID))
+	e := am.acquire(alertMergeKey(b, m.Chat.ID, m.From.ID))
+	defer am.release(e)
 	// 整段持锁：并发两条消息同时判定时，后到的那条必然看到先到者写下的
 	// msgID，因而至多发出一条初始告警。锁只覆盖同一 (群,人)。
 	e.mu.Lock()
@@ -76,9 +78,18 @@ func sendAdAlert(b *core.Bot, conf store.BotChat, m *tg.Message, v adVerdict, ac
 		e.hits++
 		e.last = now
 		text := withMergeLine(brief, mergeLine(e, snap))
-		if b.EditNoPreviewOK(m.Chat.ID, e.msgID, text, bkb) {
+		err := b.EditNoPreviewErr(m.Chat.ID, e.msgID, text, bkb)
+		if err == nil {
 			slog.Info("反广告：群内告警已合并", "chat", m.Chat.ID, "uid", m.From.ID,
 				"hits", e.hits)
+			return
+		}
+		var apiErr *tg.APIError
+		if !errors.As(err, &apiErr) || !apiErr.MessageGone() {
+			// 429/5xx/网络超时：原消息很可能还在，重发只会多出一张卡片。
+			// 保留原消息号与合并窗口，下一次命中再试。
+			slog.Warn("反广告：合并告警失败，保留原消息", "chat", m.Chat.ID,
+				"uid", m.From.ID, "msg", e.msgID, "err", err)
 			return
 		}
 		// 原告警已被 alert_cleanup 撤回或被管理员删除：改不动就重发一条，

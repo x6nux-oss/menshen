@@ -513,25 +513,24 @@ func (b *Bot) Edit(chatID, msgID int64, text string, kb map[string]any) {
 // EditNoPreview 与 Edit 相同，但关掉链接预览。群内 /check 的多步响应每次
 // 编辑都重挂申诉 deep link，客户端不该每步都重新生成一张预览卡片。
 func (b *Bot) EditNoPreview(chatID, msgID int64, text string, kb map[string]any) {
-	b.EditNoPreviewOK(chatID, msgID, text, kb)
+	if err := b.EditNoPreviewErr(chatID, msgID, text, kb); err != nil {
+		slog.Error("editMessageText 失败", "err", err)
+	}
 }
 
-// EditNoPreviewOK 同 EditNoPreview，但返回 TG 是否接受这次编辑。
+// EditNoPreviewErr 同 EditNoPreview，但把失败原因带回调用方。
 //
-// 群内告警合并要靠它区分「改好了」与「原消息已被撤回/删除」：后者得重发
-// 一条新告警并把合并窗口重新起算。APIError 与 ok:false 都算失败。
-func (b *Bot) EditNoPreviewOK(chatID, msgID int64, text string, kb map[string]any) bool {
+// 群内告警合并要靠它区分「原消息已被撤回/删除」与临时故障：只有前者值得
+// 重发一条新告警。429/5xx/网络超时重发只会多出一张卡片，调用方据
+// tg.APIError.MessageGone 判断。
+func (b *Bot) EditNoPreviewErr(chatID, msgID int64, text string, kb map[string]any) error {
 	p := map[string]any{"chat_id": chatID, "message_id": msgID,
 		"text": text, "parse_mode": "HTML",
 		"link_preview_options": map[string]any{"is_disabled": true}}
 	if kb != nil {
 		p["reply_markup"] = kb
 	}
-	ok, desc := b.CallOK("editMessageText", p)
-	if !ok {
-		slog.Error("editMessageText 失败", "err", desc)
-	}
-	return ok
+	return b.CallErr("editMessageText", p)
 }
 
 // EditOrSend 统一处理回调内编辑原消息与文本输入后新发一条两种入口。
@@ -548,21 +547,33 @@ func (b *Bot) AnswerCallback(id, text string) {
 		"callback_query_id": id, "text": text})
 }
 
-// CallOK 发起调用并解析 TG 的 ok 字段。
-// TG 的错误是 HTTP 200 + {"ok":false}，只看 err 会把业务失败当成功。
-func (b *Bot) CallOK(method string, payload any) (bool, string) {
+// CallErr 发起调用并返回具体错误：传输层错误原样带回（*tg.APIError 或
+// 网络故障），HTTP 200 + {"ok":false} 折成带 description 的错误。
+func (b *Bot) CallErr(method string, payload any) error {
 	raw, err := b.TG.Call(method, payload)
 	if err != nil {
-		return false, err.Error()
+		return err
 	}
 	var r struct {
 		OK          bool   `json:"ok"`
 		Description string `json:"description"`
 	}
 	if json.Unmarshal(raw, &r) != nil {
-		return false, "响应无法解析"
+		return fmt.Errorf("%s: 响应无法解析", method)
 	}
-	return r.OK, r.Description
+	if !r.OK {
+		return fmt.Errorf("%s: %s", method, r.Description)
+	}
+	return nil
+}
+
+// CallOK 发起调用并解析 TG 的 ok 字段。
+// TG 的错误是 HTTP 200 + {"ok":false}，只看 err 会把业务失败当成功。
+func (b *Bot) CallOK(method string, payload any) (bool, string) {
+	if err := b.CallErr(method, payload); err != nil {
+		return false, err.Error()
+	}
+	return true, ""
 }
 
 // ---- 待输入会话 ----

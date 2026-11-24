@@ -12,9 +12,10 @@ import (
 
 // alertMergeEntry 是某个 (群,人) 当前那条群内告警：消息号、命中次数与
 // 窗口到期时刻。mu 覆盖「发新告警 / 合并编辑」整段，保证并发命中至多
-// 产生一条初始告警。
+// 产生一条初始告警。refs 由 alertMerger.mu 保护，见 acquire。
 type alertMergeEntry struct {
 	mu      sync.Mutex
+	refs    int
 	msgID   int64
 	hits    int
 	first   time.Time
@@ -45,9 +46,12 @@ func alertMergeKey(b *core.Bot, chatID, uid int64) string {
 	return fmt.Sprintf("%d:%d:%d", b.BotID(), chatID, uid)
 }
 
-// entry 取该键的条目，没有就建一个。建条目必须在这里一次完成：
-// 两个并发命中拿到同一个指针，才能在条目锁上串行。
-func (am *alertMerger) entry(key string) *alertMergeEntry {
+// acquire 取该键的条目并占位，没有就建一个；用完必须 release。
+//
+// 取指针与占位在表锁内一次完成，GC 只回收 refs==0 的条目：调用方从拿到
+// 指针到上条目锁之间即使 GC 跑过，也不会拿到已被删除的条目，同一键不会
+// 同时存在两个指针、各发一条告警。
+func (am *alertMerger) acquire(key string) *alertMergeEntry {
 	am.mu.Lock()
 	defer am.mu.Unlock()
 	e := am.m[key]
@@ -55,22 +59,27 @@ func (am *alertMerger) entry(key string) *alertMergeEntry {
 		e = &alertMergeEntry{}
 		am.m[key] = e
 	}
+	e.refs++
 	return e
 }
 
+// release 归还 acquire 占的位。refs 归零后条目才可能被 GC 回收。
+func (am *alertMerger) release(e *alertMergeEntry) {
+	am.mu.Lock()
+	e.refs--
+	am.mu.Unlock()
+}
+
 // gc 回收已过期的条目，避免 map 随广告号数量无限增长。
-// 正在被持有的条目跳过（TryLock 失败），留给下一轮。
+// 仍被占用的条目跳过（refs>0），留给下一轮：占用期间调用方可能正在
+// 编辑，回收会让下一个命中新建条目、再发一条。
 func (am *alertMerger) gc(now time.Time) {
 	am.mu.Lock()
 	defer am.mu.Unlock()
 	for k, e := range am.m {
-		if !e.mu.TryLock() {
-			continue
-		}
-		if !now.Before(e.expires) {
+		if e.refs == 0 && !now.Before(e.expires) {
 			delete(am.m, k)
 		}
-		e.mu.Unlock()
 	}
 }
 
