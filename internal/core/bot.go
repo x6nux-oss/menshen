@@ -513,15 +513,25 @@ func (b *Bot) Edit(chatID, msgID int64, text string, kb map[string]any) {
 // EditNoPreview 与 Edit 相同，但关掉链接预览。群内 /check 的多步响应每次
 // 编辑都重挂申诉 deep link，客户端不该每步都重新生成一张预览卡片。
 func (b *Bot) EditNoPreview(chatID, msgID int64, text string, kb map[string]any) {
+	b.EditNoPreviewOK(chatID, msgID, text, kb)
+}
+
+// EditNoPreviewOK 同 EditNoPreview，但返回 TG 是否接受这次编辑。
+//
+// 群内告警合并要靠它区分「改好了」与「原消息已被撤回/删除」：后者得重发
+// 一条新告警并把合并窗口重新起算。APIError 与 ok:false 都算失败。
+func (b *Bot) EditNoPreviewOK(chatID, msgID int64, text string, kb map[string]any) bool {
 	p := map[string]any{"chat_id": chatID, "message_id": msgID,
 		"text": text, "parse_mode": "HTML",
 		"link_preview_options": map[string]any{"is_disabled": true}}
 	if kb != nil {
 		p["reply_markup"] = kb
 	}
-	if _, err := b.TG.Call("editMessageText", p); err != nil {
-		slog.Error("editMessageText 失败", "err", err)
+	ok, desc := b.CallOK("editMessageText", p)
+	if !ok {
+		slog.Error("editMessageText 失败", "err", desc)
 	}
+	return ok
 }
 
 // EditOrSend 统一处理回调内编辑原消息与文本输入后新发一条两种入口。

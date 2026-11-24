@@ -52,22 +52,65 @@ func sendAdAlert(b *core.Bot, conf store.BotChat, m *tg.Message, v adVerdict, ac
 	if !conf.GroupAlert || m.Chat == nil || groupSilent(b) {
 		return
 	}
-	// 按 (群, 人) 节流：避免单个刷屏者占满群内告警，也避免触发 TG 对
-	// 单群的发送频率限制。压掉的只是这一个用户的重复告警。
 	// /check 复查不走这里：由用户主动触发，有自己的命令限频。
 	snap := b.Cache.Snap()
-	if !b.AdLimits.Allow(fmt.Sprintf("ad:a:%d:%d", m.Chat.ID, m.From.ID),
-		snap.BotSettingInt(b.BotID(), "antiad_alert_rpm", 3)) {
-		slog.Info("反广告：告警被节流", "chat", m.Chat.ID, "uid", m.From.ID)
+	brief, bkb := renderAdAlertBrief(b, m, v, act, note, logID, dryrun)
+	ttl := alertTTL(b, snap, v)
+
+	// 合并窗口：同一 (群,人) 的重复命中只更新最早那条告警，不再刷屏。
+	// 0 = 关闭合并，退回逐条发送。
+	cooldown := time.Duration(snap.BotSettingInt(b.BotID(), "antiad_alert_cooldown", 600)) * time.Second
+	if cooldown <= 0 {
+		postAdAlert(b, m.Chat.ID, m.From.ID, brief, bkb, ttl)
 		return
 	}
-	// 贴在群里：处置结果对全群可见，该群的 TG 管理员可直接点按钮判断
-	// （见 adDispositionAllowed）。精简版：昵称与原文都不回贴。
-	brief, bkb := renderAdAlertBrief(b, m, v, act, note, logID, dryrun)
+
+	am := alertMerges(b)
+	e := am.entry(alertMergeKey(b, m.Chat.ID, m.From.ID))
+	// 整段持锁：并发两条消息同时判定时，后到的那条必然看到先到者写下的
+	// msgID，因而至多发出一条初始告警。锁只覆盖同一 (群,人)。
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	now := time.Now()
+	if e.msgID != 0 && now.Before(e.expires) {
+		e.hits++
+		e.last = now
+		text := withMergeLine(brief, mergeLine(e, snap))
+		if b.EditNoPreviewOK(m.Chat.ID, e.msgID, text, bkb) {
+			slog.Info("反广告：群内告警已合并", "chat", m.Chat.ID, "uid", m.From.ID,
+				"hits", e.hits)
+			return
+		}
+		// 原告警已被 alert_cleanup 撤回或被管理员删除：改不动就重发一条，
+		// 窗口从这条重新起算。
+		slog.Info("反广告：原告警已不在，重发", "chat", m.Chat.ID, "uid", m.From.ID)
+		e.msgID, e.first, e.last = 0, now, now
+	}
+	if id := postAdAlert(b, m.Chat.ID, m.From.ID, brief, bkb, ttl); id != 0 {
+		e.msgID, e.hits, e.first, e.last = id, 1, now, now
+		e.expires = now.Add(cooldown)
+	}
+}
+
+// postAdAlert 发一条新告警并安排撤回，返回消息号（被节流或发送失败为 0）。
+// 合并窗口只管「不发新卡片」，节流与撤回仍按每一条新告警算。
+func postAdAlert(b *core.Bot, chatID, uid int64, text string, kb map[string]any,
+	ttl time.Duration) int64 {
+	// 按 (群, 人) 节流：避免单个刷屏者占满群内告警，也避免触发 TG 对
+	// 单群的发送频率限制。压掉的只是这一个用户的告警。
+	if !b.AdLimits.Allow(fmt.Sprintf("ad:a:%d:%d", chatID, uid),
+		b.Cache.Snap().BotSettingInt(b.BotID(), "antiad_alert_rpm", 3)) {
+		slog.Info("反广告：告警被节流", "chat", chatID, "uid", uid)
+		return 0
+	}
 	if b.Metrics != nil {
 		b.Metrics.Alerts.With("ad").Inc()
 	}
-	groupNotice(b, m.Chat.ID, brief, bkb, alertTTL(b, snap, v))
+	id := sendGroup(b, chatID, text, kb)
+	if id != 0 {
+		scheduleAlertCleanup(b, chatID, id, ttl)
+	}
+	return id
 }
 
 // alertTTL 返回一条群内提醒的存活时间。
@@ -254,6 +297,8 @@ func scheduleAlertCleanup(b *core.Bot, chatID, msgID int64, ttl time.Duration) {
 // 逐条 deleteMessage 会产生大量往返并阻塞分钟 tick。DB 行在整轮结束后
 // 用一条 DELETE 收尾。
 func SweepAlertCleanup(b *core.Bot, now time.Time) {
+	// 顺手回收过期的告警合并条目：分钟任务已经在跑，不必另起计时器。
+	alertMerges(b).gc(now)
 	rows, err := b.Store.Read.Query(`SELECT chat_id,message_id FROM alert_cleanup
 		WHERE bot_id=? AND due_at <= ? LIMIT 200`, b.BotID(), now.Unix())
 	if err != nil {
