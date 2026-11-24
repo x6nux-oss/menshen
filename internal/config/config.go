@@ -68,6 +68,9 @@ type Config struct {
 	// 注意：Turnstile 后台的域名白名单必须包含 public_url 的主机名。
 	TurnstileSiteKey string
 	TurnstileSecret  string
+	// TurnstileVerifyURL 覆盖 siteverify 地址，空 = Cloudflare 官方。
+	// 只给离线端到端测试指向本地假验证服务用，生产不要配。
+	TurnstileVerifyURL string
 
 	// TGAPIID / TGAPIHash 是客户端应用标识（my.telegram.org 申请），
 	// 只用于一项可选能力：用 bot 自己的 token 登录 MTProto，回查历史成员的
@@ -236,6 +239,7 @@ var envKeys = []struct{ env, key string }{
 	{"MENSHEN_LISTEN_ADDR", "listen_addr"},
 	{"MENSHEN_TURNSTILE_SITE_KEY", "turnstile_site_key"},
 	{"MENSHEN_TURNSTILE_SECRET", "turnstile_secret"},
+	{"MENSHEN_TURNSTILE_VERIFY_URL", "turnstile_verify_url"},
 	{"MENSHEN_CLIENT_IP_HEADER", "client_ip_header"},
 	{"MENSHEN_METRICS_TOKEN", "metrics_token"},
 	{"MENSHEN_PPROF_ENABLED", "pprof_enabled"},
@@ -320,6 +324,8 @@ func assign(c *Config, key, val string) error {
 		c.TurnstileSiteKey = strings.TrimSpace(val)
 	case "turnstile_secret":
 		c.TurnstileSecret = strings.TrimSpace(val)
+	case "turnstile_verify_url":
+		c.TurnstileVerifyURL = strings.TrimSpace(val)
 	case "tg_api_id":
 		// 客户端应用标识（见 Config.TGAPIID）。不配走内置默认值；
 		// 显式配 0 或空串 = 关闭入群时间回查。非法值不挡住启动，
