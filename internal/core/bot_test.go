@@ -8,6 +8,7 @@ import (
 
 	"menshen/internal/config"
 	"menshen/internal/store"
+	"menshen/internal/tg"
 )
 
 // waitAdIdle 等判定队列排空。
@@ -120,4 +121,37 @@ func TestAdReviewConcurrencyCappedGlobally(t *testing.T) {
 		t.Errorf("复判并发峰值应为 %d，得到 %d", adReviewConcurrency, got)
 	}
 	close(release)
+}
+
+// TestAdWorkerRecoversPanic：一条判定里的 panic 只丢这一条，worker 不能
+// 跟着退出。审计点名过 eino_kind.go 的空 candidates 越界风险；即使再出现
+// 同类问题，其他 bot 与其他队列也必须照常工作。
+func TestAdWorkerRecoversPanic(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	cache, err := store.NewCache(db)
+	if err != nil {
+		t.Fatalf("store.NewCache: %v", err)
+	}
+	sh := NewShared(&config.Config{}, db, cache)
+	b := NewBot(nil, sh, "", func(*Bot, *tg.Update) {})
+	defer b.Shutdown()
+
+	var after atomic.Bool
+	if !b.AdSubmit(func() { panic("boom") }) {
+		t.Fatal("panic 任务未能入队")
+	}
+	if !b.AdSubmit(func() { after.Store(true) }) {
+		t.Fatal("后续任务未能入队")
+	}
+	waitAdIdle(t, b)
+	if !after.Load() {
+		t.Error("panic 之后 worker 没有继续消费队列")
+	}
+	if got := sh.Metrics.Panics.With("ad_worker").Value(); got != 1 {
+		t.Errorf("panics_total{component=\"ad_worker\"} = %d，期望 1", got)
+	}
 }

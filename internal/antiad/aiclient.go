@@ -176,6 +176,9 @@ func aiCall(sh *core.Shared, ep upstream.Endpoint, models []string, payload map[
 			continue
 		}
 		noteRetry(sh, snap, key)
+		if sh.Metrics != nil {
+			sh.Metrics.AIRetries.With(ep.String(), model).Inc()
+		}
 		if attempt == attempts-1 {
 			break
 		}
@@ -293,6 +296,9 @@ func alertUpstreamTrouble(sh *core.Shared, snap *store.Snapshot, notify func(str
 	upLabel := "（未绑定）"
 	if n, _ := upstream.SplitModelName(model); n != "" {
 		upLabel = n
+	}
+	if sh.Metrics != nil {
+		sh.Metrics.Alerts.With("upstream").Inc()
 	}
 	slog.Warn("反广告：上游连续失败，已告警", "次数", sh.AIFailStreak.Load(),
 		"端点", ep, "模型", model)
@@ -454,6 +460,7 @@ func aiAttempt(parent context.Context, sh *core.Shared, snap *store.Snapshot,
 	// 成功失败都要留痕：换模型校准阈值与排查漏判时，第一手证据是当时
 	// 发出去的载荷与拿回来的响应。剥离固定提示词只影响存储列，不影响请求。
 	logAICall(sh, ep, model, upName(up), stripFixedPrompts(ep, built), r)
+	observeAI(sh, ep, model, up, r)
 	return r
 }
 
@@ -789,4 +796,31 @@ func publicError(err error) string {
 		return ""
 	}
 	return "判定服务暂时不可用，请稍后重试"
+}
+
+// observeAI 记一次上游尝试的计数、耗时、用量与成本。放在 aiAttempt 而不是
+// aiCall：并发/重试时每次真实请求都应各记一笔，失败也能看出是哪个模型、
+// 哪个上游。标签只含模型全名与上游名（配置里有界），不含 prompt。
+func observeAI(sh *core.Shared, ep upstream.Endpoint, model string, up *upstream.Upstream, r aiResult) {
+	if sh.Metrics == nil {
+		return
+	}
+	status := "ok"
+	if r.err != nil {
+		status = "error"
+	}
+	endpoint, upstreamName := ep.String(), upName(up)
+	sh.Metrics.AIRequests.With(endpoint, model, upstreamName, status).Inc()
+	sh.Metrics.AIDuration.With(endpoint, model, upstreamName).Observe(r.elapsed.Seconds())
+	if r.err != nil {
+		return
+	}
+	u := r.reply.Usage
+	sh.Metrics.AITokens.With(endpoint, model, "prompt").Add(uint64(max(u.PromptTokens, 0)))
+	sh.Metrics.AITokens.With(endpoint, model, "completion").Add(uint64(max(u.CompletionTokens, 0)))
+	sh.Metrics.AITokens.With(endpoint, model, "cache_read").Add(uint64(max(u.CacheReadTokens, 0)))
+	sh.Metrics.AITokens.With(endpoint, model, "cache_write").Add(uint64(max(u.CacheWriteTokens, 0)))
+	if r.reply.Cost > 0 {
+		sh.Metrics.AICost.With(endpoint, model).Add(uint64(r.reply.Cost))
+	}
 }

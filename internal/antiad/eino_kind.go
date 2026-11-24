@@ -806,7 +806,7 @@ func geminiReply(raw []byte) ([]byte, error) {
 	switch {
 	case len(calls) > 0:
 		finish = "tool_calls"
-	case r.Candidates != nil && r.Candidates[0].FinishReason == "MAX_TOKENS":
+	case len(r.Candidates) > 0 && r.Candidates[0].FinishReason == "MAX_TOKENS":
 		finish = "length"
 	}
 	return einoChatReply(text.String(), reasoning.String(), calls, finish,

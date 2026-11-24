@@ -155,6 +155,8 @@ func main() {
 		srv = startWebhook(cfg, reg, sh)
 	} else {
 		startPolling(cfg, reg, stop)
+		// 长轮询没有 webhook 监听，但 /metrics 与就绪检查仍要能抓。
+		srv = startOpsServer(cfg, reg, sh)
 	}
 
 	go runBackgroundTasks(stop, sh, reg)
@@ -423,6 +425,30 @@ func hasWebSegment(p string) bool {
 		}
 	}
 	return false
+}
+
+// startOpsServer 在长轮询模式下单独提供运维端点。
+//
+// 只挂 /healthz、/metrics 与（显式开启时）pprof：这个端口不接受任何
+// webhook 投递，避免轮询模式又冒出一条并行的更新入口。
+func startOpsServer(cfg *config.Config, reg *core.Registry, sh *core.Shared) *http.Server {
+	srv := &http.Server{
+		Addr:              cfg.ListenAddr,
+		Handler:           sh.Metrics.HTTPMiddleware(reg.OpsHandler()),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	go func() {
+		slog.Info("运维端点启动", "addr", cfg.ListenAddr,
+			"pprof", cfg.PprofEnabled, "version", version)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			// 轮询仍是主输入通道，端点起不来只影响观测，不退出进程。
+			slog.Error("运维端点监听失败，/metrics 不可用", "err", err)
+		}
+	}()
+	return srv
 }
 
 // startPolling 起长轮询。只有配置里那个 bot 能走这条路 ——

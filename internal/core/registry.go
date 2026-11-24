@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"sync"
 	"time"
 
@@ -32,6 +33,10 @@ type Registry struct {
 	// 重新注册同一个 token 时必须等它结束：迟到的 deleteWebhook 会把新实例
 	// 刚设上的 webhook 悄悄删掉，而表现是 setWebhook 成功却收不到更新。
 	pendingDrops sync.Map // token -> chan struct{}
+
+	// ops 是 /healthz、/metrics 与可选 pprof 的处理器。webhook 路由
+	// 命中这些路径时转给它；长轮询模式单独起服务也用它。
+	ops *http.ServeMux
 }
 
 // dropWebhookAsync 异步撤掉一个实例的 webhook，并登记在 pendingDrops。
@@ -63,6 +68,7 @@ func NewRegistry(sh *Shared, stop <-chan struct{}, d Dispatcher) *Registry {
 		byToken: map[string]*Bot{}, byID: map[int64]*Bot{}}
 	// 回填：联合封禁那类跨全部 bot 的操作要从 Shared 走到这里。
 	sh.Reg = r
+	r.ops = r.newOpsMux()
 	return r
 }
 

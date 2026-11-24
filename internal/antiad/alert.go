@@ -64,6 +64,9 @@ func sendAdAlert(b *core.Bot, conf store.BotChat, m *tg.Message, v adVerdict, ac
 	// 贴在群里：处置结果对全群可见，该群的 TG 管理员可直接点按钮判断
 	// （见 adDispositionAllowed）。精简版：昵称与原文都不回贴。
 	brief, bkb := renderAdAlertBrief(b, m, v, act, note, logID, dryrun)
+	if b.Metrics != nil {
+		b.Metrics.Alerts.With("ad").Inc()
+	}
 	groupNotice(b, m.Chat.ID, brief, bkb, alertTTL(b, snap, v))
 }
 

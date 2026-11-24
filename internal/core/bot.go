@@ -50,6 +50,14 @@ type Shared struct {
 	// StartedAt 是进程启动时刻，/status 的「已运行」由它算。
 	// 进程级而不是 bot 级：重启后所有 bot 一起重新开始。
 	StartedAt time.Time
+
+	// Metrics 是 /metrics 的指标集合。抓取时读它，业务路径只做原子累加。
+	Metrics *Metrics
+	// LastUpdateAt / LastPollAt 是输入通道存活时间（unix 秒）：前者是最近
+	// 一条被接收的 webhook 更新，后者是最近一次成功的 getUpdates。就绪
+	// 检查据此发现「进程还在但消息断了」。
+	LastUpdateAt atomic.Int64
+	LastPollAt   atomic.Int64
 	// Version 是构建版本（main 的 ldflags 注入值）。空表示未注入。
 	Version string
 
@@ -112,7 +120,7 @@ func NewShared(cfg *config.Config, s *store.Store, c *store.Cache) *Shared {
 	if modelsDir == "" {
 		modelsDir = filepath.Join(filepath.Dir(cfg.DBPath), "models")
 	}
-	return &Shared{Cfg: cfg, Store: s, Cache: c,
+	sh := &Shared{Cfg: cfg, Store: s, Cache: c,
 		StartedAt: time.Now(),
 		LocalModels: localvision.New(localvision.Config{Dir: modelsDir,
 			BundledDir: cfg.LocalModelsBundledDir, Python: cfg.LocalModelsPython,
@@ -126,6 +134,8 @@ func NewShared(cfg *config.Config, s *store.Store, c *store.Cache) *Shared {
 		AIClient: &http.Client{Timeout: aiClientTimeout,
 			Transport: config.ProxyTransport(cfg.AIProxy)},
 		tgRoundTripper: config.ProxyTransport(cfg.TGProxy)}
+	sh.Metrics = newMetrics(sh)
+	return sh
 }
 
 // aiClientTimeout 是判定调用 AI 上游的整体超时。
@@ -306,8 +316,11 @@ func (b *Bot) adWorker(jobs chan func()) {
 		case <-b.done:
 			return
 		case job := <-jobs:
-			job()
-			b.adBusy.Add(-1)
+			func() {
+				defer b.adBusy.Add(-1)
+				defer b.recoverPanic("ad_worker")
+				job()
+			}()
 		}
 	}
 }
@@ -757,17 +770,20 @@ func (b *Bot) Enqueue(u *tg.Update) bool {
 		return true
 	}
 	if !b.MarkUpdateSeen(u.UpdateID) {
+		b.noteWebhookUpdate("duplicate")
 		slog.Info("webhook：重复投递的更新已忽略", "update_id", u.UpdateID)
 		return true
 	}
 	select {
 	case b.updates <- u:
+		b.noteWebhookUpdate("accepted")
 		return true
 	default:
 		// 队列满：丢弃并回 200。但要把已见标记撤掉 —— 否则这次 200
 		// 一旦在网络上丢失、TG 重推同一 update_id，重推会被当成重复投递
 		// 直接丢弃，这条更新就永远处理不到了。撤掉后重推仍有机会入队。
 		b.UnmarkUpdateSeen(u.UpdateID)
+		b.noteWebhookUpdate("dropped")
 		return false
 	}
 }
@@ -784,7 +800,10 @@ func (b *Bot) RunQueueWorker(stop <-chan struct{}) {
 		case <-b.done: // 这一个 bot 被停用或删除
 			return
 		case u := <-b.updates:
-			b.dispatch(b, u)
+			func() {
+				defer b.recoverPanic("update_worker")
+				b.dispatch(b, u)
+			}()
 		}
 	}
 }
@@ -850,11 +869,15 @@ func (b *Bot) RunPolling(stop <-chan struct{}) {
 			}
 			continue
 		}
+		b.Shared.LastPollAt.Store(time.Now().Unix())
 		for _, u := range resp.Result {
 			if u.UpdateID >= b.offset {
 				b.offset = u.UpdateID + 1
 			}
-			b.dispatch(b, u)
+			func() {
+				defer b.recoverPanic("polling_dispatch")
+				b.dispatch(b, u)
+			}()
 		}
 	}
 }
@@ -895,4 +918,10 @@ func (b *Bot) BotID() int64 {
 	}
 	b.SelfID.Store(resp.Result.ID)
 	return resp.Result.ID
+}
+
+func (b *Bot) noteWebhookUpdate(result string) {
+	if b.Shared != nil && b.Metrics != nil {
+		b.Metrics.WebhookUpdates.With(botLabel(b), result).Inc()
+	}
 }

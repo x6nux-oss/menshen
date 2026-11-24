@@ -25,6 +25,9 @@ func logAd(b *core.Bot, m *tg.Message, v adVerdict, action, reason string) int64
 	case adDeciderSkipped:
 		verdict = "skipped" // 没送检，不是判定失败
 	}
+	if b.Metrics != nil {
+		b.Metrics.Judgements.With(b.MetricsLabel(), verdict, action).Inc()
+	}
 	note := v.Reason
 	// 复判声明的证据并进理由列：面板、资料卡与申诉页都从这一列取文字，
 	// 落在这里管理员事后回看时才知道当初凭什么判的（见 evidence_gate.go）。

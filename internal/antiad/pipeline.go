@@ -339,6 +339,12 @@ func HandleGroupMessage(b *core.Bot, m *tg.Message) {
 // 等待机制。
 func judgeAndAct(b *core.Bot, snap *store.Snapshot, conf store.BotChat, m *tg.Message,
 	profile senderProfile, state adState) {
+	start := time.Now()
+	defer func() {
+		if b.Metrics != nil {
+			b.Metrics.JudgementDuration.With(b.MetricsLabel()).Observe(time.Since(start).Seconds())
+		}
+	}()
 
 	// 简介与简介里的链接要发 getChat，所以放在异步段取：同步段每多一次 TG
 	// 往返，更新处理就多停一次。

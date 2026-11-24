@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"menshen/internal/config"
 	"menshen/internal/tg"
@@ -49,8 +50,8 @@ func TokenFromPath(p string) string {
 // 的 Register）。没登记的一律 401 —— 没有归属就谈不上谁能管它、
 // 谁为它的开销负责。
 func (r *Registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	if req.URL.Path == "/healthz" {
-		w.Write([]byte("ok"))
+	if isOpsPath(req.URL.Path) {
+		r.ops.ServeHTTP(w, req)
 		return
 	}
 	if req.Method != http.MethodPost {
@@ -67,6 +68,7 @@ func (r *Registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	b, ok := r.LookupToken(token)
 	if !ok {
+		r.noteWebhook("unknown", "unauthorized")
 		slog.Warn("webhook：未注册的 bot，已拒绝", "token", config.MaskToken(token))
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -75,10 +77,12 @@ func (r *Registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var u tg.Update
 	if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, maxUpdateBytes)).
 		Decode(&u); err != nil {
+		r.noteWebhook(botLabel(b), "bad_body")
 		slog.Warn("webhook：请求体无法解析", "token", config.MaskToken(token), "err", err)
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
+	b.Shared.LastUpdateAt.Store(time.Now().Unix())
 
 	if !b.Enqueue(&u) {
 		// 丢弃而不是阻塞：阻塞会让 TG 投递超时并重推，重推又落到同一个
@@ -91,4 +95,10 @@ func (r *Registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// 无论投递成功与否都回 200：回非 2xx 会让 TG 反复重推同一条，
 	// 而队列满的时候最不需要的就是更多重推。
 	w.WriteHeader(http.StatusOK)
+}
+
+func (r *Registry) noteWebhook(bot, result string) {
+	if r.sh != nil && r.sh.Metrics != nil {
+		r.sh.Metrics.WebhookUpdates.With(bot, result).Inc()
+	}
 }
