@@ -18,7 +18,7 @@ RUN test -f /internal/panel/webdist/public.html
 # 是给本地 `docker buildx build --platform linux/arm64` 省掉模拟编译的开销。
 # 本地 docker build / compose 构建时（BuildKit，Docker 23+ 默认）这几个值
 # 即本机架构，交叉编译不生效。
-FROM --platform=$BUILDPLATFORM golang:1.26.11-alpine@sha256:ecb67f987aa1a57794c91d19ade7ae0209f2f0f5496aaef9e6ae85ddf92d02ab AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS build
 ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
