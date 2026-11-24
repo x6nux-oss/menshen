@@ -164,6 +164,10 @@ bot_token: "123456789:AA..."
 #    否则验证组件无法在页面加载，申诉会卡在网页验证这一步。
 # turnstile_site_key: ""
 # turnstile_secret: ""
+#
+# turnstile_verify_url 只给离线端到端测试用（scripts/e2e 指向本地假
+# siteverify），生产不要配；空 = Cloudflare 官方地址。
+# turnstile_verify_url: ""
 
 # ---- 入群人机验证 ----
 #

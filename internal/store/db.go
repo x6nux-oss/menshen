@@ -853,6 +853,12 @@ func ensureIndexes(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_antiad_bot_id ON antiad_log(bot_id, id)`,
 		`CREATE INDEX IF NOT EXISTS idx_antiad_bot_time ON antiad_log(bot_id, created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_antiad_uid ON antiad_log(user_id, id)`,
+		// 记录页的 verdict 筛选与默认「已删除」的 total 都靠 COUNT(*)；
+		// 没有这个索引时按 verdict 计数要扫全表（20 万行实测 79 ms）。
+		`CREATE INDEX IF NOT EXISTS idx_antiad_verdict_id ON antiad_log(verdict, id)`,
+		// 默认「已删除」筛选是 action LIKE 'deleted%'：索引把 200k 行的
+		// 宽表扫描变成窄索引扫描，实测 COUNT 63 ms → 19 ms。
+		`CREATE INDEX IF NOT EXISTS idx_antiad_action_id ON antiad_log(action, id)`,
 		`CREATE INDEX IF NOT EXISTS idx_gmember_user ON group_members(user_id, ad_hits, chat_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_gmember_last_msg ON group_members(last_msg_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_gmember_pwnext ON group_members(chat_id, prewarm_next_at)`,
@@ -865,6 +871,9 @@ func ensureIndexes(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_pok_expires ON profile_ok(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_joinmutes_user ON join_mutes(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_appeal_updated ON appeals(updated_at)`,
+		// 申诉列表按 bot_id IN (...) ORDER BY id DESC 取一页；只有
+		// (bot_id,user_id) 时 SQLite 得把名下全部申诉排序后再截断。
+		`CREATE INDEX IF NOT EXISTS idx_appeal_bot_id ON appeals(bot_id, id)`,
 		`CREATE INDEX IF NOT EXISTS idx_aw_expires ON ad_whitelist(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_gban_created ON gban(created_at)`,
 	}

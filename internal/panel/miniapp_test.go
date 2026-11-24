@@ -1257,6 +1257,9 @@ func TestMiniAppServesEmbeddedApp(t *testing.T) {
 	if got := w.Header().Get("Cache-Control"); got != "no-store" {
 		t.Errorf("入口页应 no-store，得到 %q", got)
 	}
+	if got := w.Header().Get("Content-Security-Policy"); got != miniAppShellCSP {
+		t.Errorf("入口页 CSP = %q，期望 %q", got, miniAppShellCSP)
+	}
 	// 入口页必须引用自托管的 SDK；漏掉 script 标签时 Telegram 里会一直
 	// 停在引导页。
 	if !strings.Contains(w.Body.String(), `src="/miniapp/telegram-web-app.js"`) {

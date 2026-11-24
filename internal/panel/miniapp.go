@@ -152,6 +152,15 @@ const miniAppMissingHTML = `<!doctype html>
 </body>
 </html>`
 
+// miniAppShellCSP 是 Mini App 入口页的 CSP。产物没有内联脚本；样式由
+// React/Tailwind 运行时注入，必须放行 inline。Telegram Web 把 Mini App
+// 放进 web.telegram.org 的 iframe，所以 frame-ancestors 只放行 Telegram。
+const miniAppShellCSP = "default-src 'self'; script-src 'self'; " +
+	"style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
+	"font-src 'self' data:; connect-src 'self'; " +
+	"frame-ancestors https://web.telegram.org https://*.telegram.org; " +
+	"base-uri 'none'; form-action 'self'"
+
 // miniAppIndex 输出前端入口页；产物缺失时返回 503 与构建提示。
 func miniAppIndex(w http.ResponseWriter, r *http.Request) {
 	dist, ok := miniAppDistFS()
@@ -164,6 +173,7 @@ func miniAppIndex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "index.html 读取失败", http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Security-Policy", miniAppShellCSP)
 	writeHTML(w, r, http.StatusOK, string(index))
 }
 
