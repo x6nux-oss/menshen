@@ -41,6 +41,11 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
 # 静态产物可以原样跑在这个 Debian 基座上。
 FROM python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
 
+# pip 自带的 _vendor 副本（msgpack / urllib3）会被 Trivy 当作可修复高危，
+# 升级 pip 到固定版本才能消掉。pip 26.3 vendor 的 setuptools 仍是 70.3.0，
+# 对应 CVE 见 .trivyignore 的说明。
+RUN python3 -m pip install --no-cache-dir --disable-pip-version-check --upgrade pip==26.3
+
 # ca-certificates：连 Telegram / AI 上游与下载模型都要它。
 # ffmpeg：现有视频抽帧。
 # libgl1 / libglib2.0-0 / libgomp1：OpenCV headless 与 ONNX Runtime 的运行时依赖。
