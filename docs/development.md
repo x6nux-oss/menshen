@@ -11,11 +11,16 @@ CGO_ENABLED=0 go build -o menshen .   # 无 CGO，纯 Go（SQLite 走 modernc.or
 
 ```bash
 go test ./...      # 全量
+go test -race ./internal/core ./internal/antiad ./internal/store
 gofmt -l .         # 必须为空
 go vet ./...
+go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
+npm --prefix web audit --omit=dev --audit-level=high
 ```
 
-这三项在 CI 上是打包前的门槛（`.github/workflows/docker.yml`）。
+这些在 CI 上都是打包前的门槛（`.github/workflows/docker.yml`）。CI 另跑
+镜像漏洞扫描（Trivy，fixable HIGH/CRITICAL 会阻断发布）与 SBOM（syft，作为
+构建产物上传），两者都在 `supply-chain` 作业里。
 
 ## 前端（web/：Mini App、管理面板与公开页）
 

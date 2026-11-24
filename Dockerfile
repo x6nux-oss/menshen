@@ -2,7 +2,7 @@
 # 也就是镜像里的 /internal/panel/webdist，供下面的 Go 阶段 go:embed。
 # 前端产物与目标架构无关，固定跑构建机的原生架构，避免 QEMU 模拟。
 # 依赖一律在容器里 npm ci（宿主机的 web/node_modules 已由 .dockerignore 排除）。
-FROM --platform=$BUILDPLATFORM node:22-alpine AS web
+FROM --platform=$BUILDPLATFORM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS web
 WORKDIR /src
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -18,7 +18,7 @@ RUN test -f /internal/panel/webdist/public.html
 # 是给本地 `docker buildx build --platform linux/arm64` 省掉模拟编译的开销。
 # 本地 docker build / compose 构建时（BuildKit，Docker 23+ 默认）这几个值
 # 即本机架构，交叉编译不生效。
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.26.11-alpine@sha256:ecb67f987aa1a57794c91d19ade7ae0209f2f0f5496aaef9e6ae85ddf92d02ab AS build
 ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -39,14 +39,17 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
 # 用 python:3.12-slim（glibc）而不是 Alpine：ONNX Runtime 的官方 wheel 按
 # manylinux 发布，musl 下没有可直接安装的版本。Go 二进制仍是 CGO_ENABLED=0，
 # 静态产物可以原样跑在这个 Debian 基座上。
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
 
 # ca-certificates：连 Telegram / AI 上游与下载模型都要它。
 # ffmpeg：现有视频抽帧。
 # libgl1 / libglib2.0-0 / libgomp1：OpenCV headless 与 ONNX Runtime 的运行时依赖。
 # OpenCV 自带的 QRCodeDetector 随 wheel 提供，不需要额外的二维码系统库。
 # 时区仍用 Go 自带的 zoneinfo.zip（见下），不额外安装 tzdata。
+# 基础镜像按 digest 固定，Debian 的补丁包不会自动进来；先 upgrade 再装
+# 运行时依赖，避免镜像长期停在带已知漏洞的 zlib/libssl 版本。
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         ffmpeg \
