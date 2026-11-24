@@ -39,7 +39,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
 # 用 python:3.12-slim（glibc）而不是 Alpine：ONNX Runtime 的官方 wheel 按
 # manylinux 发布，musl 下没有可直接安装的版本。Go 二进制仍是 CGO_ENABLED=0，
 # 静态产物可以原样跑在这个 Debian 基座上。
-FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928
 
 # ca-certificates：连 Telegram / AI 上游与下载模型都要它。
 # ffmpeg：现有视频抽帧。
