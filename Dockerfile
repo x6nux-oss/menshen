@@ -2,7 +2,7 @@
 # 也就是镜像里的 /internal/panel/webdist，供下面的 Go 阶段 go:embed。
 # 前端产物与目标架构无关，固定跑构建机的原生架构，避免 QEMU 模拟。
 # 依赖一律在容器里 npm ci（宿主机的 web/node_modules 已由 .dockerignore 排除）。
-FROM --platform=$BUILDPLATFORM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS web
+FROM --platform=$BUILDPLATFORM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS web
 WORKDIR /src
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
