@@ -168,6 +168,13 @@ func webAdminLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/", http.StatusFound)
 }
 
+// adminShellCSP 是网页版管理员面板入口页的 CSP。与 Mini App 同源产物，
+// 但后台不允许被任何页面嵌套。
+const adminShellCSP = "default-src 'self'; script-src 'self'; " +
+	"style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
+	"font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; " +
+	"base-uri 'none'; form-action 'self'"
+
 // adminIndex 输出面板入口页；产物缺失时返回 503 与构建提示。
 func adminIndex(w http.ResponseWriter, r *http.Request) {
 	dist, ok := adminDistFS()
@@ -180,6 +187,7 @@ func adminIndex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "admin.html 读取失败", http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Security-Policy", adminShellCSP)
 	writeHTML(w, r, http.StatusOK, string(page))
 }
 

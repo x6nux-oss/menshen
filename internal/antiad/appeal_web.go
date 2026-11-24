@@ -362,6 +362,9 @@ func writeWebJSON(w http.ResponseWriter, status int, v any) {
 
 // ---- 客户端 IP ----
 
+// ClientIP 供路由层对公开端点限流；规则与申诉、验证码接口一致。
+func ClientIP(sh *core.Shared, r *http.Request) string { return clientIP(sh, r) }
+
 // clientIP 取客户端真实 IP。
 //
 // 配置了 client_ip_header 就取它（逗号列表取第一个），解析失败退回对端
